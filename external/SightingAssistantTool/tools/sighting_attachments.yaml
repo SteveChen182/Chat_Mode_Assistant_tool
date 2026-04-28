@@ -1,0 +1,11 @@
+version: 1
+description: A tool to check HSD article attachments and save output to a file called attachment_info_file.
+kind: command
+params:
+- name: id 
+  type: int
+  description: The HSD id that user input
+  optional: false 
+env: []
+run:
+  command: $GNAI_TOOLKIT_ENTRYPOINT $GNAI_TOOLKIT_DIRECTORY/src/check_attachments.py

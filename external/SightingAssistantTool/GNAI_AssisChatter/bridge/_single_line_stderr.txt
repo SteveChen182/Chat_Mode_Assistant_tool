@@ -1,0 +1,2 @@
+gnai: error: unexpected argument assist
+exit status 80

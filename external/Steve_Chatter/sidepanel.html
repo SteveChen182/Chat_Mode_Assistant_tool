@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AssistTool</title>
+    <style>
+        :root {
+            --chat-font-size: 14px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f3f4f6;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header-bar {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-brand {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 24px;
+            min-height: 24px;
+            flex-shrink: 0;
+        }
+
+        .header-brand-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 5px;
+            display: block;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .language-selector {
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        .language-selector option {
+            color: #111827;
+        }
+
+        .model-selector {
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            outline: none;
+            min-width: 88px;
+        }
+
+        .model-selector option {
+            color: #111827;
+        }
+
+        .load-page-btn {
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .load-page-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .load-page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-bar {
+            padding: 8px 16px;
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: calc(var(--chat-font-size) - 2px);
+            color: #6b7280;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #statusText {
+            color: #6b7280;
+        }
+
+        .status-meta {
+            margin-left: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .runtime-config {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            color: #374151;
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            border-radius: 999px;
+            padding: 3px 8px;
+            white-space: nowrap;
+        }
+
+        .quota-progress {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            font-size: 11px;
+            color: #374151;
+            min-width: 160px;
+        }
+
+        .quota-progress-track {
+            width: 160px;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .quota-progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            border-radius: 999px;
+            transition: width 0.3s ease;
+        }
+
+        .page-access {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #6b7280;
+            font-size: 12px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 999px;
+            padding: 3px 8px;
+        }
+
+        .page-access-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #9ca3af;
+        }
+
+        .page-access.readable .page-access-dot {
+            background: #10b981;
+        }
+
+        .page-access.unreadable .page-access-dot {
+            background: #ef4444;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+        }
+
+        .status-indicator.loading {
+            background: #f59e0b;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .page-info {
+            padding: 12px 16px;
+            background: #fff;
+            border-bottom: 1px solid #e5e7eb;
+            display: none;
+        }
+
+        .page-info.show {
+            display: block;
+        }
+
+        .page-title {
+            font-size: calc(var(--chat-font-size) - 1px);
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .page-url {
+            font-size: calc(var(--chat-font-size) - 3px);
+            color: #6b7280;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .issue-quick-actions {
+            display: flex;
+            gap: 8px;
+            padding: 10px 16px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .issue-quick-actions[hidden] {
+            display: none !important;
+        }
+
+        .issue-quick-btn {
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: none;/*1px solid #bfdbfe;*/
+            background: #bbedff;
+            color: #017fad;
+            font-size: calc(var(--chat-font-size) - 2px);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .issue-quick-btn:hover {
+            background: #dbeafe;
+            border-color: #93c5fd;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: var(--chat-font-size);
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+            background: white;
+            border: 1px solid #e5e7eb;
+            color: #1f2937;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.assistant.waiting {
+            min-width: 48px;
+            font-family: inherit;
+            letter-spacing: 0;
+            color: #6b7280;
+        }
+
+        .message.system {
+            align-self: center;
+            background: #f3f4f6;
+            color: #6b7280;
+            font-size: calc(var(--chat-font-size) - 2px);
+            padding: 6px 12px;
+            border-radius: 16px;
+            max-width: 90%;
+            text-align: center;
+        }
+
+        .message.assistant p {
+            margin: 8px 0;
+        }
+
+        .message.assistant p:first-child {
+            margin-top: 0;
+        }
+
+        .message.assistant p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message.assistant ul, .message.assistant ol {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+
+        .message.assistant li {
+            margin: 4px 0;
+        }
+
+        .message.assistant code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .message.assistant strong {
+            font-weight: 600;
+        }
+
+        .input-container {
+            padding: 12px 16px;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            gap: 8px;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        #messageInput {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: var(--chat-font-size);
+            font-family: inherit;
+            resize: none;
+            max-height: 120px;
+            transition: border-color 0.2s;
+        }
+
+        #messageInput:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        #sendBtn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: var(--chat-font-size);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .font-size-control {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .font-size-btn {
+            width: 24px;
+            height: 18px;
+            padding: 0;
+            line-height: 1;
+            background: #eef2ff;
+            color: #1e3a8a;
+            border: 1px solid #c7d2fe;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .font-size-btn:hover {
+            background: #e0e7ff;
+        }
+
+        .font-size-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        #sendBtn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        #sendBtn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .clear-btn {
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .clear-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .empty-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #9ca3af;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state-title {
+            font-size: calc(var(--chat-font-size) + 2px);
+            font-weight: 600;
+            color: #6b7280;
+            margin-bottom: 8px;
+        }
+
+        .empty-state-text {
+            font-size: calc(var(--chat-font-size) - 1px);
+            line-height: 1.5;
+        }
+
+        /* Custom scrollbar */
+        .messages-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .messages-container::-webkit-scrollbar-track {
+            background: #f3f4f6;
+        }
+
+        .messages-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-radius: 4px;
+        }
+
+        .messages-container::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+        }
+    </style>
+</head>
+<body>
+    <div class="header-bar">
+        <div class="header-brand" aria-label="AssistTool icon">
+            <img class="header-brand-icon" src="icons/icon32.png" alt="AssistTool">
+        </div>
+        <div class="header-controls">
+            <button class="load-page-btn" id="loadPageBtn" data-i18n="load-page">載入網頁</button>
+            <button class="clear-btn" id="clearBtn" data-i18n="clear">清除對話</button>
+            <button class="load-page-btn" id="refreshQuotaBtn">配額檢查</button>
+            <select class="model-selector" id="modelSelect" aria-label="Model">
+                <!-- 初始選項由 JS 依 provider 動態重建 -->
+                <option value="gpt-4o">gpt-4o</option>
+            </select>
+            <select class="language-selector" id="languageSelect" aria-label="Language">
+                <option value="zh-TW">繁中</option>
+                <option value="en">English</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span class="status-indicator" id="statusIndicator"></span>
+        <span id="statusText" data-i18n="status-ready">準備就緒</span>
+        <div class="status-meta">
+            <span class="runtime-config" id="runtimeConfigLabel">Provider: OAuth2 | Model: gpt-4o</span>
+            <div class="quota-progress" id="quotaProgress">
+                <span class="quota-progress-label" id="quotaProgressLabel">gpt-4o quota</span>
+                <div class="quota-progress-track">
+                    <div class="quota-progress-fill" id="quotaProgressFill"></div>
+                </div>
+            </div>
+            <span class="page-access" id="pageAccessBadge">
+                <span class="page-access-dot"></span>
+                <span id="pageAccessText">頁面可讀取：檢查中...</span>
+            </span>
+        </div>
+    </div>
+
+    <div class="page-info" id="pageInfo">
+        <div class="page-title" id="pageTitle"></div>
+        <div class="page-url" id="pageUrl"></div>
+    </div>
+
+    <div class="chat-container">
+        <div class="issue-quick-actions" id="issueQuickActions" hidden></div>
+
+        <div class="messages-container" id="messagesContainer">
+            <div class="empty-state">
+                <div class="empty-state-icon">💭</div>
+                <div class="empty-state-title" data-i18n="empty-title">開始對話</div>
+                <div class="empty-state-text" data-i18n="empty-text">點擊「載入網頁」來載入當前頁面內容，<br>然後就可以開始提問了！</div>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <div class="input-wrapper">
+                <textarea id="messageInput" rows="1" data-i18n-placeholder="input-placeholder" placeholder="輸入您的問題..."></textarea>
+            </div>
+            <button id="sendBtn" data-i18n="send">發送</button>
+            <div class="font-size-control" aria-label="字形大小">
+                <button id="fontIncBtn" class="font-size-btn" title="放大字形">+</button>
+                <button id="fontDecBtn" class="font-size-btn" title="縮小字形">-</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="models.js"></script>
+    <script src="sidepanel.js"></script>
+</body>
+</html>

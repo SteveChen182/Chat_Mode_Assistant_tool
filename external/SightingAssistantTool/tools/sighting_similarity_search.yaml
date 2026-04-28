@@ -1,0 +1,12 @@
+version: 1
+description: A mandatory tool to find similar HSD articles to the HSD ID that user inputs.
+kind: command
+params:
+- name: id 
+  type: int
+  description: The HSD id that user input
+  optional: false 
+env: []
+run:
+  command: $GNAI_TOOLKIT_ENTRYPOINT $GNAI_TOOLKIT_DIRECTORY/src/similarity_search.py
+  console_output: ""

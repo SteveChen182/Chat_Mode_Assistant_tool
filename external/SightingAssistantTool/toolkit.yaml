@@ -1,0 +1,28 @@
+version: 1
+name: sighting 
+description: A toolkit of Graphic sighting assistant 
+env:
+- name: INTEL_USERNAME
+  description: Intel username to authenticate against internal services (not used for this demo sample)
+  secret: true
+  run: {}
+- name: INTEL_PASSWORD
+  description: Intel password to authenticate against internal services (not used for this demo sample)
+  secret: true
+  run: {}
+template:
+  type: python
+  python:
+    requirements:
+    - requests
+    - requests-kerberos==0.15.0; sys_platform == "win32"
+    - py7zr
+    - rich
+    - matplotlib
+run: {}
+dependencies:
+  - name: displaydebugger
+    url: https://github.com/intel-sandbox/displaydebugger
+  - name: sherlog
+    url: https://github.com/intel-innersource/drivers.gpu.core.sherlog-toolkit
+examples: []

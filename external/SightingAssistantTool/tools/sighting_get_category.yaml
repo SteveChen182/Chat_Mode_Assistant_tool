@@ -1,0 +1,77 @@
+version: 1
+description: A tool to get the category of the HSD article and reasoning for the assignment. One of {Display, Display Audio, Gaming, Media, Content Protection, Performance, Corruption, BSOD, TDR, Underrun, App Crash, Hard Hang, Black Screen, Yellow Bang, WHQL, IGCC/IGS/ARC, GOP, DPMO, Installer, AI}. 
+kind: agent
+params:
+- name: id 
+  type: int
+  description: The HSD id that user input
+  optional: false 
+- name : category
+  type: str
+  optional : false
+  description : The issue category that the HSD should be classified into. One of {Display, Display Audio, Gaming, Media, Content Protection, Performance, Corruption, BSOD, TDR, Underrun, App Crash, Hard Hang, Black Screen, Yellow Bang, WHQL, IGCC/IGS/ARC, GOP, DPMO, Installer, AI}.
+- name: hsd_info_file 
+  type: str 
+  description: The path to the file containting a HSD ID's info that gets passed in to this tool (sighting_get_category). That was previously produced by sighting_read_article tool.
+  optional: true
+- name: attachment_info_file 
+  type: str 
+  description: The path to the file containting a HSD ID's attachments info (attachments attached to the HSD). That was previously produced by sighting_attachments tool.
+  optional: true
+env: []
+
+run:
+  pre: $GNAI_TOOLKIT_ENTRYPOINT $GNAI_TOOLKIT_DIRECTORY/src/read_article.py
+
+prompt: |
+  USER COMMUNICATION REQUIREMENT:
+  - Keep the user continuously updated on background processing.
+  - Announce start, key analysis milestones, and completion.
+
+  OBJECTIVE:
+    You are high quality analyzer and your main task is to analyze HSD (Hardware/Software Defect) articles and find out one thing : Category of the article. A.K.A issue category. Along with the reasoning why that category was assigned.
+    You will get called with the optional params {hsd_info_file}, {attachment_info_file} and For your information, 
+    This file is the output of sighting_read_article tool which will run AFTER you call it.
+    The param {attachment_info_file} and for your information, this file is the output of sighting_attachments tool which ran previously. 
+
+
+
+  **HSD_INFO_FILE**
+  -------------
+  ```
+  {{ readFromFileParam "hsd_info_file" }}
+  ```
+
+  **ATTACHMENT_INFO_FILE**
+  -------------
+  ```
+  {{ readFromFileParam "attachment_info_file" }}
+  ```
+
+
+  CONTEXTUAL KNOWLEDGE:
+  # add contextual knowledge here, in order to make the LLM make the judgement as accurately as possible.  
+
+
+  STEPS:
+
+  - condition: "hsd_info_file AND attachment_info_file specified"
+    actions:
+      - "Analyze HSD {{ .id }} context and assign category to {{.category}} param. Explicitly say that you assigned so and so category to this HSD id. "
+      - examples where the following keywords are mentioned:
+          - "Video lag/MC6 components → Media"
+          - "Display artifacts → Display" 
+          - "Game crashes → Game"
+          - "AI/ML failures → AI/ML"
+          - "BSOD/hangs → BSOD/TDR/Hang"
+          - "Other issues → Others"
+
+  - Else, 
+    - Run the pre script to retrieve the information of the article.i.e, the equivalent to the content of (hsd_info_file)
+    - Use the context in stdout, for the information of attachments, i.e the equivalent to the content of (attachment_info_file)
+    - Use your judgement to assign the category that the HSD id belongs to. 
+    - Finally, assign the category to {{ .category }} param. Explicitly say that you assigned so and so category to this HSD id and . For example, starting the sentence with : " [SUCCESS] I assigned display category to the HSD" to the calling assistant.
+    
+
+  OUTPUT FORMAT:
+  The agent output should be printed out to stdout explicitly. Be as detailed as possible. Be as technical as possible.

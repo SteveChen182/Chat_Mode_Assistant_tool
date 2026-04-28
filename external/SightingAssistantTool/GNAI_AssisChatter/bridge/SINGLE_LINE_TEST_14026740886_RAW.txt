@@ -1,0 +1,524 @@
+
+
+[... PREVIOUS OUTPUT TRUNCATED ...]
+
+s
+- GDHM dumps: https://gdhm.intel.com/Dumps?TestEnv
+s=MANUAL&Task=160394
+
+#### 1.3.3 GOP Log Analysis (if GOP logs attached)
+**Status:** No GOP logs attached to HSD
+
+**GOP Analyzer Output:**
+
+```
+"sighting_gop_analyzer_output":
+[
+  { "Individual File Analysis":
+
+    **FILE: N/A**
+    +----------------------+----------------------
+-------+
+    | GOP Version Number   | No data provided     
+       |
+    +----------------------+----------------------
+-------+
+    | Link Status Groups   | No data provided     
+       |
+    |                      | Line ranges: N/A     
+       |
+    |                      | Group N/A: N/A       
+       |
+    +----------------------+----------------------
+-------+
+    | Mode Setting Status  | No data provided     
+       |
+    |                      | Resolutions: N/A     
+       |
+    |                      | Line N/A: N/A        
+       |
+    +----------------------+----------------------
+-------+
+    | Frame Buffer Status  | Max Buffer: N/A      
+       |
+    |                      | Calculated occurrence
+s: 0   |
+    |                      | Line N/A: N/A        
+       |
+    +----------------------+----------------------
+-------+
+    | Panel Power Sequence | T3:N/A, T5:N/A, T8:N/
+A, T10:N/A, DPCD:N/A |
+    +----------------------+----------------------
+-------+
+    | Last Successful Config| Lane Count:N/A, VSwi
+ng:N/A, Pre Emphasis:N/A |
+    |                      | Main Link Status: N/A
+       |
+    |                      | Lines: LT=N/A, Config
+=N/A, EQ=N/A |
+    +----------------------+----------------------
+-------+
+    | PrintDisplayInfo     | 0 operations found   
+       |
+    | Status               | No DisplayID entries 
+found  |
+    +----------------------+----------------------
+-------+
+  },
+  { "Comparative Insights for PASS/FAIL GOP log pa
+irs":
+
+    Comparison: N/A vs N/A
+    ** INPUT DATA WAS EMPTY - NO GOP LOGS PROVIDED
+ FOR ANALYSIS **
+  }
+]
+```
+
+#### 1.3.4 DisplayDebugger Analysis (if display lo
+gs present)
+**Status:** No display-related logs (GOP/ETL) atta
+ched. This is a gaming performance/stuttering issu
+e, not a display initialization/configuration issu
+e, so display debugger analysis is not applicable.
+
+#### 1.3.5 GDHM Dump Analysis via Sherlog (if GDHM
+ IDs present)
+**GDHM IDs Found:** 160394 (Task ID referenced in 
+comments)
+
+However, no individual dump IDs were directly refe
+renced in the HSD content. The GDHM link shows mul
+tiple crashes with older drivers (ci-master 20127,
+ 20230, 20245, 20266) that were noted as crashing 
+before the stuttering fix was applied. The stutter
+ing issue itself (not crash) was the main focus an
+d was resolved in gfx-driver-ci-comp_d3d12-5174.
+
+**Note:** GDHM dumps appear to be for game crashes
+ on older drivers, not for the stuttering issue it
+self. Sherlog analysis was not invoked as no speci
+fic GDHM dump IDs (10-digit format) were extracted
+.
+
+#### 1.3.6 BurninTest Log Analysis (if present)
+**Status:** No BurninTest logs attached.
+
+### 1.4 Driver Information
+**Driver Build Type:** Internal CI builds
+**Driver Version (Failing):** ci-master-20267, ci-
+comp_core-14307
+**Driver Version (Fixed):** gfx-driver-ci-comp_d3d
+12-5174, ci-master-20407
+**Driver Build Date:** January 2026
+**ETL File Names:** None attached  
+**Age Warning:** No - driver versions are current 
+at time of testing
+
+### 1.5 Pipe Underrun Analysis
+**Status:** Not Detected  
+**Count:** N/A
+**Affected Files:** N/A (no ETL files attached)
+
+### 1.6 Regression Analysis
+**Status:** Yes
+**Details:** Clear regression between ci-comp_core
+-14307 (based on cim-20127) and ci-master-20267. T
+he gap is specifically between cim-20127 and cim-2
+0267. Issue was resolved with "Tight Alignment + G
+MM fix" in gfx-driver-ci-comp_d3d12-5174 and later
+ merged into ci-master-20407.
+
+### 1.7 RVP Reproducibility
+**Status:** Reproducible  
+**Details:** Reproduced on multiple platforms:    
+- BMG (B580, B570)
+- PTL-H 12Xe 484 B4
+- LNL (Lunarlake)
+Issue was consistently reproducible with affected 
+driver versions and consistently fixed with the pa
+tch.
+
+### 1.8 Reproduction Steps
+1. Launch CAPCOM Pragmata (Steam Build ID: 2118699
+3)
+2. Start or Continue game
+3. Navigate to Main Menu
+4. Go to Options > Graphics (Ray Tracing should be
+ ON by default with "Quality" preset)
+5. Observe severe stuttering/freeze (~5 seconds) a
+t menu
+6. Issue appears only on first toggle of Ray Traci
+ng ON
+7. After initial freeze, toggling doesn't reproduc
+e the issue again
+
+### 1.9 System Configuration
+
+**Test Configuration 1 (PTL):**
+- Hardware: PTL-H 12Xe 484 B4 Q9EJ, PTL 12Xe 192EU
+, 32GB RAM
+- Software: ci-master-20317, Windows 26200.7462
+- Display: LG 27UL850 via HDMI
+
+**Test Configuration 2 (BMG B580/B570):**
+- Hardware: ASUS ROG Z690-E, i5 12600k, 32GB RAM, 
+B580/B570 graphics card
+- Software: ci-master-20267 through 20371, Windows
+ 24H2 (26100.7462)
+- Display: Various
+
+**Test Configuration 3 (AMD Comparison):**
+- Hardware: AMD Ryzen AI 5 w/ Radeon 840M
+- Software: Windows 26200.7623
+- Result: No stuttering or freeze observed with AM
+D
+
+## 2. **Issue Classification**
+
+**Category:** Gaming
+**Agent Output:** 
+```
+The HSD is classified as a "Gaming" issue based on
+ the following analysis:
+
+Key indicators:
+- The issue involves CAPCOM Pragmata, a DX12 video
+ game
+- Title explicitly mentions "[DX12]" API
+- The problem is performance-related (heavy stutte
+ring, freezing) during game menu interaction      
+- The issue is specific to game graphics settings 
+(Ray Tracing ON/OFF)
+- Component affected is "ip.graphics_driver.d3d12"
+
+- Reproduction steps involve launching game, navig
+ating menu, and toggling graphics options
+- Testing includes game-specific builds (Steam Bui
+ld ID 21186993)
+
+This is clearly a gaming workload issue with DX12 
+rendering performance problems.
+```
+
+**Reason:** The HSD describes a gaming performance
+ issue with severe stuttering/freezing in CAPCOM P
+ragmata game when Ray Tracing is enabled. All char
+acteristics point to a Gaming category issue:
+- DX12 game application (Pragmata)
+- Performance symptom (stuttering/freeze)
+- Graphics feature dependent (Ray Tracing)
+- D3D12 component affected
+- Game-specific reproduction
+
+**Confidence:** High
+
+## 3. **Attachment Verification**
+
+**Expected:** For a gaming performance/regression 
+issue, the following would be expected:
+- GPUView traces (PASS and FAIL cases)
+- Performance capture logs (Capframex/PresentMon)
+- Reproduction video
+- System configuration details
+- Driver versions tested
+- GITS trace or application trace
+
+**Present:**
+- System configuration details (in comments)
+- Driver version information (in description and c
+omments)
+- External SharePoint links to GPUView, Capframex,
+ and videos
+- GITS stream link
+- GDHM dump links
+- Comparative data for multiple driver versions
+
+**Missing:**
+- No direct HSD attachments (all data shared via e
+xternal links)
+- No ETL traces attached to HSD
+- No performance logs attached to HSD
+
+**Unexpected:** None
+
+**Valid:** PARTIALLY VALID  
+**Reason:** While all necessary data appears to ha
+ve been collected (GPUView, Capframex, videos, log
+s), none of it was directly attached to the HSD. I
+nstead, all data was shared via external SharePoin
+t and GDHM links. This is acceptable for collabora
+tion purposes but makes long-term data retention a
+nd automated analysis more difficult. The HSD does
+ contain sufficient information about the issue, r
+eproduction, and resolution in the description and
+ comments.
+
+## 4. **DFD Checklist Suggestions**
+
+**Mandatory DFD Output:**
+```
+⚠️ Note: The HSD Info File and Attachment Info Fill
+e contents appear to be empty or unresolved in the
+ tool output. However, based on the HSD content ex
+tracted earlier, I can provide the analysis:      
+
+| Yes/No | Checklist Item | Description |
+|--------|----------------|-------------|
+| ❓ | Is the issue specific to customer system? |
+ No - Issue reproduced on multiple Intel platforms
+ (BMG B580/B570, PTL, LNL) and RVP systems |
+| ✅ | Is the issue seen on latest ci-master drive
+r? | Yes - Initially seen on ci-master-20267 and l
+ater versions until fix in 20407 |
+| ✅ | Are videos attached after the repro? | Yes 
+- Multiple videos shared via SharePoint links show
+ing stuttering with fail drivers and pass with fix
+ed drivers |
+| ✅ | Capture logs for pass and fail cases? | Yes
+ - GPUView, Capframex logs collected for both fail
+ing (20267) and passing (d3d12-5174, 20407) driver
+s |
+| ✅ | Is this regression? GFX driver or BKC regre
+ssion? | Yes - Clear GFX driver regression between
+ cim-20127 and cim-20267 |
+| N/A | Debugger connectivity available? | Not men
+tioned - Issue was isolated via comparative driver
+ testing |
+| ✅ | Fail Rate? How frequent? | Always reproduci
+ble (100%) on first Ray Tracing toggle with affect
+ed drivers |
+| ✅ | Does the issue happen with 3rd Party Graphi
+cs (AMD/Nvidia)? | No - AMD Ryzen AI 5 w/ Radeon 8
+40M tested, no issue observed |
+```
+
+**Compliance:** 6/7 applicable items compliant (86
+% compliance rate)
+
+**BKM Tool:** sighting_game_bkm  
+**BKM Output:**
+```
+# HSD Defect Analysis Report
+## HSD ID: 14026740886
+
+⚠️ Note: The HSD_INFO_FILE and ATTACHMENT_INFO_FILL
+E parameters were not populated in tool execution.
+
+## 📌 Determined Scenario: Generic (defaulted due 
+to missing input data)
+
+## 📋 Suggested Log Collection BKM & Isolation Ste
+ps
+
+### Generic:
+- Reference: https://wiki.ith.intel.com/display/De
+bugWiKi/Game+Triage+Process
+- AILS:
+  - https://github.com/intel-innersource/drivers.g
+pu.unified/blob/master/Tools/DX12DDIGen/references
+/input_ails.yml
+  - https://github.com/intel-innersource/drivers.g
+pu.unified/blob/master/Source/Vulkan/Codegen/Input
+/VK_AIL.xml
+
+However, based on actual HSD content, this is a **
+Performance Issues** scenario with the following c
+haracteristics:
+- Low FPS / frame drops at game menu
+- Benchmark regression between driver versions    
+- Ray Tracing feature specific
+```
+
+**BKM Suggestions:**
+
+For Gaming Performance Issues (based on BKM best p
+ractices):
+
+1. **Log Collection:**
+   - ✅ GPUView traces (collected)
+   - ✅ Capframex/PresentMon data (collected)     
+   - ✅ Comparative testing across driver versions
+ (performed)
+   - ✅ GITS trace capture (collected)
+   - Video recording of issue (collected)
+
+2. **Isolation Steps:**
+   - ✅ Test with Ray Tracing OFF (confirmed no is
+sue)
+   - ✅ Test on different platforms (BMG, PTL, LNL
+ - all reproduced)
+   - ✅ Test with competitor GPU (AMD - no issue) 
+   - ✅ Bisect driver versions (identified regress
+ion window: cim-20127 to 20267)
+   - ✅ Verify fix with fixed driver builds (d3d12
+-5174, ci-master-20407)
+
+3. **Additional Recommendations:**
+   - Driver clean install using DDU (recommended i
+n comments and followed)
+   - Application-specific testing (menu vs gamepla
+y - performed)
+   - Feature isolation (Ray Tracing ON/OFF - perfo
+rmed)
+
+## 5. **Triage and Troubleshooting**
+
+**Comments Analysis:**
+The HSD has 10 comments documenting thorough inves
+tigation and resolution:
+
+1. **Initial Report (2026-01-05):** GITS stream ca
+ptured and shared
+2. **Regression Window (2026-01-06):** Identified 
+gap between cim-20127 and 20267
+3. **Extended Testing (2026-01-07):** PTL and LNL 
+testing confirmed ~5 second freeze on first RT tog
+gle; AMD 890M does not exhibit issue
+4. **Triage Update (2026-01-13):** 
+   - Confirmed issue with ci-master-20267
+   - Only occurs first time RT is enabled
+   - GPUView, Capframex, video collected
+   - Testing ongoing with multiple drivers        
+5. **Driver Bisection (2026-01-14/15):**
+   - Latest ci-master 20371 and 20267: No crash bu
+t stuttering observed
+   - Older drivers (20245, 20230, 20127): Game cra
+shes
+   - GDHM dumps link provided
+   - CP driver (releases_25ww48-ci-master-20127-26
+52): Game runs with stuttering
+   - Comparative table created showing crash vs st
+uttering behavior
+6. **Fix Identified (2026-01-16):**
+   - gfx-driver-ci-comp_d3d12-5174 resolves issue
+   - Tested on ARL-S + B580, LNL
+   - DDU recommended for clean driver install
+   - Comment from developer: "Tight alignment fix"
+ merged in d3d12-5174
+7. **Fix Verification (2026-01-21):**
+   - No stuttering with d3d12-5174
+   - First-time freeze still observed (~5 seconds)
+ but no sustained stuttering
+   - GPUView, Capframex, video collected for passi
+ng case
+8. **Competitor Comparison (2026-01-28):**        
+   - AMD Ryzen AI 5 w/ Radeon 840M: No stuttering 
+or freeze
+   - Confirmed Intel-specific issue
+9. **Closure (2026-01-28):**
+   - Verified with ci-master-20407 (patch merged) 
+   - Issue not reproduced with fixed driver
+   - HSD closed
+
+**Troubleshooting Steps:**
+
+| Step | Action | Outcome |
+|------|--------|---------|
+| 1 | Reproduce issue with ci-master-20267 | ✅ Re
+produced - Heavy stuttering at menu with RT ON |
+| 2 | Test with Ray Tracing OFF | ✅ No issue - Is
+olated to RT feature |
+| 3 | Test gameplay vs menu | ✅ Only menu affecte
+d - Isolated to menu scene |
+| 4 | Bisect driver versions | ✅ Regression windo
+w: cim-20127 to 20267 |
+| 5 | Test on multiple platforms | ✅ Reproduced o
+n BMG, PTL, LNL |
+| 6 | Test with AMD GPU | ✅ No issue - Intel driv
+er specific |
+| 7 | Test proposed fix (d3d12-5174) | ✅ Issue re
+solved |
+| 8 | Verify merged fix (ci-master-20407) | ✅ Iss
+ue resolved |
+
+**Successful Mitigations:**
+1. ✅ Use gfx-driver-ci-comp_core-14307 (based on 
+cim-20127) - No issue
+2. ✅ Use gfx-driver-ci-comp_d3d12-5174 or newer -
+ Issue fixed (Tight Alignment + GMM fix)
+3. ✅ Use ci-master-20407 or newer - Issue fixed (
+merged fix)
+4. ✅ Clean driver install using DDU when updating
+
+**Failed Mitigations:**
+1. ❌ ci-master-20267: Stuttering present
+2. ❌ ci-master-20371: Stuttering present (before 
+fix merge)
+3. ❌ Older drivers (20127, 20230, 20245, 20266): 
+Game crashes (different issue)
+
+**Pending Actions:** None - Issue resolved and HSD
+ closed
+
+**Recommended Next Steps:**
+- Monitor for any regressions in future driver bui
+lds
+- Ensure fix remains in all release branches
+- Consider adding automated test case for Pragmata
+ RT menu performance
+
+## 6. **Executive Summary & Recommendations**
+
+**Summary:**
+
+HSD 14026740886 reports a severe performance regre
+ssion in CAPCOM Pragmata where enabling Ray Tracin
+g causes heavy stuttering (~1fps freeze for severa
+l seconds) at the game menu. The issue was specifi
+c to Intel GPUs (BMG, PTL, LNL platforms tested) a
+nd did not occur on AMD hardware. Through systemat
+ic driver bisection, the regression was isolated t
+o driver changes between cim-20127 and cim-20267. 
+The root cause was identified as a "Tight Alignmen
+t" issue, and the fix (Tight Alignment + GMM fix) 
+was implemented in gfx-driver-ci-comp_d3d12-5174. 
+The fix was subsequently merged into ci-master-204
+07, where it was verified and the HSD was closed a
+s complete.
+
+The investigation demonstrates excellent triage pr
+actices:
+- Comprehensive log collection (GPUView, Capframex
+, GITS, videos)
+- Multi-platform testing
+- Competitor GPU comparison
+- Precise regression window identification        
+- Fix verification on multiple driver builds
+- Clean driver install methodology (DDU)
+
+**Recommendations:**
+
+1. **SHORT-TERM (Completed):**
+   - ✅ Apply fix in gfx-driver-ci-comp_d3d12-5174
+   - ✅ Merge fix into ci-master (20407)
+   - ✅ Verify fix on all affected platforms      
+   - ✅ Close HSD
+
+2. **MEDIUM-TERM:**
+   - Add Pragmata RT menu performance to automated
+ test suite
+   - Document "Tight Alignment + GMM fix" in drive
+r release notes
+   - Ensure fix is present in all active release b
+ranches
+   - Consider backporting fix to older supported d
+river versions if applicable
+
+3. **LONG-TERM:**
+   - Review D3D12 memory alignment handling for ot
+her potential issues
+   - Expand RT feature testing coverage in CI/CD p
+ipeline
+   - Create knowledge base article on game menu pe
+rformance debugging
+   - Establish automated performance regression de
+tection for known game scenes
+
+**Priority Level:** High (Resolved)
+
+**Escalation Path:** Not needed - Issue identified
+, fixed, and verified
+
+**Similar

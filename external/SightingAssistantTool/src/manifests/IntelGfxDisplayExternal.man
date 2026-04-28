@@ -1,0 +1,160 @@
+<?xml version="1.0"?>
+<instrumentationManifest xsi:schemaLocation="http://schemas.microsoft.com/win/2004/08/events eventman.xsd" xmlns="http://schemas.microsoft.com/win/2004/08/events" xmlns:win="http://manifests.microsoft.com/win/2004/08/windows/events" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:trace="http://schemas.microsoft.com/win/2004/08/events/trace">
+	<instrumentation>
+		<events>
+			<provider name="Intel-Gfx-Display-External" guid="{31AB337F-8BA3-4145-88F3-CEA537BFE861}" symbol="GfxDisplayExternalProvider" resourceFileName="C:\Program Files\Intel\Graphics\GfxEventsDisp.exe" messageFileName="C:\Program Files\Intel\Graphics\GfxEventsDisp.exe" parameterFileName="C:\Program Files\Intel\Graphics\GfxEventsDisp.exe">
+				<events>
+					<event symbol="Aux_Read" value="1" version="0" channel="GfxDisplayExDebug" level="win:LogAlways" task="Aux" opcode="Read" template="Aux_t" keywords="AutoLogger DP "></event>
+					<event symbol="Aux_Write" value="2" version="0" channel="GfxDisplayExDebug" level="win:LogAlways" task="Aux" opcode="Write" template="Aux_t" keywords="AutoLogger DP "></event>
+					<event symbol="I2C_Read" value="3" version="0" channel="GfxDisplayExAnalytic" level="win:LogAlways" task="I2C" opcode="Read" template="I2C_t" keywords="AutoLogger HDMI "></event>
+					<event symbol="I2C_Write" value="4" version="0" channel="GfxDisplayExAnalytic" level="win:LogAlways" task="I2C" opcode="Write" template="I2C_t" keywords="AutoLogger HDMI "></event>
+					<event symbol="I2CAux_Read" value="5" version="0" channel="GfxDisplayExDebug" level="win:LogAlways" task="I2CAux" opcode="Read" template="Aux_t" keywords="AutoLogger DP "></event>
+					<event symbol="I2CAux_Write" value="6" version="0" channel="GfxDisplayExDebug" level="win:LogAlways" task="I2CAux" opcode="Write" template="Aux_t" keywords="AutoLogger DP "></event>
+					<event symbol="AuxTransaction_Send" value="7" version="0" channel="GfxDisplayExDebug" level="win:LogAlways" task="AuxTransaction" opcode="win:Send" template="AuxInfo_t" keywords="AutoLogger DP "></event>
+					<event symbol="AuxTransaction_Receive" value="8" version="0" channel="GfxDisplayExDebug" level="win:Verbose" task="AuxTransaction" opcode="win:Receive" template="AuxInfo_t" keywords="AutoLogger DP "></event>
+					<event symbol="AuxTransaction_Info" value="9" version="0" channel="GfxDisplayExDebug" level="win:LogAlways" task="AuxTransaction" opcode="win:Info" template="AuxChannelToPortMap_t" keywords="AutoLogger DP "></event>
+					<event symbol="ExtDiagnostic_Info" value="10" version="1" channel="Intel-Gfx-Display-External/GfxDisplayExEventViewer" level="win:Error" task="ExtDiagnostic" opcode="win:Info" template="ExtDiagnosticInfo_t" keywords="AutoLogger ">"</event>
+				</events>
+				<levels>
+					<level name="PlaceHolder" symbol="PlaceHolder_Level" value="16"></level>
+				</levels>
+				<tasks>
+					<task name="Aux" symbol="Aux_Task" value="1" eventGUID="{C3F1AE88-4B98-4A88-9225-85B885EE009A}"></task>
+					<task name="I2C" symbol="I2C_Task" value="2" eventGUID="{033F0CE7-CB63-4DD0-8DAC-C260CB8137D5}"></task>
+					<task name="I2CAux" symbol="I2CAux_Task" value="3" eventGUID="{6731A1ED-4C22-4BF8-B895-A0AD0B853DD8}"></task>
+					<task name="AuxTransaction" symbol="AuxTransaction_Task" value="4" eventGUID="{AC9EA56E-31C9-4CDC-B5BC-30E1741884C2}"></task>
+					<task name="ExtDiagnostic" symbol="ExtDiagnostic_Task" value="5" eventGUID="{D6B0F0B5-33C5-4822-92DD-2BCCA41B3FA8}"></task>
+				</tasks>
+				<opcodes>
+					<opcode name="Read" symbol="Read_DE_Opcode" value="10"></opcode>
+					<opcode name="Write" symbol="Write_DE_Opcode" value="11"></opcode>
+				</opcodes>
+				<channels>
+					<channel name="Intel-Gfx-Display-External/GfxDisplayExEventViewer" chid="Intel-Gfx-Display-External/GfxDisplayExEventViewer" symbol="GfxDisplayExEventViewer_Channel" type="Operational" enabled="true" isolation="System"></channel>
+					<channel name="GfxDisplayExAnalytic" chid="GfxDisplayExAnalytic" symbol="GfxDisplayExAnalytic_Channel" type="Analytic" enabled="false" isolation="System"></channel>
+					<channel name="GfxDisplayExDebug" chid="GfxDisplayExDebug" symbol="GfxDisplayExDebug_Channel" type="Debug" enabled="false" isolation="System"></channel>
+					<channel name="GfxDisplayExOperational" chid="GfxDisplayExOperational" symbol="GfxDisplayExOperational_Channel" type="Operational" enabled="false"></channel>
+				</channels>
+				<keywords>
+					<keyword name="HDMI" symbol="keyword_HDMI" mask="0x2"></keyword>
+					<keyword name="DP" symbol="keyword_DP" mask="0x4"></keyword>
+					<keyword name="ModeSet" symbol="keyword_ModeSet" mask="0x8"></keyword>
+					<keyword name="Audio" symbol="keyword_Audio" mask="0x10"></keyword>
+					<keyword name="Flip" symbol="keyword_Flip" mask="0x20"></keyword>
+					<keyword name="Interrupt" symbol="keyword_Interrupt" mask="0x40"></keyword>
+					<keyword name="AutoLogger" symbol="keyword_AutoLogger" mask="0x80"></keyword>
+				</keywords>
+				<maps>
+					<valueMap name="DP_AUX_CHANNEL_TYPE">
+						<map value="0" message="$(string.Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.0.message)"></map>
+						<map value="1" message="$(string.Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.1.message)"></map>
+						<map value="2" message="$(string.Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.2.message)"></map>
+						<map value="3" message="$(string.Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.3.message)"></map>
+						<map value="4" message="$(string.Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.4.message)"></map>
+						<map value="5" message="$(string.Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.5.message)"></map>
+						<map value="6" message="$(string.Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.6.message)"></map>
+						<map value="7" message="$(string.Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.7.message)"></map>
+						<map value="8" message="$(string.Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.8.message)"></map>
+					</valueMap>
+					<valueMap name="PORT_TYPES">
+						<map value="0" message="$(string.Intel-Gfx-Display-External.map.PORT_TYPES.0.message)"></map>
+						<map value="1" message="$(string.Intel-Gfx-Display-External.map.PORT_TYPES.1.message)"></map>
+						<map value="2" message="$(string.Intel-Gfx-Display-External.map.PORT_TYPES.2.message)"></map>
+						<map value="3" message="$(string.Intel-Gfx-Display-External.map.PORT_TYPES.3.message)"></map>
+						<map value="4" message="$(string.Intel-Gfx-Display-External.map.PORT_TYPES.4.message)"></map>
+						<map value="5" message="$(string.Intel-Gfx-Display-External.map.PORT_TYPES.5.message)"></map>
+						<map value="6" message="$(string.Intel-Gfx-Display-External.map.PORT_TYPES.6.message)"></map>
+						<map value="7" message="$(string.Intel-Gfx-Display-External.map.PORT_TYPES.7.message)"></map>
+						<map value="8" message="$(string.Intel-Gfx-Display-External.map.PORT_TYPES.8.message)"></map>
+						<map value="255" message="$(string.Intel-Gfx-Display-External.map.PORT_TYPES.255.message)"></map>
+					</valueMap>
+				</maps>
+				<templates>
+					<template tid="Aux_t">
+						<data name="BDF" inType="win:UInt8" outType="xs:unsignedByte" count="4"></data>
+						<data name="Channel" inType="win:UInt32" map="DP_AUX_CHANNEL_TYPE"></data>
+						<data name="Status" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="Address" inType="win:UInt32" outType="win:HexInt32"></data>
+						<data name="Size" inType="win:UInt16" outType="xs:unsignedShort"></data>
+						<data name="Data" inType="win:Binary" outType="xs:hexBinary" length="Size"></data>
+						<data name="ActualTxnSize" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="I2C_t">
+						<data name="BDF" inType="win:UInt8" outType="xs:unsignedByte" count="4"></data>
+						<data name="Port" inType="win:UInt32" map="PORT_TYPES"></data>
+						<data name="Slave" inType="win:HexInt32" outType="win:HexInt32"></data>
+						<data name="Index" inType="win:HexInt32" outType="win:HexInt32"></data>
+						<data name="Flags" inType="win:HexInt32" outType="win:HexInt32"></data>
+						<data name="DataSize" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="Data" inType="win:Binary" outType="xs:hexBinary" length="DataSize"></data>
+						<data name="Status" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="ActualTxnSize" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="AuxInfo_t">
+						<data name="BDF" inType="win:UInt8" outType="xs:unsignedByte" count="4"></data>
+						<data name="Channel" inType="win:UInt32" map="DP_AUX_CHANNEL_TYPE"></data>
+						<data name="Size" inType="win:UInt16" outType="xs:unsignedShort"></data>
+						<data name="Data" inType="win:Binary" outType="xs:hexBinary" length="Size"></data>
+						<data name="Status" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="AuxChannelToPortMap_t">
+						<data name="BDF" inType="win:UInt8" outType="xs:unsignedByte" count="4"></data>
+						<data name="ArraySize" inType="win:UInt16" outType="xs:unsignedShort"></data>
+						<data name="Map_AuxChannelToPort" inType="win:UInt32" map="PORT_TYPES" count="ArraySize"></data>
+					</template>
+					<template tid="ExtDiagnosticInfo_t">
+						<data name="BDF" inType="win:UInt8" outType="xs:unsignedByte" count="4"></data>
+						<data name="Source" inType="win:UInt32" outType="win:HexInt32"></data>
+						<data name="Param1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="Param2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="Param3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="Param4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="Param5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="Param6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="Version" inType="win:UnicodeString" outType="xs:string"></data>
+					</template>
+				</templates>
+			</provider>
+		</events>
+	</instrumentation>
+	<localization>
+		<resources culture="en-US">
+			<stringTable>
+				<string id="task.None" value="None"></string>
+				<string id="opcode.Stop" value="Stop"></string>
+				<string id="opcode.Start" value="Start"></string>
+				<string id="opcode.Send" value="Send"></string>
+				<string id="opcode.Reply" value="Reply"></string>
+				<string id="opcode.Receive" value="Receive"></string>
+				<string id="opcode.Info" value="Info"></string>
+				<string id="opcode.Extension" value="Extension"></string>
+				<string id="level.Warning" value="Warning"></string>
+				<string id="level.Verbose" value="Verbose"></string>
+				<string id="level.LogAlways" value="Log Always"></string>
+				<string id="level.Informational" value="Information"></string>
+				<string id="level.Error" value="Error"></string>
+				<string id="level.Critical" value="Critical"></string>
+				<string id="keyword.ResponseTime" value="Response Time"></string>
+				<string id="Intel-Gfx-Display-External.map.PORT_TYPES.8.message" value="PORT_I"></string>
+				<string id="Intel-Gfx-Display-External.map.PORT_TYPES.7.message" value="PORT_H"></string>
+				<string id="Intel-Gfx-Display-External.map.PORT_TYPES.6.message" value="PORT_G"></string>
+				<string id="Intel-Gfx-Display-External.map.PORT_TYPES.5.message" value="PORT_F"></string>
+				<string id="Intel-Gfx-Display-External.map.PORT_TYPES.4.message" value="PORT_E"></string>
+				<string id="Intel-Gfx-Display-External.map.PORT_TYPES.3.message" value="PORT_D"></string>
+				<string id="Intel-Gfx-Display-External.map.PORT_TYPES.255.message" value="NULL_PORT"></string>
+				<string id="Intel-Gfx-Display-External.map.PORT_TYPES.2.message" value="PORT_C"></string>
+				<string id="Intel-Gfx-Display-External.map.PORT_TYPES.1.message" value="PORT_B"></string>
+				<string id="Intel-Gfx-Display-External.map.PORT_TYPES.0.message" value="PORT_A"></string>
+				<string id="Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.8.message" value="AUX_CHANNEL_I"></string>
+				<string id="Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.7.message" value="AUX_CHANNEL_H"></string>
+				<string id="Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.6.message" value="AUX_CHANNEL_G"></string>
+				<string id="Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.5.message" value="AUX_CHANNEL_F"></string>
+				<string id="Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.4.message" value="AUX_CHANNEL_E"></string>
+				<string id="Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.3.message" value="AUX_CHANNEL_D"></string>
+				<string id="Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.2.message" value="AUX_CHANNEL_C"></string>
+				<string id="Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.1.message" value="AUX_CHANNEL_B"></string>
+				<string id="Intel-Gfx-Display-External.map.DP_AUX_CHANNEL_TYPE.0.message" value="AUX_CHANNEL_A"></string>
+			</stringTable>
+		</resources>
+	</localization>
+</instrumentationManifest>

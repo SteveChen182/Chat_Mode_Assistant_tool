@@ -1,0 +1,19 @@
+version: 1
+description: A tool for checking whether a HSD is compliant with DFD checklist before moving to Debug.
+kind: command
+params: 
+- name : category
+  type: str
+  optional : false
+  description : The issue category that the HSD is classified into. One of {Display, Display Audio, Gaming, Media, Content Protection, Performance, Corruption, BSOD, TDR, Underrun, App Crash, Hard Hang, Black Screen, Yellow Bang, WHQL, IGCC/IGS/ARC, GOP, DPMO, Installer, AI}.
+                Read this and keep it in memory for analysis.
+- name: checklist_prompt
+  type: str
+  optional: false
+  description: The prompt which gnai_client uses to query the DFD checklist and compare against the HSD id.
+env: 
+- INTEL_USERNAME
+- INTEL_PASSWORD
+run:
+  command: $GNAI_TOOLKIT_ENTRYPOINT $GNAI_TOOLKIT_DIRECTORY/src/checklist_analyzer.py
+  console_output: ""

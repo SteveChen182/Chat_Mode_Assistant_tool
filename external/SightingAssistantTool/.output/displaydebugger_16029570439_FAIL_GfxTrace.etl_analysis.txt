@@ -1,0 +1,198 @@
+2026-04-28 15:11:06 [DEBUG] GNAI Cli v1.153.16
+2026-04-28 15:11:07 [INFO] A new version 1.155.0 is available! Upgrade GNAI by running "dt gnai update".
+2026-04-28 15:11:08 [DEBUG] Defaulting to model claude-4-6-sonnet
+2026-04-28 15:11:08 [DEBUG] Adding default tools
+2026-04-28 15:11:08 [INFO] ◐ Loading toolkits...
+2026-04-28 15:11:08 [DEBUG] Loading toolkit from C:\dt_sighting
+2026-04-28 15:11:08 [DEBUG] Loading toolkit from C:\Users\steveche\.gnai\toolkits\drivers.gpu.core.sherlog-toolkit
+2026-04-28 15:11:08 [DEBUG] Loading toolkit from C:\Users\steveche\.gnai\toolkits\displaydebugger
+2026-04-28 15:11:08 [DEBUG] Loaded 1 tools from toolkit displaydebugger
+2026-04-28 15:11:08 [DEBUG] Loaded assistant displaydebugger
+2026-04-28 15:11:08 [DEBUG] Loaded 12 tools from toolkit sighting
+2026-04-28 15:11:08 [DEBUG] Loaded assistant sighting_assistant
+2026-04-28 15:11:09 [DEBUG] Loaded 19 tools from toolkit sherlog
+2026-04-28 15:11:09 [DEBUG] Loaded assistant sherlog_complex_analyzer
+2026-04-28 15:11:09 [DEBUG] Loaded assistant sherlog_debug_analyzer
+2026-04-28 15:11:09 [DEBUG] Removing existing temporary workspace at C:\Users\steveche\AppData\Local\Temp\gnai-chat\7fa7e8e2-66aa-484d-b91e-4fa60a231d71
+2026-04-28 15:11:09 [DEBUG] Using temporary workspace at C:\Users\steveche\AppData\Local\Temp\gnai-chat\7fa7e8e2-66aa-484d-b91e-4fa60a231d71
+2026-04-28 15:11:09 [INFO] 💬Asking GNAI (displaydebugger) ▶️▶️▶️     
+2026-04-28 15:11:09 [DEBUG] Asking question with 4 assistants
+2026-04-28 15:11:09 [DEBUG] Processing request with correlation ID 047da25c656079b4
+2026-04-28 15:11:14 [DEBUG] Executing command tool displaydebugger_analyze
+2026-04-28 15:11:14 [DEBUG] Filtered environment variable with empty value: PYTHONHOME
+2026-04-28 15:11:14 [DEBUG] Running command: C:\Users\steveche\AppData\Local\Temp\gnai-run-613235298.bat with C:\Users\steveche\bin\dt.exe gnai toolkits entrypoint --quiet --path "C:\\Users\\steveche\\.gnai\\toolkits\\displaydebugger" C:\Users\steveche\.gnai\toolkits\displaydebugger\src\entry_point.py
+2026-04-28 15:12:09 [DEBUG] stdout: Manifest auto-download failed!
+2026-04-28 15:12:09 [DEBUG] stdout: Error: Failed to download manifest metadata: Usage: dt <command> [flags]
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout: A powerful cli tool for Intel developers
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout: Flags:
+2026-04-28 15:12:09 [DEBUG] stdout:   -h, --help     Show context-sensitive help.
+2026-04-28 15:12:09 [DEBUG] stdout:       --debug    Enable debug logging
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout: Commands:
+2026-04-28 15:12:09 [DEBUG] stdout:   version                          Print dt version
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   install                          Add dt directory to system PATH
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   install-git-aliases              Install git-pr and git-refresh-proxy aliases
+2026-04-28 15:12:09 [DEBUG] stdout:     [<install-path>]               Override the default install location (must
+2026-04-28 15:12:09 [DEBUG] stdout:                                    be same folder where dt binary is installed)
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   install-git-credential-helper    Install git-credential-dtkeyring credential
+2026-04-28 15:12:09 [DEBUG] stdout:                                    helper
+2026-04-28 15:12:09 [DEBUG] stdout:     [<install-path>]               Override the default install location (must
+2026-04-28 15:12:09 [DEBUG] stdout:                                    be same folder where dt binary is installed)
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   update                           Update dt binary to latest version
+2026-04-28 15:12:09 [DEBUG] stdout:     [<version>]                    Optional version to upgrade to
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   config
+2026-04-28 15:12:09 [DEBUG] stdout:     get                            Print the value for a configuration key
+2026-04-28 15:12:09 [DEBUG] stdout:       <key>
+2026-04-28 15:12:09 [DEBUG] stdout:     get-config-dir                 Print the devtool configuration directory
+2026-04-28 15:12:09 [DEBUG] stdout:     get-extensions-dir             Print the devtool extensions storage
+2026-04-28 15:12:09 [DEBUG] stdout:                                    directory
+2026-04-28 15:12:09 [DEBUG] stdout:     set-extensions-dir             Set the devtool extensions storage directory
+2026-04-28 15:12:09 [DEBUG] stdout:       <dir>                        The value to set
+2026-04-28 15:12:09 [DEBUG] stdout:     unset-extensions-dir           Remove custom setting for extensions storage
+2026-04-28 15:12:09 [DEBUG] stdout:                                    directory
+2026-04-28 15:12:09 [DEBUG] stdout:     get-extensions-binaries-dir    Print the directory where extension binaries
+2026-04-28 15:12:09 [DEBUG] stdout:                                    are installed
+2026-04-28 15:12:09 [DEBUG] stdout:     set-extensions-binaries-dir    Set the directory where extension binaries
+2026-04-28 15:12:09 [DEBUG] stdout:                                    are installed
+2026-04-28 15:12:09 [DEBUG] stdout:       <dir>                        The directory to install extension binaries
+2026-04-28 15:12:09 [DEBUG] stdout:                                    into
+2026-04-28 15:12:09 [DEBUG] stdout:     unset-extensions-binaries-dir
+2026-04-28 15:12:09 [DEBUG] stdout:                                    Remove custom setting for extensions binaries
+2026-04-28 15:12:09 [DEBUG] stdout:                                    directory
+2026-04-28 15:12:09 [DEBUG] stdout:     dump                           Print the full configuration to STDOUT
+2026-04-28 15:12:09 [DEBUG] stdout:     set-check-for-updates          Disable or enable check for new version of
+2026-04-28 15:12:09 [DEBUG] stdout:                                    devtool
+2026-04-28 15:12:09 [DEBUG] stdout:       enabled                      Set in devtool config to true
+2026-04-28 15:12:09 [DEBUG] stdout:       disabled                     Set in devtool config to false
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   diagnose                         Check workstation configuration for errors or
+2026-04-28 15:12:09 [DEBUG] stdout:                                    missing packages
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   refresh-proxy                    Update proxy settings
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   proxy
+2026-04-28 15:12:09 [DEBUG] stdout:     refresh                        Update proxy settings
+2026-04-28 15:12:09 [DEBUG] stdout:     print                          Print proxy settings
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   setup                            Setup your workstation
+2026-04-28 15:12:09 [DEBUG] stdout:     install-git                    Install Git
+2026-04-28 15:12:09 [DEBUG] stdout:     install-git-lfs                Install Git LFS
+2026-04-28 15:12:09 [DEBUG] stdout:     install-docker                 Install and configure docker (Ubuntu Linux
+2026-04-28 15:12:09 [DEBUG] stdout:                                    only)
+2026-04-28 15:12:09 [DEBUG] stdout:     install-certificates           Install Intel SSL certificates (Ubuntu Linux
+2026-04-28 15:12:09 [DEBUG] stdout:                                    only)
+2026-04-28 15:12:09 [DEBUG] stdout:     install-choco                  Install the chocolatey package manager
+2026-04-28 15:12:09 [DEBUG] stdout:                                    (Windows only)
+2026-04-28 15:12:09 [DEBUG] stdout:     create-netrc-symlink           Create a symlink to the .netrc file in the
+2026-04-28 15:12:09 [DEBUG] stdout:                                    user's home directory (Windows only)
+2026-04-28 15:12:09 [DEBUG] stdout:     github-auth                    Create a new oauth token for Github
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   branch                           Create a local branch for new development
+2026-04-28 15:12:09 [DEBUG] stdout:     <branch-name>                  Name of branch to create
+2026-04-28 15:12:09 [DEBUG] stdout:     [<start-point>]                Optional start point for new branch
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   pr                               Manage Github pull requests
+2026-04-28 15:12:09 [DEBUG] stdout:     init                           Create a local branch for new development
+2026-04-28 15:12:09 [DEBUG] stdout:       <branch-name>                Name of branch to create
+2026-04-28 15:12:09 [DEBUG] stdout:       [<start-point>]              Optional start point for new branch
+2026-04-28 15:12:09 [DEBUG] stdout:     create                         Create pull request
+2026-04-28 15:12:09 [DEBUG] stdout:     dump                           Print pull request details to stdout
+2026-04-28 15:12:09 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-28 15:12:09 [DEBUG] stdout:       <pr-number>                  Pull request number to dump
+2026-04-28 15:12:09 [DEBUG] stdout:     browse                         Open a browser to the given pull request
+2026-04-28 15:12:09 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-28 15:12:09 [DEBUG] stdout:       <pr-number>                  Pull request number to open in browser
+2026-04-28 15:12:09 [DEBUG] stdout:     download                       Download pull request
+2026-04-28 15:12:09 [DEBUG] stdout:       <pr-number>                  Pull request number to download
+2026-04-28 15:12:09 [DEBUG] stdout:     close                          Close a Github pull request
+2026-04-28 15:12:09 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-28 15:12:09 [DEBUG] stdout:       <pr-number>                  Pull request number to close
+2026-04-28 15:12:09 [DEBUG] stdout:     merge                          Merge a Github pull request
+2026-04-28 15:12:09 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-28 15:12:09 [DEBUG] stdout:       <pr-number>                  Pull request number to merge
+2026-04-28 15:12:09 [DEBUG] stdout:       <sha>                        The head commit of the pull request branch
+2026-04-28 15:12:09 [DEBUG] stdout:                                    you wish to merge
+2026-04-28 15:12:09 [DEBUG] stdout:     enqueue                        Enqueue a Github pull request to a merge
+2026-04-28 15:12:09 [DEBUG] stdout:                                    queue
+2026-04-28 15:12:09 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-28 15:12:09 [DEBUG] stdout:       <pr-number>                  Pull request number to enqueue
+2026-04-28 15:12:09 [DEBUG] stdout:     dequeue                        Dequeue a Github pull request from a merge
+2026-04-28 15:12:09 [DEBUG] stdout:                                    queue
+2026-04-28 15:12:09 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-28 15:12:09 [DEBUG] stdout:       <pr-number>                  Pull request number to dequeue
+2026-04-28 15:12:09 [DEBUG] stdout:     cherry-pick                    Cherry-pick all commits from the given pull
+2026-04-28 15:12:09 [DEBUG] stdout:                                    request into the current branch
+2026-04-28 15:12:09 [DEBUG] stdout:       <pr-number>                  Pull request number to cherry-pick
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   github                           Github helper commands
+2026-04-28 15:12:09 [DEBUG] stdout:     print-token                    Get authentication token for the given GitHub
+2026-04-28 15:12:09 [DEBUG] stdout:                                    repo URL
+2026-04-28 15:12:09 [DEBUG] stdout:       [<url>]                      The url you need to access (default:
+2026-04-28 15:12:09 [DEBUG] stdout:                                    https://github.com)
+2026-04-28 15:12:09 [DEBUG] stdout:     revoke-token                   Revoke a token that was created by Devtool
+2026-04-28 15:12:09 [DEBUG] stdout:       <token>                      The token to be revoked (OAuth or Personal
+2026-04-28 15:12:09 [DEBUG] stdout:                                    Access Token)
+2026-04-28 15:12:09 [DEBUG] stdout:     status-check                   Create status check in Github
+2026-04-28 15:12:09 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-28 15:12:09 [DEBUG] stdout:       <sha>                        The commit id to update
+2026-04-28 15:12:09 [DEBUG] stdout:     search-issues                  Search for open Github issues
+2026-04-28 15:12:09 [DEBUG] stdout:     get-commit-status-check        Query a status check value by commit
+2026-04-28 15:12:09 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-28 15:12:09 [DEBUG] stdout:       <sha>                        The commit to query
+2026-04-28 15:12:09 [DEBUG] stdout:       <status-check>               The status check to query
+2026-04-28 15:12:09 [DEBUG] stdout:     install-runner                 Install GitHub Runner on 1Source organization
+2026-04-28 15:12:09 [DEBUG] stdout:     uninstall-runner               Uninstall GitHub Runner on 1Source
+2026-04-28 15:12:09 [DEBUG] stdout:                                    organization
+2026-04-28 15:12:09 [DEBUG] stdout:     encrypt-vault-secret           Encrypt Secret using Vault from 1Source
+2026-04-28 15:12:09 [DEBUG] stdout:                                    inventory
+2026-04-28 15:12:09 [DEBUG] stdout:     decrypt-vault-secret           Decrypt Secret using Vault from 1Source
+2026-04-28 15:12:09 [DEBUG] stdout:                                    inventory
+2026-04-28 15:12:09 [DEBUG] stdout:     service-runner                 Github service runner commands
+2026-04-28 15:12:09 [DEBUG] stdout:       status                       Show status of Github service runner
+2026-04-28 15:12:09 [DEBUG] stdout:       start                        Start Github service runner
+2026-04-28 15:12:09 [DEBUG] stdout:       stop                         Stop Github service runner
+2026-04-28 15:12:09 [DEBUG] stdout:     workflow                       Github workflow commands
+2026-04-28 15:12:09 [DEBUG] stdout:       run                          Run a Github workflow
+2026-04-28 15:12:09 [DEBUG] stdout:         <workflow>                 The name of the workflow to run
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   extensions
+2026-04-28 15:12:09 [DEBUG] stdout:     list                           List available devtool extensions
+2026-04-28 15:12:09 [DEBUG] stdout:     enable                         Enable extension
+2026-04-28 15:12:09 [DEBUG] stdout:       <name>
+2026-04-28 15:12:09 [DEBUG] stdout:     disable                        Disable extension
+2026-04-28 15:12:09 [DEBUG] stdout:       <name>
+2026-04-28 15:12:09 [DEBUG] stdout:     update                         Update active extensions to latest versions
+2026-04-28 15:12:09 [DEBUG] stdout:       [<name>]                     Name of extension to update
+2026-04-28 15:12:09 [DEBUG] stdout:     install-aliases                Install suggested extension shortcuts
+2026-04-28 15:12:09 [DEBUG] stdout:       <name>
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout:   vault
+2026-04-28 15:12:09 [DEBUG] stdout:     get-secret                     Fetch one or more secrets from a vault (for
+2026-04-28 15:12:09 [DEBUG] stdout:                                    automation use)
+2026-04-28 15:12:09 [DEBUG] stdout:       <secret-name> ...            One or more secrets to fetch
+2026-04-28 15:12:09 [DEBUG] stdout:     verify-secret-password         Verify secret password from a vault
+2026-04-28 15:12:09 [DEBUG] stdout:       <secret-name>                Secret to verify
+2026-04-28 15:12:09 [DEBUG] stdout:     change-secret-password         Change secret password from a vault
+2026-04-28 15:12:09 [DEBUG] stdout:       <secret-name>                Secret to change
+2026-04-28 15:12:09 [DEBUG] stdout:     show-secret-info               Show secret info from a vault
+2026-04-28 15:12:09 [DEBUG] stdout:       <secret-name>                Secret to change
+2026-04-28 15:12:09 [DEBUG] stdout:     show-secret-password           Show secret password from a vault (for
+2026-04-28 15:12:09 [DEBUG] stdout:                                    non-automation use)
+2026-04-28 15:12:09 [DEBUG] stdout:       <secret-name>                Secret to change
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout: Run "dt <command> --help" for more information on a command.
+2026-04-28 15:12:09 [DEBUG] stdout: Please provide the manifest file path manually.
+2026-04-28 15:12:09 [DEBUG] stdout: You can either:
+2026-04-28 15:12:09 [DEBUG] stdout: 1. Set GNAI_INPUT_MAN_PATH environment variable
+2026-04-28 15:12:09 [DEBUG] stdout: 2. Enter the path now
+2026-04-28 15:12:09 [DEBUG] stdout: 3. Exit
+2026-04-28 15:12:09 [DEBUG] stdout: 
+2026-04-28 15:12:09 [DEBUG] stdout: Enter choice (1/2/3):
+2026-04-28 15:21:25 [ERROR] Error reading message: websocket: close 1006 (abnormal closure): unexpected EOF. For more details, you can reference this request using the correlation ID 047da25c656079b4

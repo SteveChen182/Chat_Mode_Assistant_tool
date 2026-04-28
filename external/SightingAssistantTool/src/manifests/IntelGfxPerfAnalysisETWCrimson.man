@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<instrumentationManifest xsi:schemaLocation="http://schemas.microsoft.com/win/2004/08/events eventman.xsd" xmlns="http://schemas.microsoft.com/win/2004/08/events" xmlns:win="http://manifests.microsoft.com/win/2004/08/windows/events" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:trace="http://schemas.microsoft.com/win/2004/08/events/trace">
+	<instrumentation>
+		<events>
+			<provider name="Intel-Gfx-Driver-Perf-Analysis" guid="{90F8AFC2-3F92-4DA3-A4C1-C933A74D2AEC}" symbol="GfxDriverPerfAnalysisProvider" resourceFileName="%SystemRoot%\system32\drivers\igdkmd64.sys" messageFileName="%SystemRoot%\system32\drivers\igdkmd64.sys" parameterFileName="%SystemRoot%\system32\drivers\igdkmd64.sys">
+				<events>
+					<event symbol="OSAllocateTrack_Allocate" value="5" version="0" channel="TraceClassic" level="win:LogAlways" task="OSAllocateTrack" opcode="Allocate" template="OSAllocData_t" keywords="Heap "></event>
+					<event symbol="OSAllocateTrack_Free" value="6" version="0" channel="TraceClassic" level="win:LogAlways" task="OSAllocateTrack" opcode="Free" template="OSAllocData_t" keywords="Heap "></event>
+					<event symbol="OSAllocateTrack_ReAllocate" value="7" version="0" channel="TraceClassic" level="win:LogAlways" task="OSAllocateTrack" opcode="ReAllocate" template="OSAllocData_t" keywords="Heap "></event>
+					<event symbol="MmioStartTrack_Read" value="8" version="0" channel="TraceClassic" level="win:LogAlways" task="MmioStartTrack" opcode="Read" template="MmioPrint_t" keywords="Mmio "></event>
+					<event symbol="MmioStartTrack_Write" value="9" version="0" channel="TraceClassic" level="win:LogAlways" task="MmioStartTrack" opcode="Write" template="MmioPrint_t" keywords="Mmio "></event>
+				</events>
+				<levels></levels>
+				<tasks>
+					<task name="OSAllocateTrack" symbol="OSAllocateTrack_Task" value="3" eventGUID="{C854ADEA-269D-42EA-8C20-D77FD2B54E8F}"></task>
+					<task name="MmioStartTrack" symbol="MmioStartTrack_Task" value="4" eventGUID="{F972E160-810F-4B1A-9F9F-9EF15B160113}"></task>
+				</tasks>
+				<opcodes>
+					<opcode name="Allocate" symbol="Allocate_Perf_Op" value="10"></opcode>
+					<opcode name="Free" symbol="Free_Perf_Op" value="11"></opcode>
+					<opcode name="ReAllocate" symbol="ReAllocate_Perf_Op" value="12"></opcode>
+					<opcode name="Read" symbol="Read_Perf_Op" value="13"></opcode>
+					<opcode name="Write" symbol="Write_Perf_Op" value="14"></opcode>
+				</opcodes>
+				<channels>
+					<importChannel name="TraceClassic" chid="TraceClassic"></importChannel>
+				</channels>
+				<keywords>
+					<keyword name="Heap" symbol="Heap_Kw" mask="0x4"></keyword>
+					<keyword name="Mmio" symbol="Mmio_Kw" mask="0x8"></keyword>
+				</keywords>
+				<templates>
+					<template tid="OSAllocData_t">
+						<data name="IRQL" inType="win:UInt8" outType="win:HexInt8"></data>
+						<data name="Size" inType="win:Int32" outType="xs:int"></data>
+						<data name="Paged" inType="win:Boolean" outType="xs:boolean"></data>
+						<data name="VirtualAddress" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="Tag" inType="win:Int32" outType="xs:int"></data>
+						<data name="FileName" inType="win:AnsiString" outType="xs:string"></data>
+						<data name="FunctionName" inType="win:AnsiString" outType="xs:string"></data>
+						<data name="LineNo" inType="win:Int32" outType="xs:int"></data>
+					</template>
+					<template tid="MmioPrint_t">
+						<data name="Offset" inType="win:HexInt32" outType="win:HexInt32"></data>
+					</template>
+				</templates>
+			</provider>
+		</events>
+	</instrumentation>
+	<localization>
+		<resources culture="en-US">
+			<stringTable>
+				<string id="level.LogAlways" value="Log Always"></string>
+				<string id="channel.TraceClassic" value="TraceClassic"></string>
+			</stringTable>
+		</resources>
+	</localization>
+</instrumentationManifest>

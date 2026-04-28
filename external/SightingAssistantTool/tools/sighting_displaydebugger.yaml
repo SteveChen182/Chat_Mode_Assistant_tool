@@ -1,0 +1,28 @@
+version: 1
+description: Analyze display driver logs (GOP UEFI logs and ETL OS driver logs) using the displaydebugger toolkit. Use when the sighting involves display-related issues and GOP or ETL logs are available. In interactive mode, analysis_focus must come from explicit user selection (assistant may suggest options first).
+kind: command 
+params:
+- name: hsd_id
+  type: str 
+  description: HSD ID of the sighting being analyzed
+  optional: false
+- name: attachment_info_file
+  type: str
+  description: Full path to the file containing HSD attachment info (output of sighting_attachments)
+  optional: true
+- name: log_files
+  type: str
+  description: Optional list of display log file paths (GOP text logs or ETL binary logs). When provided, pass one or more file paths as separate values. If omitted, the tool auto-discovers ETL/GOP files from extracted attachments in GNAI_TEMP_WORKSPACE.
+  optional: true
+  multiple: true
+- name: analysis_focus
+  type: str
+  description: >
+    Analysis focus text selected by user in interactive flow (assistant may provide
+    suggested options). Examples: modeset and timing configuration, link training and
+    display connectivity, brightness and power-state transition handling.
+  optional: false
+env: []
+run:
+  command: $GNAI_TOOLKIT_ENTRYPOINT $GNAI_TOOLKIT_DIRECTORY/src/displaydebugger_subprocess.py
+  console_output: ""

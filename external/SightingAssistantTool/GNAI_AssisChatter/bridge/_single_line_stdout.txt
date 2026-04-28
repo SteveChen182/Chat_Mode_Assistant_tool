@@ -1,0 +1,40 @@
+Usage: gnai ask [<question>] [flags]
+
+Ask a question
+
+Arguments:
+  [<question>]    The question to ask
+
+Flags:
+  -h, --help                      Show context-sensitive help.
+  -v, --verbose                   Enable verbose logging
+  -q, --quiet                     Disable logging and only show only fatal
+                                  errors
+      --json                      JSON log output
+      --log-file=LOG-FILE         Log file path ($GNAI_LOG_FILE)
+      --config-dir="C:\\Users\\steveche\\.gnai"
+                                  Configuration directory used for GNAI config
+                                  and toolkits ($GNAI_CONFIG_DIR)
+
+      --username=STRING           Defaults to username from netrc file
+      --password=STRING           Defaults to password from netrc file
+      --url="https://gnai.intel.com/api"
+                                  GNAI URL ($GNAI_URL)
+      --profile="public"          GNAI profile
+      --model=STRING              LLM Model to use for answering the question
+      --conversation-id=STRING    Conversation ID
+      --prompt=STRING             Prompt
+      --context="go-cli"          Context
+      --skip-toolkits             Skip loading toolkits
+      --assistant=STRING          Assistant to use as primary assistant (primary
+                                  assistant will choose what assistant to use
+                                  when not provided)
+      --max-concurrency=1         Max number of concurrent steps allowed for the
+                                  workflow
+  -g, --graph=STRING              Path to save the graph with .svg extension
+      --toolkit-path=TOOLKIT-PATH
+                                  Path(s) to toolkit(s) to load (if not
+                                  provided, toolkits from config file will be
+                                  used)
+  -i, --input-file=STRING         File containing the question to ask
+

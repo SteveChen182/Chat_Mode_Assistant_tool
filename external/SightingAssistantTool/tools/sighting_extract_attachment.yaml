@@ -1,0 +1,24 @@
+version: 1
+description: >
+  Extracts a single HSD attachment archive on demand into the workspace so its
+  files are available for subsequent analysis tools. Call this BEFORE calling any
+  analysis tool (sighting_ptat_analyzer, sighting_gop_analyzer,
+  sighting_burnin_log_analyzer, sighting_gfxpnp_analyzer, sighting_displaydebugger)
+  when the selected item came from a .7z or .zip archive rather than a direct file.
+  The tool reads archive_manifest.json written by sighting_attachments to locate
+  the archive, extracts its contents, copies .log/.txt/.trace/.csv members to
+  persistent_logs/, and updates all_log_txt_trace_csv_files.json. Idempotent:
+  safe to call again if already extracted.
+kind: command
+params:
+  - name: attachment_name
+    type: str
+    description: >
+      The exact attachment filename as it appears in the archive_manifest.json
+      (e.g. "gop_files (2).7z" or "Logs.zip"). This is the archive filename,
+      not a member inside the archive.
+    optional: false
+    multiple: false
+run:
+  command: $GNAI_TOOLKIT_ENTRYPOINT $GNAI_TOOLKIT_DIRECTORY/src/extract_attachment.py
+  timeout: 600

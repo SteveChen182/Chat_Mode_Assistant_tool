@@ -1,0 +1,17 @@
+version: 1
+kind: command
+description: Render SAT HTML report from structured report JSON. Use this after sighting_report_json_builder returns structured JSON. Writes HTML to SAT_[HSD_ID]_Output/SAT_analysis_report.html and returns status/path.
+params:
+- name: report_json_file
+  type: str
+  description: Absolute path to structured report JSON file.
+  optional: false
+- name: report_output_file
+  type: str
+  description: Absolute or relative path for output HTML report file.
+  optional: false
+env: []
+run:
+  command: $GNAI_TOOLKIT_ENTRYPOINT $GNAI_TOOLKIT_DIRECTORY/src/render_sat_report.py
+  console_output: stdout
+  timeout: 180

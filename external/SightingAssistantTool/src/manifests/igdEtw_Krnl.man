@@ -1,0 +1,1257 @@
+<?xml version="1.0"?>
+<instrumentationManifest xsi:schemaLocation="http://schemas.microsoft.com/win/2004/08/events eventman.xsd" xmlns="http://schemas.microsoft.com/win/2004/08/events" xmlns:win="http://manifests.microsoft.com/win/2004/08/windows/events" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:trace="http://schemas.microsoft.com/win/2004/08/events/trace">
+	<instrumentation>
+		<events>
+			<provider name="Intel_HD_Graphics_Krnl" guid="{DBBF40DD-5E4F-4528-8A43-BBF62DB6E401}" symbol="Intel_HD_Graphics_Krnl" resourceFileName="igdkmd64.sys" messageFileName="igdkmd64.sys" parameterFileName="igdkmd64.sys">
+				<events>
+					<event symbol="GfxAssertPrint" value="0" version="0" level="win:LogAlways" task="GfxAssertPrint" template="GfxAssert" keywords="KMD GMM PWR_CONS " message="$(string.Intel_HD_Graphics_Krnl.event.0.message)"></event>
+					<event symbol="GfxRunTimeError" value="1" version="0" level="win:Critical" task="GfxRunTimeError" template="GfxRunTimeError" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLogU32" value="2" version="0" level="win:LogAlways" task="GfxLog" template="GfxLogU32" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxDebugPrint" value="3" version="0" level="win:LogAlways" task="GfxDebugPrint" template="GfxDebugPrint" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog1U64" value="4" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog1U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog2U64" value="5" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog2U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog3U64" value="6" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog3U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog4U64" value="7" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog4U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog5U64" value="8" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog5U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog6U64" value="9" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog6U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxRunTimeError1U64" value="10" version="0" level="win:LogAlways" task="GfxRunTimeError" template="GfxRunTimeError1U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxRunTimeError2U64" value="11" version="0" level="win:LogAlways" task="GfxRunTimeError" template="GfxRunTimeError2U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxRunTimeError3U64" value="12" version="0" level="win:LogAlways" task="GfxRunTimeError" template="GfxRunTimeError3U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxRunTimeError4U64" value="13" version="0" level="win:LogAlways" task="GfxRunTimeError" template="GfxRunTimeError4U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxRunTimeError5U64" value="14" version="0" level="win:LogAlways" task="GfxRunTimeError" template="GfxRunTimeError5U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxRunTimeError6U64" value="15" version="0" level="win:LogAlways" task="GfxRunTimeError" template="GfxRunTimeError6U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog1String" value="16" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog1String" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog2String" value="17" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog2String" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog3String" value="18" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog3String" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog4String" value="19" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog4String" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog5String" value="20" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog5String" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog6String" value="21" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog6String" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog12U64" value="22" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog12U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog18U64" value="23" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog18U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog24U64" value="24" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog24U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog12String" value="25" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog12String" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog24String" value="26" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog24String" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxRunTimeError13U64" value="27" version="0" level="win:LogAlways" task="GfxRunTimeError" template="GfxRunTimeError13U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxRunTimeError15U64" value="28" version="0" level="win:LogAlways" task="GfxRunTimeError" template="GfxRunTimeError15U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxRunTimeError18U64" value="29" version="0" level="win:LogAlways" task="GfxRunTimeError" template="GfxRunTimeError18U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog13U64" value="30" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog13U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog15U64" value="31" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog15U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog21U64" value="32" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog21U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog7U64" value="33" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog7U64" keywords="KMD GMM PWR_CONS "></event>
+					<event symbol="GfxLog7String" value="34" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog7String" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxAssertLog" value="35" version="0" level="win:LogAlways" task="GfxAssertPrint" template="GfxAssertLog" keywords="KMD "></event>
+					<event symbol="KmGfxAssertPrint" value="36" version="0" level="win:LogAlways" task="KmGfxAssertPrint_Task" opcode="Assert" template="KmGfxAssert" keywords="KMD GMM PWR_CONS " message="$(string.Intel_HD_Graphics_Krnl.event.36.message)"></event>
+					<event symbol="CreateContext" value="37" version="0" level="win:LogAlways" task="KmCreateContext_Task" opcode="KmInfo" template="CreateContext_t" keywords="KMD " message="$(string.Intel_HD_Graphics_Krnl.event.37.message)"></event>
+					<event symbol="GfxRunTimeError7U64" value="38" version="0" level="win:LogAlways" task="GfxRunTimeError" template="GfxLog7U64" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog8U64" value="39" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog8U64" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog9U64" value="40" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog9U64" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog10U64" value="41" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog10U64" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog11U64" value="42" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog11U64" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog14U64" value="43" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog14U64" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog16U64" value="44" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog16U64" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxLog17U64" value="45" version="0" level="win:LogAlways" task="GfxLog" template="GfxLog17U64" keywords="PWR_CONS GMM KMD "></event>
+					<event symbol="GfxValStubDivaLogs" value="46" version="0" level="win:LogAlways" task="GfxLog" template="GfxValStub" keywords="GMM_LIB GMM_PAGING GMM_SEGMENT KMD_COMMON GMM KMD " message="$(string.Intel_HD_Graphics_Krnl.event.47.message)"></event>
+					<event symbol="GfxValStubDivaLog1" value="47" version="0" level="win:LogAlways" task="GfxLog" template="GfxValStubLog1" keywords="GMM_LIB GMM_PAGING KMD_COMMON GMM KMD "></event>
+					<event symbol="GfxValStubDivaLog2" value="48" version="0" level="win:LogAlways" task="GfxLog" template="GfxValStubLog2" keywords="GMM_LIB GMM_PAGING GMM_SEGMENT KMD_COMMON GMM KMD "></event>
+					<event symbol="GfxValStubDivaLog3" value="49" version="0" level="win:LogAlways" task="GfxLog" template="GfxValStubLog3" keywords="GMM_PAGING GMM_SEGMENT GMM_DISPLAY KMD_COMMON GMM KMD "></event>
+					<event symbol="GfxValStubDivaLog4" value="50" version="0" level="win:LogAlways" task="GfxLog" template="GfxValStubLog4" keywords="GMM_LIB GMM_PAGING GMM_SEGMENT KMD_COMMON GMM KMD "></event>
+					<event symbol="GfxValStubDivaLog5" value="51" version="0" level="win:LogAlways" task="GfxLog" template="GfxValStubLog5" keywords="GMM_LIB GMM_PAGING GMM_SEGMENT KMD_COMMON GMM KMD "></event>
+				</events>
+				<levels></levels>
+				<tasks>
+					<task name="GfxAssertPrint" symbol="GfxAssertPrint_Task" value="1" eventGUID="{40BBB2D3-5960-496A-92DB-CB200B87C28B}"></task>
+					<task name="GfxRunTimeError" symbol="GfxRunTimeError_Task" value="2" eventGUID="{B4341841-7C94-43A3-9324-A9F35B846332}"></task>
+					<task name="GfxLog" symbol="GfxLog_Task" value="3" eventGUID="{107853BE-F8EF-4E75-8D61-009AD59D941A}"></task>
+					<task name="GfxDebugPrint" symbol="GfxDebugPrint_Task" value="4" eventGUID="{258C4DA7-BB0D-4FAE-85BF-FC19F1AD20BB}"></task>
+					<task name="KmGfxAssertPrint_Task" symbol="KmGfxAssertPrint_Task" value="5" eventGUID="{6DBC670E-9BFC-48C3-8C7B-92BA20310F00}"></task>
+					<task name="KmCreateContext_Task" symbol="KmCreateContext_Task" value="6" eventGUID="{94136D16-EC7B-4AC6-8072-92675A299043}"></task>
+				</tasks>
+				<opcodes>
+					<opcode name="Assert" symbol="Assert" value="10" message="$(string.Intel_HD_Graphics_Krnl.map.Opcodes.10.message)"></opcode>
+					<opcode name="KmInfo" symbol="KmInfo" value="11" message="$(string.Intel_HD_Graphics_Krnl.opcode.KmInfo.message)"></opcode>
+				</opcodes>
+				<keywords>
+					<keyword name="KMD" symbol="KMD" mask="0x1"></keyword>
+					<keyword name="GMM" symbol="GMM" mask="0x4"></keyword>
+					<keyword name="KMD_COMMON" symbol="KMD_COMMON" mask="0x10"></keyword>
+					<keyword name="GMM_INTERNAL_ALLOC" symbol="GMM_INTERNAL_ALLOC" mask="0x20000"></keyword>
+					<keyword name="KMD_INTRPT" symbol="KMD_INTRPT" mask="0x80000"></keyword>
+					<keyword name="KMD_GUC" symbol="KMD_GUC" mask="0x200000"></keyword>
+					<keyword name="GMM_DISPLAY" symbol="GMM_DISPLAY" mask="0x800000"></keyword>
+					<keyword name="GMM_SEGMENT" symbol="GMM_SEGMENT" mask="0x1000000"></keyword>
+					<keyword name="GMM_PAGING" symbol="GMM_PAGING" mask="0x2000000"></keyword>
+					<keyword name="GMM_LIB" symbol="GMM_LIB" mask="0x4000000"></keyword>
+					<keyword name="PWR_CONS" symbol="PWR_CONS" mask="0x8000000"></keyword>
+				</keywords>
+				<maps>
+					<valueMap name="FeatureId">
+						<map value="2147483647" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureId.2147483647.message)"></map>
+					</valueMap>
+					<valueMap name="PId">
+						<map value="2147483647" message="$(string.Intel_HD_Graphics_Krnl.map.PId.2147483647.message)"></map>
+					</valueMap>
+					<valueMap name="LogId">
+						<map value="2147483647" message="$(string.Intel_HD_Graphics_Krnl.map.LogId.2147483647.message)"></map>
+					</valueMap>
+					<valueMap name="ErrorCode">
+						<map value="2147483647" message="$(string.Intel_HD_Graphics_Krnl.map.ErrorCode.2147483647.message)"></map>
+					</valueMap>
+					<valueMap name="MesaageLevel">
+						<map value="0" message="$(string.Intel_HD_Graphics_Krnl.map.MesaageLevel.0.message)"></map>
+						<map value="1" message="$(string.Intel_HD_Graphics_Krnl.map.MesaageLevel.1.message)"></map>
+						<map value="2" message="$(string.Intel_HD_Graphics_Krnl.map.MesaageLevel.2.message)"></map>
+						<map value="3" message="$(string.Intel_HD_Graphics_Krnl.map.MesaageLevel.3.message)"></map>
+						<map value="4" message="$(string.Intel_HD_Graphics_Krnl.map.MesaageLevel.4.message)"></map>
+						<map value="5" message="$(string.Intel_HD_Graphics_Krnl.map.MesaageLevel.5.message)"></map>
+					</valueMap>
+					<valueMap name="ComponentId">
+						<map value="32767" message="$(string.Intel_HD_Graphics_Krnl.map.ComponentId.32767.message)"></map>
+					</valueMap>
+					<valueMap name="FeatureSet">
+						<map value="0" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.0.message)"></map>
+						<map value="1" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.1.message)"></map>
+						<map value="2" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.2.message)"></map>
+						<map value="3" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.3.message)"></map>
+						<map value="4" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.4.message)"></map>
+						<map value="5" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.5.message)"></map>
+						<map value="6" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.6.message)"></map>
+						<map value="7" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.7.message)"></map>
+						<map value="8" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.8.message)"></map>
+						<map value="9" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.9.message)"></map>
+						<map value="10" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.10.message)"></map>
+						<map value="11" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.11.message)"></map>
+						<map value="12" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.12.message)"></map>
+						<map value="13" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.13.message)"></map>
+						<map value="14" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.14.message)"></map>
+						<map value="15" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.15.message)"></map>
+						<map value="16" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.16.message)"></map>
+						<map value="17" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.17.message)"></map>
+						<map value="18" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.18.message)"></map>
+						<map value="19" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.19.message)"></map>
+						<map value="20" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.20.message)"></map>
+						<map value="63" message="$(string.Intel_HD_Graphics_Krnl.map.FeatureSet.63.message)"></map>
+					</valueMap>
+				</maps>
+				<templates>
+					<template tid="GfxLogU32">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxRunTimeError">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="ErrorCode" inType="win:UInt32" map="ErrorCode"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxAssert">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="File" inType="win:AnsiString" outType="xs:string"></data>
+						<data name="Function" inType="win:AnsiString" outType="xs:string"></data>
+						<data name="LineNum" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="Expression" inType="win:AnsiString" outType="xs:string"></data>
+						<data name="Message" inType="win:AnsiString" outType="xs:string"></data>
+					</template>
+					<template tid="GfxDebugPrint">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="MessageLevel" inType="win:UInt32" map="MesaageLevel"></data>
+						<data name="Message" inType="win:AnsiString" outType="xs:string"></data>
+					</template>
+					<template tid="GfxLog1U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog2U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog3U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog4U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog5U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog6U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxRunTimeError1U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="ErrorCode" inType="win:UInt32" map="ErrorCode"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxRunTimeError2U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="ErrorCode" inType="win:UInt32" map="ErrorCode"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxRunTimeError3U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="ErrorCode" inType="win:UInt32" map="ErrorCode"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxRunTimeError4U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="ErrorCode" inType="win:UInt32" map="ErrorCode"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxRunTimeError5U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="ErrorCode" inType="win:UInt32" map="ErrorCode"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxRunTimeError6U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="ErrorCode" inType="win:UInt32" map="ErrorCode"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxRunTimeError13U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="ErrorCode" inType="win:UInt32" map="ErrorCode"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P13_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P13" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxRunTimeError15U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="ErrorCode" inType="win:UInt32" map="ErrorCode"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P13_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P13" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P14_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P14" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P15_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P15" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxRunTimeError18U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="ErrorCode" inType="win:UInt32" map="ErrorCode"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P13_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P13" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P14_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P14" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P15_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P15" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P16_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P16" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P17_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P17" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P18_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P18" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog1String">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:AnsiString" outType="xs:string" length="256"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog2String">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:AnsiString" outType="xs:string" length="256"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog3String">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:AnsiString" outType="xs:string" length="32"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog4String">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:AnsiString" outType="xs:string" length="256"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog5String">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:AnsiString" outType="xs:string" length="256"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog6String">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:AnsiString" outType="xs:string" length="256"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog12U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog18U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P13_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P13" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P14_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P14" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P15_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P15" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P16_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P16" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P17_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P17" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P18_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P18" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog24U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P13_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P13" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P14_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P14" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P15_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P15" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P16_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P16" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P17_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P17" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P18_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P18" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P19_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P19" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P20_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P20" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P21_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P21" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P22_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P22" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P23_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P23" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P24_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P24" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog12String">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:AnsiString" outType="xs:string" length="256"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog24String">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P13_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P13" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P14_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P14" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P15_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P15" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P16_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P16" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P17_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P17" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P18_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P18" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P19_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P19" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P20_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P20" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P21_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P21" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P22_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P22" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P23_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P23" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P24_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P24" inType="win:AnsiString" outType="xs:string" length="256"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog13U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P13_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P13" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog15U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P13_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P13" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P14_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P14" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P15_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P15" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog21U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P13_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P13" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P14_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P14" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P15_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P15" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P16_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P16" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P17_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P17" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P18_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P18" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P19_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P19" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P20_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P20" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P21_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P21" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog7U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog7String">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:AnsiString" outType="xs:string" length="256"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxAssertLog">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="Expression" inType="win:AnsiString" outType="xs:string"></data>
+						<data name="FunctionName" inType="win:AnsiString" outType="xs:string"></data>
+						<data name="LineNumber" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="File" inType="win:AnsiString" outType="xs:string"></data>
+						<data name="ReturnAddressOffset" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="CallerReturnAddressOffset" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="KmGfxAssert">
+						<data name="LineNum" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="File" inType="win:AnsiString" outType="xs:string"></data>
+						<data name="Function" inType="win:AnsiString" outType="xs:string"></data>
+						<data name="Expression" inType="win:AnsiString" outType="xs:string"></data>
+						<data name="Message" inType="win:AnsiString" outType="xs:string"></data>
+					</template>
+					<template tid="CreateContext_t">
+						<data name="pKmGpuContext" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="DeviceHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="ProcessContext" inType="win:Pointer" outType="win:HexInt64"></data>
+					</template>
+					<template tid="GfxLog8U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog9U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog10U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog11U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog14U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P13_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P13" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P14_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P14" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog16U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P13_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P13" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P14_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P14" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P15_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P15" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P16_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P16" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxLog17U64">
+						<data name="ComponentId" inType="win:UInt16" map="ComponentId"></data>
+						<data name="FeatureId" inType="win:UInt32" map="FeatureId"></data>
+						<data name="LogId" inType="win:UInt32" map="LogId"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P6_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P6" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P7_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P7" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P8_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P8" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P9_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P9" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P10_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P10" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P11_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P11" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P12_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P12" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P13_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P13" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P14_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P14" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P15_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P15" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P16_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P16" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P17_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P17" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="AdapterHandle" inType="win:Pointer" outType="win:HexInt64"></data>
+						<data name="BusDeviceFunc" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxValStub">
+						<data name="FunctionName" inType="win:UnicodeString" outType="xs:string"></data>
+						<data name="Status" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="BusDeviceFunction" inType="win:UInt32" outType="xs:unsignedInt"></data>
+					</template>
+					<template tid="GfxValStubLog1">
+						<data name="FunctionName" inType="win:UnicodeString" outType="xs:string"></data>
+						<data name="Status" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="BusDeviceFunction" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+					</template>
+					<template tid="GfxValStubLog2">
+						<data name="FunctionName" inType="win:UnicodeString" outType="xs:string"></data>
+						<data name="Status" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="BusDeviceFunction" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+					</template>
+					<template tid="GfxValStubLog3">
+						<data name="FunctionName" inType="win:UnicodeString" outType="xs:string"></data>
+						<data name="Status" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="BusDeviceFunction" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+					</template>
+					<template tid="GfxValStubLog4">
+						<data name="FunctionName" inType="win:UnicodeString" outType="xs:string"></data>
+						<data name="Status" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="BusDeviceFunction" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+					</template>
+					<template tid="GfxValStubLog5">
+						<data name="FunctionName" inType="win:UnicodeString" outType="xs:string"></data>
+						<data name="Status" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="BusDeviceFunction" inType="win:UInt32" outType="xs:unsignedInt"></data>
+						<data name="P1_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P1" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P2_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P2" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P3_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P3" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P4_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P4" inType="win:UInt64" outType="win:HexInt64"></data>
+						<data name="P5_Id" inType="win:UInt32" map="PId"></data>
+						<data name="P5" inType="win:UInt64" outType="win:HexInt64"></data>
+					</template>
+				</templates>
+			</provider>
+		</events>
+	</instrumentation>
+	<localization>
+		<resources culture="en-US">
+			<stringTable>
+				<string id="level.LogAlways" value="Log Always"></string>
+				<string id="level.Informational" value="Information"></string>
+				<string id="level.Critical" value="Critical"></string>
+				<string id="Intel_HD_Graphics_Krnl.opcode.KmInfo.message" value="KmInfo"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.PId.2147483647.message" value="Default"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.Opcodes.10.message" value="Assert"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.MesaageLevel.5.message" value="Gfx_Verbose"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.MesaageLevel.4.message" value="Gfx_Information"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.MesaageLevel.3.message" value="Gfx_Warning"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.MesaageLevel.2.message" value="Gfx_Error"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.MesaageLevel.1.message" value="Gfx_Critical"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.MesaageLevel.0.message" value="Gfx_None"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.LogId.2147483647.message" value="Default"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.9.message" value="FTR_SET_KMD_SUBMIT_MEDIA"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.8.message" value="FTR_SET_KMD_SUBMIT_COPY"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.7.message" value="FTR_SET_KMD_SUBMIT_3D"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.63.message" value="FTR_SET_GFX_INIT"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.6.message" value="FTR_SET_KMD_INTRPT"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.5.message" value="FTR_SET_KMD_CONTEXT"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.4.message" value="FTR_SET_GMM_INTERNAL_ALLOC"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.3.message" value="FTR_SET_GMM_ALLOC"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.20.message" value="FTR_SET_KMD_SUB_COMP"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.2.message" value="FTR_SET_GMM_INIT"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.19.message" value="FTR_SET_GENERIC_PWR_MGMT"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.18.message" value="FTR_SET_GENERIC_DDI"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.17.message" value="FTR_SET_GMM_PAGING"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.16.message" value="FTR_SET_GMM_PAGE_TABLE"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.15.message" value="FTR_SET_GMM_LIB"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.14.message" value="FTR_SET_GMM_SEGMENT"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.13.message" value="FTR_SET_GMM_DISPLAY"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.12.message" value="FTR_SET_GMM_GENERIC"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.11.message" value="FTR_SET_GUC_INTERACTION"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.10.message" value="FTR_SET_KMD_SUBMIT_ABORT"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.1.message" value="FTR_SET_KMD_INIT"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureSet.0.message" value="FTR_SET_KMD_COMMON"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.FeatureId.2147483647.message" value="Default"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.ErrorCode.2147483647.message" value="Default"></string>
+				<string id="Intel_HD_Graphics_Krnl.map.ComponentId.32767.message" value="Default"></string>
+				<string id="Intel_HD_Graphics_Krnl.event.47.message" value="GfxValStubDivaLogs"></string>
+				<string id="Intel_HD_Graphics_Krnl.event.37.message" value="CreateContext"></string>
+				<string id="Intel_HD_Graphics_Krnl.event.36.message" value="KmGfxAssertPrint"></string>
+				<string id="Intel_HD_Graphics_Krnl.event.0.message" value="GfxAssertPrint"></string>
+			</stringTable>
+		</resources>
+	</localization>
+</instrumentationManifest>

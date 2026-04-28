@@ -1,0 +1,1086 @@
+2026-04-15 14:09:41 [DEBUG] GNAI Cli v1.153.8
+2026-04-15 14:09:45 [DEBUG] Defaulting to model claude-4-6-sonnet
+2026-04-15 14:09:45 [DEBUG] Adding default tools
+2026-04-15 14:09:45 [DEBUG] Loading toolkit from C:\Users\steveche\.gnai\toolkits\drivers.gpu.core.sherlog-toolkit
+2026-04-15 14:09:45 [DEBUG] Loading toolkit from C:\dt_sighting
+2026-04-15 14:09:45 [DEBUG] Loading toolkit from C:\Users\steveche\.gnai\toolkits\displaydebugger
+2026-04-15 14:09:45 [DEBUG] Loaded 1 tools from toolkit displaydebugger
+2026-04-15 14:09:45 [DEBUG] Loaded assistant displaydebugger
+2026-04-15 14:09:45 [DEBUG] Loaded 12 tools from toolkit sighting
+2026-04-15 14:09:45 [DEBUG] Loaded assistant sighting_assistant
+2026-04-15 14:09:45 [DEBUG] Loaded 19 tools from toolkit sherlog
+2026-04-15 14:09:45 [DEBUG] Loaded assistant sherlog_complex_analyzer
+2026-04-15 14:09:45 [DEBUG] Loaded assistant sherlog_debug_analyzer
+2026-04-15 14:09:45 [DEBUG] Removing existing temporary workspace at C:\Users\steveche\AppData\Local\Temp\gnai-chat\14027512785-1776232777467
+2026-04-15 14:09:45 [DEBUG] Using temporary workspace at C:\Users\steveche\AppData\Local\Temp\gnai-chat\14027512785-1776232777467
+2026-04-15 14:09:45 [DEBUG] Asking question with 4 assistants
+2026-04-15 14:09:46 [DEBUG] Processing request with correlation ID e8a53bad34755766
+2026-04-15 14:09:48 [DEBUG] steps:
+- name: displaydebugger_agent
+  type: agent
+
+2026-04-15 14:09:52 [DEBUG] steps:
+- args:
+    attachment_name: MergedGfxTrace_GfxTrace_VGA_Hotplug-FCCL.etl
+    hsd_id: "14027512785"
+    user_request: verify Type-C and Alt Mode configuration, display output and signal issues, display detection and initialization sequence
+  name: displaydebugger_analyze
+  type: tool
+
+2026-04-15 14:09:52 [DEBUG] request:
+  operation: tool
+  name: displaydebugger_analyze
+  args:
+    attachment_name: MergedGfxTrace_GfxTrace_VGA_Hotplug-FCCL.etl
+    hsd_id: "14027512785"
+    user_request: verify Type-C and Alt Mode configuration, display output and signal issues, display detection and initialization sequence
+  request_id: c4d7d1e0-71bc-45d9-a67c-5a62e87ecd7c
+  timeout: 3600
+
+2026-04-15 14:09:52 [DEBUG] Executing command tool displaydebugger_analyze
+2026-04-15 14:09:52 [DEBUG] Filtered environment variable with empty value: PYTHONHOME
+2026-04-15 14:09:52 [DEBUG] Running command: C:\Users\steveche\AppData\Local\Temp\gnai_run.bat with C:\Users\steveche\bin\dt.exe gnai toolkits entrypoint --quiet --path "C:\\Users\\steveche\\.gnai\\toolkits\\displaydebugger" C:\Users\steveche\.gnai\toolkits\displaydebugger\src\entry_point.py
+2026-04-15 14:10:21 [DEBUG] stdout: Manifest auto-download failed!
+2026-04-15 14:10:21 [DEBUG] stdout: Error: Failed to download manifest metadata: Usage: dt <command> [flags]
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout: A powerful cli tool for Intel developers
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout: Flags:
+2026-04-15 14:10:21 [DEBUG] stdout:   -h, --help     Show context-sensitive help.
+2026-04-15 14:10:21 [DEBUG] stdout:       --debug    Enable debug logging
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout: Commands:
+2026-04-15 14:10:21 [DEBUG] stdout:   version                          Print dt version
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   install                          Add dt directory to system PATH
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   install-git-aliases              Install git-pr and git-refresh-proxy aliases
+2026-04-15 14:10:21 [DEBUG] stdout:     [<install-path>]               Override the default install location (must
+2026-04-15 14:10:21 [DEBUG] stdout:                                    be same folder where dt binary is installed)
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   install-git-credential-helper    Install git-credential-dtkeyring credential
+2026-04-15 14:10:21 [DEBUG] stdout:                                    helper
+2026-04-15 14:10:21 [DEBUG] stdout:     [<install-path>]               Override the default install location (must
+2026-04-15 14:10:21 [DEBUG] stdout:                                    be same folder where dt binary is installed)
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   update                           Update dt binary to latest version
+2026-04-15 14:10:21 [DEBUG] stdout:     [<version>]                    Optional version to upgrade to
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   config
+2026-04-15 14:10:21 [DEBUG] stdout:     get                            Print the value for a configuration key
+2026-04-15 14:10:21 [DEBUG] stdout:       <key>
+2026-04-15 14:10:21 [DEBUG] stdout:     get-config-dir                 Print the devtool configuration directory
+2026-04-15 14:10:21 [DEBUG] stdout:     get-extensions-dir             Print the devtool extensions storage
+2026-04-15 14:10:21 [DEBUG] stdout:                                    directory
+2026-04-15 14:10:21 [DEBUG] stdout:     set-extensions-dir             Set the devtool extensions storage directory
+2026-04-15 14:10:21 [DEBUG] stdout:       <dir>                        The value to set
+2026-04-15 14:10:21 [DEBUG] stdout:     unset-extensions-dir           Remove custom setting for extensions storage
+2026-04-15 14:10:21 [DEBUG] stdout:                                    directory
+2026-04-15 14:10:21 [DEBUG] stdout:     get-extensions-binaries-dir    Print the directory where extension binaries
+2026-04-15 14:10:21 [DEBUG] stdout:                                    are installed
+2026-04-15 14:10:21 [DEBUG] stdout:     set-extensions-binaries-dir    Set the directory where extension binaries
+2026-04-15 14:10:21 [DEBUG] stdout:                                    are installed
+2026-04-15 14:10:21 [DEBUG] stdout:       <dir>                        The directory to install extension binaries
+2026-04-15 14:10:21 [DEBUG] stdout:                                    into
+2026-04-15 14:10:21 [DEBUG] stdout:     unset-extensions-binaries-dir
+2026-04-15 14:10:21 [DEBUG] stdout:                                    Remove custom setting for extensions binaries
+2026-04-15 14:10:21 [DEBUG] stdout:                                    directory
+2026-04-15 14:10:21 [DEBUG] stdout:     dump                           Print the full configuration to STDOUT
+2026-04-15 14:10:21 [DEBUG] stdout:     set-check-for-updates          Disable or enable check for new version of
+2026-04-15 14:10:21 [DEBUG] stdout:                                    devtool
+2026-04-15 14:10:21 [DEBUG] stdout:       enabled                      Set in devtool config to true
+2026-04-15 14:10:21 [DEBUG] stdout:       disabled                     Set in devtool config to false
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   diagnose                         Check workstation configuration for errors or
+2026-04-15 14:10:21 [DEBUG] stdout:                                    missing packages
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   refresh-proxy                    Update proxy settings
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   proxy
+2026-04-15 14:10:21 [DEBUG] stdout:     refresh                        Update proxy settings
+2026-04-15 14:10:21 [DEBUG] stdout:     print                          Print proxy settings
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   setup                            Setup your workstation
+2026-04-15 14:10:21 [DEBUG] stdout:     install-git                    Install Git
+2026-04-15 14:10:21 [DEBUG] stdout:     install-git-lfs                Install Git LFS
+2026-04-15 14:10:21 [DEBUG] stdout:     install-docker                 Install and configure docker (Ubuntu Linux
+2026-04-15 14:10:21 [DEBUG] stdout:                                    only)
+2026-04-15 14:10:21 [DEBUG] stdout:     install-certificates           Install Intel SSL certificates (Ubuntu Linux
+2026-04-15 14:10:21 [DEBUG] stdout:                                    only)
+2026-04-15 14:10:21 [DEBUG] stdout:     install-choco                  Install the chocolatey package manager
+2026-04-15 14:10:21 [DEBUG] stdout:                                    (Windows only)
+2026-04-15 14:10:21 [DEBUG] stdout:     create-netrc-symlink           Create a symlink to the .netrc file in the
+2026-04-15 14:10:21 [DEBUG] stdout:                                    user's home directory (Windows only)
+2026-04-15 14:10:21 [DEBUG] stdout:     github-auth                    Create a new oauth token for Github
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   branch                           Create a local branch for new development
+2026-04-15 14:10:21 [DEBUG] stdout:     <branch-name>                  Name of branch to create
+2026-04-15 14:10:21 [DEBUG] stdout:     [<start-point>]                Optional start point for new branch
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   pr                               Manage Github pull requests
+2026-04-15 14:10:21 [DEBUG] stdout:     init                           Create a local branch for new development
+2026-04-15 14:10:21 [DEBUG] stdout:       <branch-name>                Name of branch to create
+2026-04-15 14:10:21 [DEBUG] stdout:       [<start-point>]              Optional start point for new branch
+2026-04-15 14:10:21 [DEBUG] stdout:     create                         Create pull request
+2026-04-15 14:10:21 [DEBUG] stdout:     dump                           Print pull request details to stdout
+2026-04-15 14:10:21 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-15 14:10:21 [DEBUG] stdout:       <pr-number>                  Pull request number to dump
+2026-04-15 14:10:21 [DEBUG] stdout:     browse                         Open a browser to the given pull request
+2026-04-15 14:10:21 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-15 14:10:21 [DEBUG] stdout:       <pr-number>                  Pull request number to open in browser
+2026-04-15 14:10:21 [DEBUG] stdout:     download                       Download pull request
+2026-04-15 14:10:21 [DEBUG] stdout:       <pr-number>                  Pull request number to download
+2026-04-15 14:10:21 [DEBUG] stdout:     close                          Close a Github pull request
+2026-04-15 14:10:21 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-15 14:10:21 [DEBUG] stdout:       <pr-number>                  Pull request number to close
+2026-04-15 14:10:21 [DEBUG] stdout:     merge                          Merge a Github pull request
+2026-04-15 14:10:21 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-15 14:10:21 [DEBUG] stdout:       <pr-number>                  Pull request number to merge
+2026-04-15 14:10:21 [DEBUG] stdout:       <sha>                        The head commit of the pull request branch
+2026-04-15 14:10:21 [DEBUG] stdout:                                    you wish to merge
+2026-04-15 14:10:21 [DEBUG] stdout:     enqueue                        Enqueue a Github pull request to a merge
+2026-04-15 14:10:21 [DEBUG] stdout:                                    queue
+2026-04-15 14:10:21 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-15 14:10:21 [DEBUG] stdout:       <pr-number>                  Pull request number to enqueue
+2026-04-15 14:10:21 [DEBUG] stdout:     dequeue                        Dequeue a Github pull request from a merge
+2026-04-15 14:10:21 [DEBUG] stdout:                                    queue
+2026-04-15 14:10:21 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-15 14:10:21 [DEBUG] stdout:       <pr-number>                  Pull request number to dequeue
+2026-04-15 14:10:21 [DEBUG] stdout:     cherry-pick                    Cherry-pick all commits from the given pull
+2026-04-15 14:10:21 [DEBUG] stdout:                                    request into the current branch
+2026-04-15 14:10:21 [DEBUG] stdout:       <pr-number>                  Pull request number to cherry-pick
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   github                           Github helper commands
+2026-04-15 14:10:21 [DEBUG] stdout:     print-token                    Get authentication token for the given GitHub
+2026-04-15 14:10:21 [DEBUG] stdout:                                    repo URL
+2026-04-15 14:10:21 [DEBUG] stdout:       [<url>]                      The url you need to access (default:
+2026-04-15 14:10:21 [DEBUG] stdout:                                    https://github.com)
+2026-04-15 14:10:21 [DEBUG] stdout:     revoke-token                   Revoke a token that was created by Devtool
+2026-04-15 14:10:21 [DEBUG] stdout:       <token>                      The token to be revoked (OAuth or Personal
+2026-04-15 14:10:21 [DEBUG] stdout:                                    Access Token)
+2026-04-15 14:10:21 [DEBUG] stdout:     status-check                   Create status check in Github
+2026-04-15 14:10:21 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-15 14:10:21 [DEBUG] stdout:       <sha>                        The commit id to update
+2026-04-15 14:10:21 [DEBUG] stdout:     search-issues                  Search for open Github issues
+2026-04-15 14:10:21 [DEBUG] stdout:     get-commit-status-check        Query a status check value by commit
+2026-04-15 14:10:21 [DEBUG] stdout:       <repo-path>                  Repository in OWNER/REPO format
+2026-04-15 14:10:21 [DEBUG] stdout:       <sha>                        The commit to query
+2026-04-15 14:10:21 [DEBUG] stdout:       <status-check>               The status check to query
+2026-04-15 14:10:21 [DEBUG] stdout:     install-runner                 Install GitHub Runner on 1Source organization
+2026-04-15 14:10:21 [DEBUG] stdout:     uninstall-runner               Uninstall GitHub Runner on 1Source
+2026-04-15 14:10:21 [DEBUG] stdout:                                    organization
+2026-04-15 14:10:21 [DEBUG] stdout:     encrypt-vault-secret           Encrypt Secret using Vault from 1Source
+2026-04-15 14:10:21 [DEBUG] stdout:                                    inventory
+2026-04-15 14:10:21 [DEBUG] stdout:     decrypt-vault-secret           Decrypt Secret using Vault from 1Source
+2026-04-15 14:10:21 [DEBUG] stdout:                                    inventory
+2026-04-15 14:10:21 [DEBUG] stdout:     service-runner                 Github service runner commands
+2026-04-15 14:10:21 [DEBUG] stdout:       status                       Show status of Github service runner
+2026-04-15 14:10:21 [DEBUG] stdout:       start                        Start Github service runner
+2026-04-15 14:10:21 [DEBUG] stdout:       stop                         Stop Github service runner
+2026-04-15 14:10:21 [DEBUG] stdout:     workflow                       Github workflow commands
+2026-04-15 14:10:21 [DEBUG] stdout:       run                          Run a Github workflow
+2026-04-15 14:10:21 [DEBUG] stdout:         <workflow>                 The name of the workflow to run
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   extensions
+2026-04-15 14:10:21 [DEBUG] stdout:     list                           List available devtool extensions
+2026-04-15 14:10:21 [DEBUG] stdout:     enable                         Enable extension
+2026-04-15 14:10:21 [DEBUG] stdout:       <name>
+2026-04-15 14:10:21 [DEBUG] stdout:     disable                        Disable extension
+2026-04-15 14:10:21 [DEBUG] stdout:       <name>
+2026-04-15 14:10:21 [DEBUG] stdout:     update                         Update active extensions to latest versions
+2026-04-15 14:10:21 [DEBUG] stdout:       [<name>]                     Name of extension to update
+2026-04-15 14:10:21 [DEBUG] stdout:     install-aliases                Install suggested extension shortcuts
+2026-04-15 14:10:21 [DEBUG] stdout:       <name>
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout:   vault
+2026-04-15 14:10:21 [DEBUG] stdout:     get-secret                     Fetch one or more secrets from a vault (for
+2026-04-15 14:10:21 [DEBUG] stdout:                                    automation use)
+2026-04-15 14:10:21 [DEBUG] stdout:       <secret-name> ...            One or more secrets to fetch
+2026-04-15 14:10:21 [DEBUG] stdout:     verify-secret-password         Verify secret password from a vault
+2026-04-15 14:10:21 [DEBUG] stdout:       <secret-name>                Secret to verify
+2026-04-15 14:10:21 [DEBUG] stdout:     change-secret-password         Change secret password from a vault
+2026-04-15 14:10:21 [DEBUG] stdout:       <secret-name>                Secret to change
+2026-04-15 14:10:21 [DEBUG] stdout:     show-secret-info               Show secret info from a vault
+2026-04-15 14:10:21 [DEBUG] stdout:       <secret-name>                Secret to change
+2026-04-15 14:10:21 [DEBUG] stdout:     show-secret-password           Show secret password from a vault (for
+2026-04-15 14:10:21 [DEBUG] stdout:                                    non-automation use)
+2026-04-15 14:10:21 [DEBUG] stdout:       <secret-name>                Secret to change
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout: Run "dt <command> --help" for more information on a command.
+2026-04-15 14:10:21 [DEBUG] stdout: Please provide the manifest file path manually.
+2026-04-15 14:10:21 [DEBUG] stdout: You can either:
+2026-04-15 14:10:21 [DEBUG] stdout: 1. Set GNAI_INPUT_MAN_PATH environment variable
+2026-04-15 14:10:21 [DEBUG] stdout: 2. Enter the path now
+2026-04-15 14:10:21 [DEBUG] stdout: 3. Exit
+2026-04-15 14:10:21 [DEBUG] stdout: 
+2026-04-15 14:10:21 [DEBUG] stdout: Enter choice (1/2/3):
+2026-04-15 14:13:34 [DEBUG] Command finished with exit code 1. exit status 1
+2026-04-15 14:13:34 [DEBUG] Tool output: The command tool displaydebugger_analyze returned an error: exit status 1. Exit Code: 1
+Stdout:
+Manifest auto-download failed!
+Error: Failed to download manifest metadata: Usage: dt <command> [flags]
+
+A powerful cli tool for Intel developers
+
+Flags:
+  -h, --help     Show context-sensitive help.
+      --debug    Enable debug logging
+
+Commands:
+  version                          Print dt version
+
+  install                          Add dt directory to system PATH
+
+  install-git-aliases              Install git-pr and git-refresh-proxy aliases
+    [<install-path>]               Override the default install location (must
+                                   be same folder where dt binary is installed)
+
+  install-git-credential-helper    Install git-credential-dtkeyring credential
+                                   helper
+    [<install-path>]               Override the default install location (must
+                                   be same folder where dt binary is installed)
+
+  update                           Update dt binary to latest version
+    [<version>]                    Optional version to upgrade to
+
+  config
+    get                            Print the value for a configuration key
+      <key>
+    get-config-dir                 Print the devtool configuration directory
+    get-extensions-dir             Print the devtool extensions storage
+                                   directory
+    set-extensions-dir             Set the devtool extensions storage directory
+      <dir>                        The value to set
+    unset-extensions-dir           Remove custom setting for extensions storage
+                                   directory
+    get-extensions-binaries-dir    Print the directory where extension binaries
+                                   are installed
+    set-extensions-binaries-dir    Set the directory where extension binaries
+                                   are installed
+      <dir>                        The directory to install extension binaries
+                                   into
+    unset-extensions-binaries-dir
+                                   Remove custom setting for extensions binaries
+                                   directory
+    dump                           Print the full configuration to STDOUT
+    set-check-for-updates          Disable or enable check for new version of
+                                   devtool
+      enabled                      Set in devtool config to true
+      disabled                     Set in devtool config to false
+
+  diagnose                         Check workstation configuration for errors or
+                                   missing packages
+
+  refresh-proxy                    Update proxy settings
+
+  proxy
+    refresh                        Update proxy settings
+    print                          Print proxy settings
+
+  setup                            Setup your workstation
+    install-git                    Install Git
+    install-git-lfs                Install Git LFS
+    install-docker                 Install and configure docker (Ubuntu Linux
+                                   only)
+    install-certificates           Install Intel SSL certificates (Ubuntu Linux
+                                   only)
+    install-choco                  Install the chocolatey package manager
+                                   (Windows only)
+    create-netrc-symlink           Create a symlink to the .netrc file in the
+                                   user's home directory (Windows only)
+    github-auth                    Create a new oauth token for Github
+
+  branch                           Create a local branch for new development
+    <branch-name>                  Name of branch to create
+    [<start-point>]                Optional start point for new branch
+
+  pr                               Manage Github pull requests
+    init                           Create a local branch for new development
+      <branch-name>                Name of branch to create
+      [<start-point>]              Optional start point for new branch
+    create                         Create pull request
+    dump                           Print pull request details to stdout
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to dump
+    browse                         Open a browser to the given pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to open in browser
+    download                       Download pull request
+      <pr-number>                  Pull request number to download
+    close                          Close a Github pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to close
+    merge                          Merge a Github pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to merge
+      <sha>                        The head commit of the pull request branch
+                                   you wish to merge
+    enqueue                        Enqueue a Github pull request to a merge
+                                   queue
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to enqueue
+    dequeue                        Dequeue a Github pull request from a merge
+                                   queue
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to dequeue
+    cherry-pick                    Cherry-pick all commits from the given pull
+                                   request into the current branch
+      <pr-number>                  Pull request number to cherry-pick
+
+  github                           Github helper commands
+    print-token                    Get authentication token for the given GitHub
+                                   repo URL
+      [<url>]                      The url you need to access (default:
+                                   https://github.com)
+    revoke-token                   Revoke a token that was created by Devtool
+      <token>                      The token to be revoked (OAuth or Personal
+                                   Access Token)
+    status-check                   Create status check in Github
+      <repo-path>                  Repository in OWNER/REPO format
+      <sha>                        The commit id to update
+    search-issues                  Search for open Github issues
+    get-commit-status-check        Query a status check value by commit
+      <repo-path>                  Repository in OWNER/REPO format
+      <sha>                        The commit to query
+      <status-check>               The status check to query
+    install-runner                 Install GitHub Runner on 1Source organization
+    uninstall-runner               Uninstall GitHub Runner on 1Source
+                                   organization
+    encrypt-vault-secret           Encrypt Secret using Vault from 1Source
+                                   inventory
+    decrypt-vault-secret           Decrypt Secret using Vault from 1Source
+                                   inventory
+    service-runner                 Github service runner commands
+      status                       Show status of Github service runner
+      start                        Start Github service runner
+      stop                         Stop Github service runner
+    workflow                       Github workflow commands
+      run                          Run a Github workflow
+        <workflow>                 The name of the workflow to run
+
+  extensions
+    list                           List available devtool extensions
+    enable                         Enable extension
+      <name>
+    disable                        Disable extension
+      <name>
+    update                         Update active extensions to latest versions
+      [<name>]                     Name of extension to update
+    install-aliases                Install suggested extension shortcuts
+      <name>
+
+  vault
+    get-secret                     Fetch one or more secrets from a vault (for
+                                   automation use)
+      <secret-name> ...            One or more secrets to fetch
+    verify-secret-password         Verify secret password from a vault
+      <secret-name>                Secret to verify
+    change-secret-password         Change secret password from a vault
+      <secret-name>                Secret to change
+    show-secret-info               Show secret info from a vault
+      <secret-name>                Secret to change
+    show-secret-password           Show secret password from a vault (for
+                                   non-automation use)
+      <secret-name>                Secret to change
+
+Run "dt <command> --help" for more information on a command.
+
+Please provide the manifest file path manually.
+You can either:
+1. Set GNAI_INPUT_MAN_PATH environment variable
+2. Enter the path now
+3. Exit
+
+Enter choice (1/2/3):
+Stderr:
+14:10:03  Display Analyzer - Entry Point
+14:10:03  Fetching HSD ticket: 14027512785
+14:10:10  Looking for specific attachment: MergedGfxTrace_GfxTrace_VGA_Hotplug-FCCL.etl
+14:10:10  Downloading: MergedGfxTrace_GfxTrace_VGA_Hotplug-FCCL.etl
+14:10:21  Cached: MergedGfxTrace_GfxTrace_VGA_Hotplug-FCCL.etl → C:\Users\steveche\.displaydebugger\cache\14027512785
+14:10:21  Log acquired: MergedGfxTrace_GfxTrace_VGA_Hotplug-FCCL.etl
+14:10:21  Log file ready: MergedGfxTrace_GfxTrace_VGA_Hotplug-FCCL.etl
+14:10:21  Detected log type from file: etl
+14:10:21  No manifest found locally, downloading from QB...
+14:10:21  ======================================================================
+14:10:21    Automatic Manifest Download
+14:10:21  ======================================================================
+14:10:21  Starting manifest acquisition process...
+14:10:21  Steps: Metadata -> Download (~50-200MB) -> Extract -> Locate manifest
+14:10:21  ======================================================================
+14:10:21  dt CLI found at: C:\Users\steveche\bin\dt.EXE
+14:10:21  [Step 1/3] Fetching manifest metadata from QuickBuild...
+14:10:21  dt CLI failed with exit code 80
+14:10:21  stdout: Usage: dt <command> [flags]
+
+A powerful cli tool for Intel developers
+
+Flags:
+  -h, --help     Show context-sensitive help.
+      --debug    Enable debug logging
+
+Commands:
+  version                          Print dt version
+
+  install                          Add dt directory to system PATH
+
+  install-git-aliases              Install git-pr and git-refresh-proxy aliases
+    [<install-path>]               Override the default install location (must
+                                   be same folder where dt binary is installed)
+
+  install-git-credential-helper    Install git-credential-dtkeyring credential
+                                   helper
+    [<install-path>]               Override the default install location (must
+                                   be same folder where dt binary is installed)
+
+  update                           Update dt binary to latest version
+    [<version>]                    Optional version to upgrade to
+
+  config
+    get                            Print the value for a configuration key
+      <key>
+    get-config-dir                 Print the devtool configuration directory
+    get-extensions-dir             Print the devtool extensions storage
+                                   directory
+    set-extensions-dir             Set the devtool extensions storage directory
+      <dir>                        The value to set
+    unset-extensions-dir           Remove custom setting for extensions storage
+                                   directory
+    get-extensions-binaries-dir    Print the directory where extension binaries
+                                   are installed
+    set-extensions-binaries-dir    Set the directory where extension binaries
+                                   are installed
+      <dir>                        The directory to install extension binaries
+                                   into
+    unset-extensions-binaries-dir
+                                   Remove custom setting for extensions binaries
+                                   directory
+    dump                           Print the full configuration to STDOUT
+    set-check-for-updates          Disable or enable check for new version of
+                                   devtool
+      enabled                      Set in devtool config to true
+      disabled                     Set in devtool config to false
+
+  diagnose                         Check workstation configuration for errors or
+                                   missing packages
+
+  refresh-proxy                    Update proxy settings
+
+  proxy
+    refresh                        Update proxy settings
+    print                          Print proxy settings
+
+  setup                            Setup your workstation
+    install-git                    Install Git
+    install-git-lfs                Install Git LFS
+    install-docker                 Install and configure docker (Ubuntu Linux
+                                   only)
+    install-certificates           Install Intel SSL certificates (Ubuntu Linux
+                                   only)
+    install-choco                  Install the chocolatey package manager
+                                   (Windows only)
+    create-netrc-symlink           Create a symlink to the .netrc file in the
+                                   user's home directory (Windows only)
+    github-auth                    Create a new oauth token for Github
+
+  branch                           Create a local branch for new development
+    <branch-name>                  Name of branch to create
+    [<start-point>]                Optional start point for new branch
+
+  pr                               Manage Github pull requests
+    init                           Create a local branch for new development
+      <branch-name>                Name of branch to create
+      [<start-point>]              Optional start point for new branch
+    create                         Create pull request
+    dump                           Print pull request details to stdout
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to dump
+    browse                         Open a browser to the given pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to open in browser
+    download                       Download pull request
+      <pr-number>                  Pull request number to download
+    close                          Close a Github pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to close
+    merge                          Merge a Github pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to merge
+      <sha>                        The head commit of the pull request branch
+                                   you wish to merge
+    enqueue                        Enqueue a Github pull request to a merge
+                                   queue
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to enqueue
+    dequeue                        Dequeue a Github pull request from a merge
+                                   queue
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to dequeue
+    cherry-pick                    Cherry-pick all commits from the given pull
+                                   request into the current branch
+      <pr-number>                  Pull request number to cherry-pick
+
+  github                           Github helper commands
+    print-token                    Get authentication token for the given GitHub
+                                   repo URL
+      [<url>]                      The url you need to access (default:
+                                   https://github.com)
+    revoke-token                   Revoke a token that was created by Devtool
+      <token>                      The token to be revoked (OAuth or Personal
+                                   Access Token)
+    status-check                   Create status check in Github
+      <repo-path>                  Repository in OWNER/REPO format
+      <sha>                        The commit id to update
+    search-issues                  Search for open Github issues
+    get-commit-status-check        Query a status check value by commit
+      <repo-path>                  Repository in OWNER/REPO format
+      <sha>                        The commit to query
+      <status-check>               The status check to query
+    install-runner                 Install GitHub Runner on 1Source organization
+    uninstall-runner               Uninstall GitHub Runner on 1Source
+                                   organization
+    encrypt-vault-secret           Encrypt Secret using Vault from 1Source
+                                   inventory
+    decrypt-vault-secret           Decrypt Secret using Vault from 1Source
+                                   inventory
+    service-runner                 Github service runner commands
+      status                       Show status of Github service runner
+      start                        Start Github service runner
+      stop                         Stop Github service runner
+    workflow                       Github workflow commands
+      run                          Run a Github workflow
+        <workflow>                 The name of the workflow to run
+
+  extensions
+    list                           List available devtool extensions
+    enable                         Enable extension
+      <name>
+    disable                        Disable extension
+      <name>
+    update                         Update active extensions to latest versions
+      [<name>]                     Name of extension to update
+    install-aliases                Install suggested extension shortcuts
+      <name>
+
+  vault
+    get-secret                     Fetch one or more secrets from a vault (for
+                                   automation use)
+      <secret-name> ...            One or more secrets to fetch
+    verify-secret-password         Verify secret password from a vault
+      <secret-name>                Secret to verify
+    change-secret-password         Change secret password from a vault
+      <secret-name>                Secret to change
+    show-secret-info               Show secret info from a vault
+      <secret-name>                Secret to change
+    show-secret-password           Show secret password from a vault (for
+                                   non-automation use)
+      <secret-name>                Secret to change
+
+Run "dt <command> --help" for more information on a command.
+14:10:21  stderr: dt: error: unexpected argument asset
+14:10:21  Auto-download failed: Failed to download manifest metadata: Usage: dt <command> [flags]
+
+A powerful cli tool for Intel developers
+
+Flags:
+  -h, --help     Show context-sensitive help.
+      --debug    Enable debug logging
+
+Commands:
+  version                          Print dt version
+
+  install                          Add dt directory to system PATH
+
+  install-git-aliases              Install git-pr and git-refresh-proxy aliases
+    [<install-path>]               Override the default install location (must
+                                   be same folder where dt binary is installed)
+
+  install-git-credential-helper    Install git-credential-dtkeyring credential
+                                   helper
+    [<install-path>]               Override the default install location (must
+                                   be same folder where dt binary is installed)
+
+  update                           Update dt binary to latest version
+    [<version>]                    Optional version to upgrade to
+
+  config
+    get                            Print the value for a configuration key
+      <key>
+    get-config-dir                 Print the devtool configuration directory
+    get-extensions-dir             Print the devtool extensions storage
+                                   directory
+    set-extensions-dir             Set the devtool extensions storage directory
+      <dir>                        The value to set
+    unset-extensions-dir           Remove custom setting for extensions storage
+                                   directory
+    get-extensions-binaries-dir    Print the directory where extension binaries
+                                   are installed
+    set-extensions-binaries-dir    Set the directory where extension binaries
+                                   are installed
+      <dir>                        The directory to install extension binaries
+                                   into
+    unset-extensions-binaries-dir
+                                   Remove custom setting for extensions binaries
+                                   directory
+    dump                           Print the full configuration to STDOUT
+    set-check-for-updates          Disable or enable check for new version of
+                                   devtool
+      enabled                      Set in devtool config to true
+      disabled                     Set in devtool config to false
+
+  diagnose                         Check workstation configuration for errors or
+                                   missing packages
+
+  refresh-proxy                    Update proxy settings
+
+  proxy
+    refresh                        Update proxy settings
+    print                          Print proxy settings
+
+  setup                            Setup your workstation
+    install-git                    Install Git
+    install-git-lfs                Install Git LFS
+    install-docker                 Install and configure docker (Ubuntu Linux
+                                   only)
+    install-certificates           Install Intel SSL certificates (Ubuntu Linux
+                                   only)
+    install-choco                  Install the chocolatey package manager
+                                   (Windows only)
+    create-netrc-symlink           Create a symlink to the .netrc file in the
+                                   user's home directory (Windows only)
+    github-auth                    Create a new oauth token for Github
+
+  branch                           Create a local branch for new development
+    <branch-name>                  Name of branch to create
+    [<start-point>]                Optional start point for new branch
+
+  pr                               Manage Github pull requests
+    init                           Create a local branch for new development
+      <branch-name>                Name of branch to create
+      [<start-point>]              Optional start point for new branch
+    create                         Create pull request
+    dump                           Print pull request details to stdout
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to dump
+    browse                         Open a browser to the given pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to open in browser
+    download                       Download pull request
+      <pr-number>                  Pull request number to download
+    close                          Close a Github pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to close
+    merge                          Merge a Github pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to merge
+      <sha>                        The head commit of the pull request branch
+                                   you wish to merge
+    enqueue                        Enqueue a Github pull request to a merge
+                                   queue
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to enqueue
+    dequeue                        Dequeue a Github pull request from a merge
+                                   queue
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to dequeue
+    cherry-pick                    Cherry-pick all commits from the given pull
+                                   request into the current branch
+      <pr-number>                  Pull request number to cherry-pick
+
+  github                           Github helper commands
+    print-token                    Get authentication token for the given GitHub
+                                   repo URL
+      [<url>]                      The url you need to access (default:
+                                   https://github.com)
+    revoke-token                   Revoke a token that was created by Devtool
+      <token>                      The token to be revoked (OAuth or Personal
+                                   Access Token)
+    status-check                   Create status check in Github
+      <repo-path>                  Repository in OWNER/REPO format
+      <sha>                        The commit id to update
+    search-issues                  Search for open Github issues
+    get-commit-status-check        Query a status check value by commit
+      <repo-path>                  Repository in OWNER/REPO format
+      <sha>                        The commit to query
+      <status-check>               The status check to query
+    install-runner                 Install GitHub Runner on 1Source organization
+    uninstall-runner               Uninstall GitHub Runner on 1Source
+                                   organization
+    encrypt-vault-secret           Encrypt Secret using Vault from 1Source
+                                   inventory
+    decrypt-vault-secret           Decrypt Secret using Vault from 1Source
+                                   inventory
+    service-runner                 Github service runner commands
+      status                       Show status of Github service runner
+      start                        Start Github service runner
+      stop                         Stop Github service runner
+    workflow                       Github workflow commands
+      run                          Run a Github workflow
+        <workflow>                 The name of the workflow to run
+
+  extensions
+    list                           List available devtool extensions
+    enable                         Enable extension
+      <name>
+    disable                        Disable extension
+      <name>
+    update                         Update active extensions to latest versions
+      [<name>]                     Name of extension to update
+    install-aliases                Install suggested extension shortcuts
+      <name>
+
+  vault
+    get-secret                     Fetch one or more secrets from a vault (for
+                                   automation use)
+      <secret-name> ...            One or more secrets to fetch
+    verify-secret-password         Verify secret password from a vault
+      <secret-name>                Secret to verify
+    change-secret-password         Change secret password from a vault
+      <secret-name>                Secret to change
+    show-secret-info               Show secret info from a vault
+      <secret-name>                Secret to change
+    show-secret-password           Show secret password from a vault (for
+                                   non-automation use)
+      <secret-name>                Secret to change
+
+Run "dt <command> --help" for more information on a command.
+14:10:21  Manifest auto-download failed: Failed to download manifest metadata: Usage: dt <command> [flags]
+
+A powerful cli tool for Intel developers
+
+Flags:
+  -h, --help     Show context-sensitive help.
+      --debug    Enable debug logging
+
+Commands:
+  version                          Print dt version
+
+  install                          Add dt directory to system PATH
+
+  install-git-aliases              Install git-pr and git-refresh-proxy aliases
+    [<install-path>]               Override the default install location (must
+                                   be same folder where dt binary is installed)
+
+  install-git-credential-helper    Install git-credential-dtkeyring credential
+                                   helper
+    [<install-path>]               Override the default install location (must
+                                   be same folder where dt binary is installed)
+
+  update                           Update dt binary to latest version
+    [<version>]                    Optional version to upgrade to
+
+  config
+    get                            Print the value for a configuration key
+      <key>
+    get-config-dir                 Print the devtool configuration directory
+    get-extensions-dir             Print the devtool extensions storage
+                                   directory
+    set-extensions-dir             Set the devtool extensions storage directory
+      <dir>                        The value to set
+    unset-extensions-dir           Remove custom setting for extensions storage
+                                   directory
+    get-extensions-binaries-dir    Print the directory where extension binaries
+                                   are installed
+    set-extensions-binaries-dir    Set the directory where extension binaries
+                                   are installed
+      <dir>                        The directory to install extension binaries
+                                   into
+    unset-extensions-binaries-dir
+                                   Remove custom setting for extensions binaries
+                                   directory
+    dump                           Print the full configuration to STDOUT
+    set-check-for-updates          Disable or enable check for new version of
+                                   devtool
+      enabled                      Set in devtool config to true
+      disabled                     Set in devtool config to false
+
+  diagnose                         Check workstation configuration for errors or
+                                   missing packages
+
+  refresh-proxy                    Update proxy settings
+
+  proxy
+    refresh                        Update proxy settings
+    print                          Print proxy settings
+
+  setup                            Setup your workstation
+    install-git                    Install Git
+    install-git-lfs                Install Git LFS
+    install-docker                 Install and configure docker (Ubuntu Linux
+                                   only)
+    install-certificates           Install Intel SSL certificates (Ubuntu Linux
+                                   only)
+    install-choco                  Install the chocolatey package manager
+                                   (Windows only)
+    create-netrc-symlink           Create a symlink to the .netrc file in the
+                                   user's home directory (Windows only)
+    github-auth                    Create a new oauth token for Github
+
+  branch                           Create a local branch for new development
+    <branch-name>                  Name of branch to create
+    [<start-point>]                Optional start point for new branch
+
+  pr                               Manage Github pull requests
+    init                           Create a local branch for new development
+      <branch-name>                Name of branch to create
+      [<start-point>]              Optional start point for new branch
+    create                         Create pull request
+    dump                           Print pull request details to stdout
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to dump
+    browse                         Open a browser to the given pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to open in browser
+    download                       Download pull request
+      <pr-number>                  Pull request number to download
+    close                          Close a Github pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to close
+    merge                          Merge a Github pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to merge
+      <sha>                        The head commit of the pull request branch
+                                   you wish to merge
+    enqueue                        Enqueue a Github pull request to a merge
+                                   queue
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to enqueue
+    dequeue                        Dequeue a Github pull request from a merge
+                                   queue
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to dequeue
+    cherry-pick                    Cherry-pick all commits from the given pull
+                                   request into the current branch
+      <pr-number>                  Pull request number to cherry-pick
+
+  github                           Github helper commands
+    print-token                    Get authentication token for the given GitHub
+                                   repo URL
+      [<url>]                      The url you need to access (default:
+                                   https://github.com)
+    revoke-token                   Revoke a token that was created by Devtool
+      <token>                      The token to be revoked (OAuth or Personal
+                                   Access Token)
+    status-check                   Create status check in Github
+      <repo-path>                  Repository in OWNER/REPO format
+      <sha>                        The commit id to update
+    search-issues                  Search for open Github issues
+    get-commit-status-check        Query a status check value by commit
+      <repo-path>                  Repository in OWNER/REPO format
+      <sha>                        The commit to query
+      <status-check>               The status check to query
+    install-runner                 Install GitHub Runner on 1Source organization
+    uninstall-runner               Uninstall GitHub Runner on 1Source
+                                   organization
+    encrypt-vault-secret           Encrypt Secret using Vault from 1Source
+                                   inventory
+    decrypt-vault-secret           Decrypt Secret using Vault from 1Source
+                                   inventory
+    service-runner                 Github service runner commands
+      status                       Show status of Github service runner
+      start                        Start Github service runner
+      stop                         Stop Github service runner
+    workflow                       Github workflow commands
+      run                          Run a Github workflow
+        <workflow>                 The name of the workflow to run
+
+  extensions
+    list                           List available devtool extensions
+    enable                         Enable extension
+      <name>
+    disable                        Disable extension
+      <name>
+    update                         Update active extensions to latest versions
+      [<name>]                     Name of extension to update
+    install-aliases                Install suggested extension shortcuts
+      <name>
+
+  vault
+    get-secret                     Fetch one or more secrets from a vault (for
+                                   automation use)
+      <secret-name> ...            One or more secrets to fetch
+    verify-secret-password         Verify secret password from a vault
+      <secret-name>                Secret to verify
+    change-secret-password         Change secret password from a vault
+      <secret-name>                Secret to change
+    show-secret-info               Show secret info from a vault
+      <secret-name>                Secret to change
+    show-secret-password           Show secret password from a vault (for
+                                   non-automation use)
+      <secret-name>                Secret to change
+
+Run "dt <command> --help" for more information on a command.
+14:13:34  User chose to exit
+14:13:34  ValueError: Manifest acquisition failed: Failed to download manifest metadata: Usage: dt <command> [flags]
+
+A powerful cli tool for Intel developers
+
+Flags:
+  -h, --help     Show context-sensitive help.
+      --debug    Enable debug logging
+
+Commands:
+  version                          Print dt version
+
+  install                          Add dt directory to system PATH
+
+  install-git-aliases              Install git-pr and git-refresh-proxy aliases
+    [<install-path>]               Override the default install location (must
+                                   be same folder where dt binary is installed)
+
+  install-git-credential-helper    Install git-credential-dtkeyring credential
+                                   helper
+    [<install-path>]               Override the default install location (must
+                                   be same folder where dt binary is installed)
+
+  update                           Update dt binary to latest version
+    [<version>]                    Optional version to upgrade to
+
+  config
+    get                            Print the value for a configuration key
+      <key>
+    get-config-dir                 Print the devtool configuration directory
+    get-extensions-dir             Print the devtool extensions storage
+                                   directory
+    set-extensions-dir             Set the devtool extensions storage directory
+      <dir>                        The value to set
+    unset-extensions-dir           Remove custom setting for extensions storage
+                                   directory
+    get-extensions-binaries-dir    Print the directory where extension binaries
+                                   are installed
+    set-extensions-binaries-dir    Set the directory where extension binaries
+                                   are installed
+      <dir>                        The directory to install extension binaries
+                                   into
+    unset-extensions-binaries-dir
+                                   Remove custom setting for extensions binaries
+                                   directory
+    dump                           Print the full configuration to STDOUT
+    set-check-for-updates          Disable or enable check for new version of
+                                   devtool
+      enabled                      Set in devtool config to true
+      disabled                     Set in devtool config to false
+
+  diagnose                         Check workstation configuration for errors or
+                                   missing packages
+
+  refresh-proxy                    Update proxy settings
+
+  proxy
+    refresh                        Update proxy settings
+    print                          Print proxy settings
+
+  setup                            Setup your workstation
+    install-git                    Install Git
+    install-git-lfs                Install Git LFS
+    install-docker                 Install and configure docker (Ubuntu Linux
+                                   only)
+    install-certificates           Install Intel SSL certificates (Ubuntu Linux
+                                   only)
+    install-choco                  Install the chocolatey package manager
+                                   (Windows only)
+    create-netrc-symlink           Create a symlink to the .netrc file in the
+                                   user's home directory (Windows only)
+    github-auth                    Create a new oauth token for Github
+
+  branch                           Create a local branch for new development
+    <branch-name>                  Name of branch to create
+    [<start-point>]                Optional start point for new branch
+
+  pr                               Manage Github pull requests
+    init                           Create a local branch for new development
+      <branch-name>                Name of branch to create
+      [<start-point>]              Optional start point for new branch
+    create                         Create pull request
+    dump                           Print pull request details to stdout
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to dump
+    browse                         Open a browser to the given pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to open in browser
+    download                       Download pull request
+      <pr-number>                  Pull request number to download
+    close                          Close a Github pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to close
+    merge                          Merge a Github pull request
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to merge
+      <sha>                        The head commit of the pull request branch
+                                   you wish to merge
+    enqueue                        Enqueue a Github pull request to a merge
+                                   queue
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to enqueue
+    dequeue                        Dequeue a Github pull request from a merge
+                                   queue
+      <repo-path>                  Repository in OWNER/REPO format
+      <pr-number>                  Pull request number to dequeue
+    cherry-pick                    Cherry-pick all commits from the given pull
+                                   request into the current branch
+      <pr-number>                  Pull request number to cherry-pick
+
+  github                           Github helper commands
+    print-token                    Get authentication token for the given GitHub
+                                   repo URL
+      [<url>]                      The url you need to access (default:
+                                   https://github.com)
+    revoke-token                   Revoke a token that was created by Devtool
+      <token>                      The token to be revoked (OAuth or Personal
+                                   Access Token)
+    status-check                   Create status check in Github
+      <repo-path>                  Repository in OWNER/REPO format
+      <sha>                        The commit id to update
+    search-issues                  Search for open Github issues
+    get-commit-status-check        Query a status check value by commit
+      <repo-path>                  Repository in OWNER/REPO format
+      <sha>                        The commit to query
+      <status-check>               The status check to query
+    install-runner                 Install GitHub Runner on 1Source organization
+    uninstall-runner               Uninstall GitHub Runner on 1Source
+                                   organization
+    encrypt-vault-secret           Encrypt Secret using Vault from 1Source
+                                   inventory
+    decrypt-vault-secret           Decrypt Secret using Vault from 1Source
+                                   inventory
+    service-runner                 Github service runner commands
+      status                       Show status of Github service runner
+      start                        Start Github service runner
+      stop                         Stop Github service runner
+    workflow                       Github workflow commands
+      run                          Run a Github workflow
+        <workflow>                 The name of the workflow to run
+
+  extensions
+    list                           List available devtool extensions
+    enable                         Enable extension
+      <name>
+    disable                        Disable extension
+      <name>
+    update                         Update active extensions to latest versions
+      [<name>]                     Name of extension to update
+    install-aliases                Install suggested extension shortcuts
+      <name>
+
+  vault
+    get-secret                     Fetch one or more secrets from a vault (for
+                                   automation use)
+      <secret-name> ...            One or more secrets to fetch
+    verify-secret-password         Verify secret password from a vault
+      <secret-name>                Secret to verify
+    change-secret-password         Change secret password from a vault
+      <secret-name>                Secret to change
+    show-secret-info               Show secret info from a vault
+      <secret-name>                Secret to change
+    show-secret-password           Show secret password from a vault (for
+                                   non-automation use)
+      <secret-name>                Secret to change
+
+Run "dt <command> --help" for more information on a command.
+{"error": "Manifest acquisition failed: Failed to download manifest metadata: Usage: dt <command> [flags]\n\nA powerful cli tool for Intel developers\n\nFlags:\n  -h, --help     Show context-sensitive help.\n      --debug    Enable debug logging\n\nCommands:\n  version                          Print dt version\n\n  install                          Add dt directory to system PATH\n\n  install-git-aliases              Install git-pr and git-refresh-proxy aliases\n    [<install-path>]               Override the default install location (must\n                                   be same folder where dt binary is installed)\n\n  install-git-credential-helper    Install git-credential-dtkeyring credential\n                                   helper\n    [<install-path>]               Override the default install location (must\n                                   be same folder where dt binary is installed)\n\n  update                           Update dt binary to latest version\n    [<version>]                    Optional version to upgrade to\n\n  config\n    get                            Print the value for a configuration key\n      <key>\n    get-config-dir                 Print the devtool configuration directory\n    get-extensions-dir             Print the devtool extensions storage\n                                   directory\n    set-extensions-dir             Set the devtool extensions storage directory\n      <dir>                        The value to set\n    unset-extensions-dir           Remove custom setting for extensions storage\n                                   directory\n    get-extensions-binaries-dir    Print the directory where extension binaries\n                                   are installed\n    set-extensions-binaries-dir    Set the directory where extension binaries\n                                   are installed\n      <dir>                        The directory to install extension binaries\n                                   into\n    unset-extensions-binaries-dir\n                                   Remove custom setting for extensions binaries\n                                   directory\n    dump                           Print the full configuration to STDOUT\n    set-check-for-updates          Disable or enable check for new version of\n                                   devtool\n      enabled                      Set in devtool config to true\n      disabled                     Set in devtool config to false\n\n  diagnose                         Check workstation configuration for errors or\n                                   missing packages\n\n  refresh-proxy                    Update proxy settings\n\n  proxy\n    refresh                        Update proxy settings\n    print                          Print proxy settings\n\n  setup                            Setup your workstation\n    install-git                    Install Git\n    install-git-lfs                Install Git LFS\n    install-docker                 Install and configure docker (Ubuntu Linux\n                                   only)\n    install-certificates           Install Intel SSL certificates (Ubuntu Linux\n                                   only)\n    install-choco                  Install the chocolatey package manager\n                                   (Windows only)\n    create-netrc-symlink           Create a symlink to the .netrc file in the\n                                   user's home directory (Windows only)\n    github-auth                    Create a new oauth token for Github\n\n  branch                           Create a local branch for new development\n    <branch-name>                  Name of branch to create\n    [<start-point>]                Optional start point for new branch\n\n  pr                               Manage Github pull requests\n    init                           Create a local branch for new development\n      <branch-name>                Name of branch to create\n      [<start-point>]              Optional start point for new branch\n    create                         Create pull request\n    dump                           Print pull request details to stdout\n      <repo-path>                  Repository in OWNER/REPO format\n      <pr-number>                  Pull request number to dump\n    browse                         Open a browser to the given pull request\n      <repo-path>                  Repository in OWNER/REPO format\n      <pr-number>                  Pull request number to open in browser\n    download                       Download pull request\n      <pr-number>                  Pull request number to download\n    close                          Close a Github pull request\n      <repo-path>                  Repository in OWNER/REPO format\n      <pr-number>                  Pull request number to close\n    merge                          Merge a Github pull request\n      <repo-path>                  Repository in OWNER/REPO format\n      <pr-number>                  Pull request number to merge\n      <sha>                        The head commit of the pull request branch\n                                   you wish to merge\n    enqueue                        Enqueue a Github pull request to a merge\n                                   queue\n      <repo-path>                  Repository in OWNER/REPO format\n      <pr-number>                  Pull request number to enqueue\n    dequeue                        Dequeue a Github pull request from a merge\n                                   queue\n      <repo-path>                  Repository in OWNER/REPO format\n      <pr-number>                  Pull request number to dequeue\n    cherry-pick                    Cherry-pick all commits from the given pull\n                                   request into the current branch\n      <pr-number>                  Pull request number to cherry-pick\n\n  github                           Github helper commands\n    print-token                    Get authentication token for the given GitHub\n                                   repo URL\n      [<url>]                      The url you need to access (default:\n                                   https://github.com)\n    revoke-token                   Revoke a token that was created by Devtool\n      <token>                      The token to be revoked (OAuth or Personal\n                                   Access Token)\n    status-check                   Create status check in Github\n      <repo-path>                  Repository in OWNER/REPO format\n      <sha>                        The commit id to update\n    search-issues                  Search for open Github issues\n    get-commit-status-check        Query a status check value by commit\n      <repo-path>                  Repository in OWNER/REPO format\n      <sha>                        The commit to query\n      <status-check>               The status check to query\n    install-runner                 Install GitHub Runner on 1Source organization\n    uninstall-runner               Uninstall GitHub Runner on 1Source\n                                   organization\n    encrypt-vault-secret           Encrypt Secret using Vault from 1Source\n                                   inventory\n    decrypt-vault-secret           Decrypt Secret using Vault from 1Source\n                                   inventory\n    service-runner                 Github service runner commands\n      status                       Show status of Github service runner\n      start                        Start Github service runner\n      stop                         Stop Github service runner\n    workflow                       Github workflow commands\n      run                          Run a Github workflow\n        <workflow>                 The name of the workflow to run\n\n  extensions\n    list                           List available devtool extensions\n    enable                         Enable extension\n      <name>\n    disable                        Disable extension\n      <name>\n    update                         Update active extensions to latest versions\n      [<name>]                     Name of extension to update\n    install-aliases                Install suggested extension shortcuts\n      <name>\n\n  vault\n    get-secret                     Fetch one or more secrets from a vault (for\n                                   automation use)\n      <secret-name> ...            One or more secrets to fetch\n    verify-secret-password         Verify secret password from a vault\n      <secret-name>                Secret to verify\n    change-secret-password         Change secret password from a vault\n      <secret-name>                Secret to change\n    show-secret-info               Show secret info from a vault\n      <secret-name>                Secret to change\n    show-secret-password           Show secret password from a vault (for\n                                   non-automation use)\n      <secret-name>                Secret to change\n\nRun \"dt <command> --help\" for more information on a command.", "type": "ValueError"}
+exit status 1
+2026-04-15 14:13:34 [DEBUG] steps:
+- name: displaydebugger_agent
+  type: agent
+
+2026-04-15 14:13:36 [DEBUG] Received interrupt, cleaning up 0 tracked process(es)

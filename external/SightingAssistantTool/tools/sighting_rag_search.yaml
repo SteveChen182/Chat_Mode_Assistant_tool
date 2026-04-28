@@ -1,0 +1,22 @@
+version: 1
+description: Retrieves DFD checklist items, category-specific BKM guidance, and user ad-hoc doubt/query support from the GNAI RAG knowledge base using vector similarity search. Use this for Section 4 DFD compliance, BKM retrieval, and optional user-question lookups.
+kind: command
+params:
+- name: search_query
+  type: str
+  description: Natural language query to search the RAG knowledge base with.
+  optional: false
+- name: profile
+  type: str
+  description: RAG profile name to query.
+  optional: false
+- name: max_documents
+  type: int
+  description: Maximum number of matching documents to return.
+  optional: true
+env:
+- INTEL_USERNAME
+- INTEL_PASSWORD
+run:
+  command: $GNAI_TOOLKIT_ENTRYPOINT $GNAI_TOOLKIT_DIRECTORY/src/sighting_rag_search.py
+  timeout: 360

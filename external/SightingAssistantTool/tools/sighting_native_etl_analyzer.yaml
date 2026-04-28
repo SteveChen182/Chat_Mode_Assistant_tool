@@ -1,0 +1,15 @@
+version: 1
+description: Run native SAT ETL analysis on a user-selected ETL file or ETL attachment name.
+kind: command
+params:
+- name: id
+  type: int
+  description: The HSD id that user input
+  optional: false
+- name: etl_target
+  type: str
+  description: Selected ETL target from interactive menu (ETL file name or attachment name)
+  optional: false
+env: []
+run:
+  command: $GNAI_TOOLKIT_ENTRYPOINT $GNAI_TOOLKIT_DIRECTORY/src/native_etl_analyzer.py

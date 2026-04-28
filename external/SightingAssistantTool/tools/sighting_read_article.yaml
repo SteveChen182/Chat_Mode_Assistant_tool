@@ -1,0 +1,12 @@
+version: 1
+description: A tool to read HSD article and comments and save output to the file param named hsd_info_file.
+kind: command
+params:
+- name: id 
+  type: int
+  description: The HSD id that user input
+  optional: false 
+env: []
+run:
+  command: $GNAI_TOOLKIT_ENTRYPOINT $GNAI_TOOLKIT_DIRECTORY/src/read_article.py
+  console_output: ""

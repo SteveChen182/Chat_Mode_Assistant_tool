@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "SightingAssistant_Chatter",
+  "version": "1.0.0",
+  "description": "Chat with webpage content via GNAI-compatible endpoint.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "sidePanel",
+    "clipboardRead",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_title": "SightingAssistant_Chatter"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}

@@ -1,0 +1,16 @@
+version: 1
+description: A tool to read HSD article and comments and analyse the GDHM dumps via sherlog 
+kind: command 
+params:
+- name: list_of_gdhm_ids
+  type: str 
+  description: List of GDHM IDs that are present in the HSD id 
+  optional: false
+- name: hsd_id
+  type: str
+  description: HSD ID for the current sighting (used to organise output under SAT_{hsd_id}_Output/Sherlog_Output/)
+  optional: true
+env: []
+run:
+  command: $GNAI_TOOLKIT_ENTRYPOINT $GNAI_TOOLKIT_DIRECTORY/src/sherlog_subprocess.py
+  console_output: ""

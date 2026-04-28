@@ -1,0 +1,345 @@
+﻿=== GNAI Direct CLI Test ===
+TimestampStart: 2026-03-18 22:01:22.598
+WorkingDir: C:\Users\steveche\OneDrive - Intel Corporation\Documents\Python_Project\GCD_SightingAssistantTool
+Command: C:\Users\steveche\bin\dt.exe gnai ask "please check hsd id 16028493318" --assistant sighting_assistant
+
+--- Combined Output (stdout+stderr) ---
+
+��� Loading toolkits...
+a"���Asking GNAI (sighting_assistant) ��b%)"U%���b%)"U%���b%)"U%�     
+Now let me get the category classification and perform the RAG searches for DFD checklist and BKM guidance:
+
+Now let me call the sighting_sherlog_sync tool to analyze the GDHM dumps found in the HSD content. I identified GDHM IDs: 3215439703, 3215974035, and 3224858738.
+
+Now I have all the information needed to compile the complete analysis. Let me prepare the full report.
+
+---
+
+## 1. **Content Extraction & Summary**
+
+### 1.1 Basic Information
+**ID:** 16028493318
+**Title:** [TGL-U][25H2][VULKAN]Dota 2 - Crash Observed with TDR while launching Vulkan API
+**Main Issue:** Dota 2 game crashes with TDR when launching with Vulkan API on Gen12 LP platforms (TGL-U, ADL-S, ADL-P, RKL-S, TWL) due to uninitialized VK_KHR_fragment_shading_rate extension usage.
+
+### 1.2 Detailed Problem Description
+**Description:** The issue involves Dota 2 game crashing with a Timeout Detection and Recovery (TDR) error when launched using the Vulkan rendering API on Tiger Lake-U and other Gen12 LP platforms. The root cause was identified as the game attempting to use the VK_KHR_fragment_shading_rate Vulkan extension which is not fully supported on Gen12 LP platforms. The game detects that the extension does not support all required features and reports disabling it, but still calls `vkCmdSetFragmentShadingRateKHR()` function, causing an assertion failure in the driver's `GetFragmentShadingRateOffset` function when `m_FragmentShadingRatePrimitiveCombinerCount` and `m_FragmentShadingRateAttachmentCombinerCount` are zero.
+
+The issue was reproducible at 100% rate on Gen12 LP platforms (TGL-U, ADL-S, ADL-P, RKL-S, TWL) but worked correctly on Gen12 HP (DG2) and MTL-H platforms. The issue was not seen on AMD systems. A fix was implemented via AIL (Application Image List) mechanism to handle the uninitialized extension usage. The issue was verified fixed in driver version 101.7079.
+
+### 1.3 Attachment Analysis
+
+#### 1.3.1 ETL Attachment Analysis
+| Name | ETL Type | Notes |
+|------|----------|-------|
+| N/A | N/A | No ETL files directly attached to HSD |
+
+#### 1.3.2 Other Attachment Details
+| Name | Type | Notes |
+|------|------|-------|
+| Pass_Logs.zip | Archive | External link - Contains pass case logs including sysconfig, DxDiag, Debug Layer, GPUView/ETL traces |
+| Fail_Logs.zip | Archive | External link - Contains fail case logs including sysconfig, DxDiag, Debug Layer, GPUView/ETL traces |
+| DOTA2_Vulkan Issue.mp4 | Video | Video reference showing the issue |
+| Issue_Screenshot.png | Image | Screenshot of the issue |
+| AMD_Issue Not Seen.png | Image | Screenshot showing issue not seen on AMD |
+| Dota 2 Pass Video.mp4 | Video | Video showing issue fixed in 101.7079 |
+
+#### 1.3.3 GOP Log Analysis (if GOP logs attached)
+No GOP logs detected in the attachments. No GOP indicators (gop, uefi, preos, bios, intelgop, intelugop, intelpeim, boot) found in file names.
+
+#### 1.3.4 DisplayDebugger Analysis (if display logs present)
+No display logs directly attached to HSD for analysis. Logs referenced via external SharePoint links (Pass_Logs.zip, Fail_Logs.zip) but not available for automated analysis.
+
+#### 1.3.5 GDHM Dump Analysis via Sherlog (if GDHM IDs present)
+GDHM IDs found in HSD content:
+- **3215439703** - Original submitter's GDHM dump
+- **3215974035** - Triage team's GDHM dump
+- **3224858738** - Verification team's GDHM dump
+
+Sherlog analysis was attempted but encountered failures. Analysis commands were executed but output files were not generated. The dumps point to Vulkan component according to the HSD comments. The dumps indicate TDR events related to the VK_KHR_fragment_shading_rate extension assertion failure.
+
+#### 1.3.6 BurninTest Log Analysis (if present)
+No BurninTest logs present in this HSD.
+
+### 1.4 Driver Information 
+**Driver Build Type:** Production/CI-Master
+**Driver Version:** Reported: 32.0.101.7074, Fixed: 32.0.101.7079
+**Driver Build Date:** Not explicitly stated
+**ETL File Names:** Referenced in Pass_Logs.zip and Fail_Logs.zip (external links)
+**Age Warning:** No - Issue is recently resolved (WW44 2025)
+
+### 1.5 Pipe Underrun Analysis
+**Status:** Not Detected
+**Count:** 0
+**Affected Files:** N/A (Not a display underrun issue - this is a Vulkan API crash)
+
+### 1.6 Regression Analysis
+**Regression Status:** No
+**Details:** This is not a regression. The issue was present across multiple driver versions:
+- Public drivers: 101.7074, 101.7023, 101.6881, 101.6795, 101.6651 - All FAILED
+- CI-Master: 19500, 19392, 19115, 18795, 18546 - All FAILED
+- Driver regression analysis limited due to Legacy branch creation from ci-master-19485
+- This appears to be a long-standing issue where Gen12 LP never properly supported VK_KHR_fragment_shading_rate extension handling in Dota 2
+
+### 1.7 RVP Reproducibility Status
+**Status:** Reproducible
+**Details:** 100% reproducible on RVP systems:
+- **Issue Seen:** TGL-U RVP, ADL-S RVP, RKL-S RVP, TWL RVP
+- **Issue NOT Seen:** MTL-H RVP, ROG ADL-S + IBC A750 FRD DG2 Retail (Gen12 HP platforms work fine)
+
+### 1.8 Reproduction Steps
+1. Install latest BKC (TGL-UY42-25.35.2.112)
+2. Install driver gfx_win_101.7074.exe (or earlier failing version)
+3. Install Dota 2 from Steam
+4. After installation, enable Vulkan DLC: Manage -> Properties -> DLC -> Check "Dota 2 Vulkan Support"
+5. Launch Game and change rendering option to Vulkan from Video settings
+6. Relaunch the game
+7. **Issue:** Crash with TDR observed while launching DOTA 2 in Vulkan API
+
+### 1.9 System Configuration and Environment Details
+**Hardware:**
+- Platform: TGL U DDR4 SODIMM CRB FAB 1
+- CPU: TGL U CPU C0 QX2N 96EU 4c QS 270
+- Memory: 16 GB
+- GPU: Intel Iris Xe Graphics (TGL-U integrated)
+- Display: LG 4K HDR (Bom 46)
+- BIOS: TGLSFWI1.R00.6261.A00.2306280425
+- IFWI: TGL_R_C0_UP3_IFWI_2023WW37.4.01
+
+**Software:**
+- OS: Windows 11 25H2 (Build 26200.5742)
+- BKC: TGL-UY42-25.35.2.112
+- Driver: gfx_win_101.7074.exe (failing), gfx_win_101.7079 (passing)
+- IGCC Lite: 1.100.5688.0 (v26.0)
+- IGS Version: 25.32.1758.2
+- Edge Version: 140.0.3485.54
+
+**Environment:**
+- Application: Dota 2 (Steam App ID: 570, Build ID: 19931432/19948489/20503303)
+- API: Vulkan
+- 3rd Party Comparison: AMD Radeon 550X Series (31.0.21923.11000) - Issue NOT seen
+
+---
+
+## 2. **Issue Classification**
+
+**Category:** TDR
+**Agent Output:** The sighting_get_category tool classified this issue as TDR based on the crash behavior involving Timeout Detection and Recovery when launching Dota 2 with Vulkan API on Gen12 LP platforms.
+**Reason:** The issue involves a TDR (Timeout Detection and Recovery) crash caused by the Vulkan driver encountering an unsupported VK_KHR_fragment_shading_rate extension usage on Gen12 LP platforms. The driver's UMD_ASSERT failure in GetFragmentShadingRateOffset triggers a TDR event. This is specifically a Vulkan API/Gaming TDR issue caused by improper handling of unsupported hardware features.
+**Confidence:** High
+
+---
+
+## 3. **Attachment Verification**
+
+### 3.1 Attachment Analysis
+**Expected:** 
+- GDHM dump links (for TDR issues)
+- Crash dumps (WATCHDOG dumps)
+- Video evidence
+- System configuration logs
+- Pass/Fail ETL traces
+- DxDiag
+
+**Present:** 
+- GDHM links: 3215439703, 3215974035, 3224858738 ���
+- Video evidence: DOTA2_Vulkan Issue.mp4, Dota 2 Pass Video.mp4 ���
+- Screenshots: Issue_Screenshot.png, AMD_Issue Not Seen.png ���
+- External log archives: Pass_Logs.zip, Fail_Logs.zip (SharePoint links) ���
+- System configuration tables in HSD description ���
+
+**Missing:**
+- Direct HSD attachment of ETL files (referenced via external links)
+- Debug layer logs directly attached (referenced in external zips)
+
+**Unexpected:** None
+
+### 3.2 Validity Assessment
+**Valid article as per attachment requirements: YES**
+**Validity Reason:** The HSD contains comprehensive triage information including multiple GDHM dump links for TDR analysis, video evidence of both fail and pass cases, 3rd party comparison (AMD), detailed system configuration, clear reproduction steps, extensive driver regression testing, and external links to pass/fail log archives. The fix has been implemented (PR #223898) and verified with driver 101.7079.
+
+---
+
+## 4. **Suggestions as per DFD Checklist**
+
+### 4.1 Mandatory DFD Checklist for moving issue to Debug Compliance
+
+**Mandatory DFD Analysis Output:** Based on RAG retrieval from [DFD - Checklist before moving issue to Debug]
+
+| Checklist Item | Description | Yes/No |
+|----------------|-------------|--------|
+| Is the issue specific to customer system? | TGL-U RVP, ADL-S RVP, RKL-S RVP, TWL RVP - Issue seen on multiple Gen12 LP RVP systems | Yes |
+| Is the issue seen on latest ci-master driver? | Tested with CI Master 19500, 19392, 19115, 18795, 18546 - issue seen on all. Latest 19687 not compatible. | Yes |
+| Are videos attached after the repro? | DOTA2_Vulkan Issue.mp4 and Dota 2 Pass Video.mp4 attached | Yes |
+| Capture logs for pass and fail cases? | Pass_Logs.zip and Fail_Logs.zip referenced (external SharePoint links) | Yes |
+| Is this regression? | No - Issue present since earliest tested driver (101.6651) | Yes |
+| Debugger connectivity available? | Not explicitly stated in HSD | No |
+| Fail Rate documented? | 100% reproducible (always_100% field) | Yes |
+| Does the Issue happen with 3rd Party Graphics? | Tested with AMD Radeon 550X - Issue NOT seen | Yes |
+| GDHM dumps uploaded? | Yes - 3215439703, 3215974035, 3224858738 | Yes |
+| Collect logs via STC tool? | Referenced logs collected in zip archives | Yes |
+
+**Compliance:** 9/10 compliant
+
+**BKM Guidance Source:** [DFD - Checklist before moving issue to Debug], [Game Triage Checklist], [Application Debug Handbook] - RAG (gpu-debug profile)
+
+**BKM Output:** Based on category=TDR and scenario=Dota 2 Vulkan crash with TDR on game launch:
+- MANDATORY: Capture the 'WATCHDOG' dump and upload to GDHM - On each TDR event, crash dumps are stored to C:/Windows/LiveKernelReports/WATCHDOG
+- MANDATORY: Check TDR type - Check if TDR is due to GPU scheduler timeout or GPU page fault
+- MANDATORY: Reproduce on other platform - Identify platform generation & stepping
+- BEST EFFORT: Look for driver asserts occurring before the TDR
+- BEST EFFORT: Check validity of the application using Validation Layers
+- Collect Debug Layer Log for DX API (Vulkan validation layers for VK API)
+- Game Settings isolation - Check specific to windowed/fullscreen mode, resolution, graphics preset, API settings
+
+**BKM Suggestions:**
+- ��� GDHM dumps uploaded with links - Evidence: 3215439703, 3215974035, 3224858738 present in HSD
+- ��� TDR type identified - Evidence: Root cause identified as VK_KHR_fragment_shading_rate assertion failure
+- ��� Multiple platform testing - Evidence: TGL-U, ADL-S, RKL-S, TWL (failed), MTL-H, DG2 (passed)
+- ��� 3rd party comparison - Evidence: AMD tested, issue not seen
+- ��� Game settings isolation - Evidence: Issue specific to Vulkan API, DX11 works
+- Not evidenced; recommended by DFD BKM: Explicit windbg debugger connectivity confirmation
+- Not evidenced; recommended by DFD BKM: Full memory dump collection (mini dumps may not be sufficient for indirect state debug)
+
+---
+
+## 5. **Triage and Troubleshooting Review**
+
+### 5.1 Analysis of Comments and Actions
+**Comments Analysis:** 
+- **jamespje (2025-09-12):** Questioned if use case ever worked, noted driver regression analysis limited to gfx-driver-ci-master-19485
+- **mswathi (2025-09-19):** No driver regression found, GDHM dumps point to Vulkan component, moved to Vulkan team
+- **pjagusia (2025-10-15):** Root cause identified - Assert on unsupported gen12lp feature in GetFragmentShadingRateOffset function, gen12hp works fine
+- **pjagusia (2025-10-16):** Detailed analysis - Dota2 checks VK_KHR_fragment_shading_rate extension, reports disabling but still calls vkCmdSetFragmentShadingRateKHR(), needs AIL fix
+- **pjagusia (2025-10-20):** Draft PR submitted: https://github.com/intel-innersource/drivers.gpu.unified/pull/223898
+- **manumohx (2025-10-23):** Issue still seen with 101.7078
+- **manumohx (2025-10-29):** Issue NOT seen with 101.7079 - Fix verified
+
+### 5.2 Troubleshooting Assessment
+**Troubleshooting Steps Performed:**
+- Driver regression testing across multiple public and CI-master versions - Issue consistently present
+- Platform comparison testing (TGL-U, ADL-S, RKL-S, TWL vs MTL-H, DG2) - Gen12 LP specific
+- 3rd party comparison (AMD) - Issue Intel-specific
+- API isolation (Vulkan vs DX11) - Issue Vulkan-specific
+- Root cause analysis via GDHM dumps - Identified VK_KHR_fragment_shading_rate assertion
+- Game log analysis - Found "VK_KHR_fragment_shading_rate does not support all required features, disabling" message
+
+**Successful Mitigations:** 
+- AIL (Application Image List) fix implemented to handle uninitialized VK_KHR_fragment_shading_rate extension usage in Dota2
+- Fix merged and verified in driver 101.7079
+
+**Failed Mitigations:** 
+- Driver 101.7078 still showed issue (fix not yet integrated)
+
+**Pending Actions:** 
+- None - Issue is VERIFIED FIXED
+
+**Recommended Next Steps:**
+- Monitor for similar issues in other games using VK_KHR_fragment_shading_rate extension on Gen12 LP
+- Consider proactive AIL entries for other games with similar extension misuse patterns
+
+---
+
+## 6. **Executive Summary & Recommendations**
+
+### 6.1 Technical Summary
+**Summary:** This was a Vulkan driver TDR issue affecting Dota 2 on Gen12 LP platforms (TGL-U, ADL-S, RKL-S, TWL). The root cause was identified as improper handling of the VK_KHR_fragment_shading_rate Vulkan extension. Dota 2 queries the extension support, receives notification that full features aren't supported on Gen12 LP, logs that it's "disabling" the feature, but then proceeds to call vkCmdSetFragmentShadingRateKHR() anyway. This caused a UMD_ASSERT failure in the driver's GetFragmentShadingRateOffset function because m_FragmentShadingRatePrimitiveCombinerCount and m_FragmentShadingRateAttachmentCombinerCount were zero (unsupported). The fix was implemented via AIL (Application Image List) mechanism to gracefully handle this misuse pattern specifically for Dota 2. The fix was verified in driver 101.7079. Status is now VERIFIED.
+
+### 6.2 Actionable Recommendations
+**Recommendations:**
+- **Priority 1:** Issue is RESOLVED - No immediate action required
+- **Priority 2:** Consider documenting this pattern for similar future issues with VK_KHR_fragment_shading_rate on Gen12 LP
+- **Priority 3:** Proactive testing of other popular Vulkan games for similar extension misuse patterns
+
+### 6.3 Tool Usage Best Practices
+**For Optimal Analysis Results:** Archive pass/fail log pairs in one ZIP for comparison. Include both passing (DX11) and failing (Vulkan) traces when API-specific issues are identified.
+
+### 6.4 Escalation and Priority
+**Priority Level:** Medium (Was High during active investigation, now resolved)
+**Escalation Path:** N/A - Issue resolved and verified
+**Missing Information:** 
+- Direct ETL file attachments (logs in external SharePoint)
+- Explicit debugger connectivity confirmation
+
+### 6.5 Similar HSDs to this HSD
+**Top 5 Similar HSDs:**
+---
+Serial Number - 1
+  Confidence Score - 82
+  HSD ID - 2006658482
+  HSD Title - Functional Failure / DOTA 2/ Tdr after return from S3 / S4 [ACS][RANK2]
+---
+Serial Number - 2
+  Confidence Score - 72
+  HSD ID - 1807291350
+  HSD Title - [VK][LKF][GPUMMU-PF] Dota 2- TDRs when launching game
+---
+Serial Number - 3
+  Confidence Score - 71
+  HSD ID - 1607610778
+  HSD Title - [OST][ICL LP U][RS6][HP RAINER]: TDR observed while launching DOTA 2 via IGCC and Steam
+---
+Serial Number - 4
+  Confidence Score - 70
+  HSD ID - 18013543252
+  HSD Title - [TGL U B0][ACS][20H2][Vulkan] Dota 2 crash[Adhoc]
+---
+Serial Number - 5
+  Confidence Score - 68
+  HSD ID - 16023552937
+  HSD Title - [LNL-Mx][B0][Vulkan][Gaming] DOTA2 : App hang + TDR(x141) + crash observed after game launch w/ Vulkan API
+---
+
+---
+
+## 7. **Technical Steps and Tool Invocation Log**
+
+**Sighting Read Article:** Yes - Successfully retrieved HSD info with full description and 8 comments
+**Sighting Attachments:** Yes - Successfully analyzed (0 direct attachments, logs via external links)
+**GOP Analyzer Tool(sighting_gop_analyzer):** No - No GOP logs detected in attachments
+**sighting_rag_search:** Yes - Successfully retrieved mandatory checklist and BKM guidance (2 calls)
+**Sighting Get Category:** Yes - Classified as TDR with High confidence
+**GDHM IDs Extraction:** ['3215439703','3215974035','3224858738'] - 3 IDs found
+**sighting_sherlog_sync:** Yes - Executed for 3 GDHM IDs (analysis window opened, output files not generated)
+**Mandatory DFD Checklist Source:** RAG (gpu-debug profile) - Successfully retrieved
+**Category Specific BKM Guidance Source:** RAG (gpu-debug profile) - Successfully retrieved TDR/Gaming guidance
+**Similarity Search:** Yes - Successfully found 25 similar HSDs with top match at 82% confidence
+**Sighting Burnin Log Analyzer:** No - No burnin logs present
+**Tool invocation order:** 
+1. sighting_read_article (parallel)
+2. sighting_attachments (parallel)
+3. sighting_similarity_search (parallel)
+4. sighting_get_category
+5. sighting_rag_search (mandatory checklist)
+6. sighting_rag_search (BKM guidance)
+7. sighting_sherlog_sync
+
+**Justification:** Parallel invocation of read, attachments, and similarity search for efficiency. Category classification used HSD info and attachment analysis. RAG searches targeted mandatory checklist and category-specific BKM. Sherlog invoked for GDHM dump analysis.
+
+**Notes:** 
+- GOP analyzer not invoked - no GOP/UEFI/boot logs detected
+- DisplayDebugger not invoked - no display logs present and issue is not display-related (Vulkan API TDR)
+- Burnin log analyzer not invoked - no burnin logs present
+- GDHM IDs extracted from description and comments: 3215439703 (original), 3215974035 (triage), 3224858738 (verification)
+- Issue status is VERIFIED - fix implemented via AIL in PR #223898 and confirmed working in driver 101.7079
+- Fix description: "[VK][AIL] Handle uninitialized VK_KHR_fragment_shading_rate extension usage in Dota2."
+
+---
+**End of Summary**
+
+
+dt.exe : ^C^C^C
+At line:1 char:761
++ ... Date; try { & $dtPath gnai ask $prompt --assistant $assistant 2>&1 |  ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (^C^C^C:String) [], RemoteExceptio 
+   n
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+--- Summary ---
+TimestampEnd: 2026-03-18 22:05:36.159
+DurationSec: 253.483
+ExitCode: 0
+
+
