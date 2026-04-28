@@ -117,3 +117,60 @@ prompt: |
 
 - **只改一件事：** 移除 `pause` — 直接消除最大的技術 hack。
 - **改三件事：** `pause` + `[USER_INPUT_REQUIRED]` 標記 + `[PROGRESS]` 輸出 — 1 小時工作量，Extension 可靠度從 80% → **95%+**。
+
+---
+
+## 建議 6：Phase 1 拆成兩步 — 先輸出已知摘要再跑耗時 tools
+
+> 日期：2026-04-28 | 背景：Extension 測試 HSD 14027453772 時，所有 Phase 1 tools 同時呼叫，用戶等到 Sherlog 跑完才看到第一行 answer text
+
+### 問題
+
+目前 `sighting_assistant.yaml` 的 Phase 1 prompt 讓 LLM 一口氣呼叫所有 tools（`read_article`、`attachments`、`similarity_search`、`rag_search`、`sherlog_sync`、`gop_analyzer` 等），然後等**全部完成**後才開始生成 answer。
+
+其中 `sherlog_sync` 和 `displaydebugger` 是 subprocess 呼叫外部 GNAI assistant，可能需要 1-5 分鐘。用戶在這段時間只看到 "Running: Sherlog Sync" 的 spinner，沒有任何內容。
+
+### 建議修改
+
+在 `sighting_assistant.yaml` 的 prompt 中，將 Phase 1 拆成 **Step A（快速）** 和 **Step B（耗時）**：
+
+```yaml
+prompt: |
+  ## PHASE 1 — DATA GATHERING (TWO-STEP)
+
+  ### Step 1A — Quick Data (output immediately after these tools return)
+  1. Call sighting_read_article with the HSD ID
+  2. Call sighting_attachments with the HSD ID
+  3. Call sighting_similarity_search with the HSD ID
+  4. Call sighting_rag_search for DFD checklist and BKM
+
+  **AFTER Step 1A tools return, IMMEDIATELY output a preliminary summary:**
+  - HSD title, category, component, status
+  - Attachment list (names, sizes, types)
+  - Similar HSD matches (if any)
+  - DFD checklist status
+  
+  Format: "## Preliminary Summary (detailed analysis in progress...)"
+
+  ### Step 1B — Deep Analysis (runs after preliminary summary is shown)
+  5. If GDHM IDs found → call sighting_sherlog_sync
+  6. If GOP logs found → call sighting_gop_analyzer
+  7. If display logs found → call sighting_displaydebugger
+  
+  After Step 1B tools complete, append their results to the analysis.
+```
+
+### 預期效果
+
+| 階段 | 時間 | 用戶看到 |
+|------|------|----------|
+| Step 1A | ~10-20s | HSD 摘要、附件列表、相似 HSD、checklist |
+| Step 1B | ~1-5min | Sherlog/DisplayDebugger/GOP 分析結果追加 |
+
+用戶在等 Sherlog 跑的時候已經能看到 HSD 的基本資訊，大幅改善體驗。
+
+### 風險
+
+- **低風險：** 只改 prompt 文字，不改 tool code
+- **注意：** LLM 可能忽略「先輸出再繼續」的指令，需要用強指令語氣（如 `YOU MUST output the preliminary summary BEFORE calling Step 1B tools. DO NOT batch all tools together.`）
+- **Token 影響：** 多一次 answer generation（preliminary summary），增加約 500-1000 tokens
