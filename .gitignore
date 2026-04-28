@@ -24,3 +24,8 @@ Thumbs.db
 *.7z
 *.zip
 SAT_*_Output/
+
+# Bridge debug/generated
+bridge/bridge_debug.log
+bridge/native_host.cmd
+bridge/com.chat_mode_assistant.bridge.json

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chat Mode Assistant</title>
+  <style>
+    :root { --primary: #5F80AB; --bg: #f3f4f6; --msg-user: #dbeafe; --msg-ai: #ffffff; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-size: 14px;
+    }
+
+    /* ── Header ─── */
+    .header {
+      background: var(--primary);
+      color: #fff;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+    }
+    .header-title { font-size: 15px; font-weight: 700; }
+    .header-status {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.2);
+    }
+    .header-status.connected { background: #22c55e; color: #fff; }
+    .header-status.disconnected { background: #ef4444; color: #fff; }
+    .header-controls { display: flex; gap: 6px; }
+    .header-btn {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: #fff;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .header-btn:hover { background: rgba(255,255,255,0.35); }
+
+    /* ── Chat Area ─── */
+    #chat-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .msg { max-width: 90%; padding: 10px 14px; border-radius: 12px; line-height: 1.5; word-wrap: break-word; }
+    .msg-user { background: var(--msg-user); align-self: flex-end; border-bottom-right-radius: 4px; }
+    .msg-ai { background: var(--msg-ai); align-self: flex-start; border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .msg-ai pre { background: #f9fafb; padding: 8px; border-radius: 6px; overflow-x: auto; font-size: 12px; margin: 6px 0; }
+    .msg-ai code { font-size: 12px; }
+    .msg-ai table { border-collapse: collapse; margin: 6px 0; font-size: 12px; }
+    .msg-ai th, .msg-ai td { border: 1px solid #d1d5db; padding: 4px 8px; text-align: left; }
+    .msg-ai th { background: #f3f4f6; }
+
+    /* ── Tool Progress ─── */
+    .tool-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: #fef3c7;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #92400e;
+      align-self: flex-start;
+    }
+    .tool-indicator .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid #f59e0b;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Quick Action Buttons ─── */
+    #quick-actions {
+      display: none;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px 14px;
+      background: #eef2ff;
+      border-top: 1px solid #c7d2fe;
+    }
+    #quick-actions.show { display: flex; }
+    .quick-btn {
+      background: #fff;
+      border: 1px solid #a5b4fc;
+      color: #4338ca;
+      border-radius: 16px;
+      padding: 5px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .quick-btn:hover { background: #4338ca; color: #fff; }
+    .quick-btn.selected { background: #4338ca; color: #fff; }
+
+    /* ── Input Area ─── */
+    .input-area {
+      display: flex;
+      gap: 8px;
+      padding: 10px 14px;
+      background: #fff;
+      border-top: 1px solid #e5e7eb;
+    }
+    #input {
+      flex: 1;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      outline: none;
+      resize: none;
+      min-height: 38px;
+      max-height: 120px;
+      font-family: inherit;
+    }
+    #input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(95,128,171,0.2); }
+    #send-btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #send-btn:hover { background: #4a6a94; }
+    #send-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <span class="header-title">Chat Mode Assistant</span>
+    <span id="status-badge" class="header-status disconnected">Offline</span>
+    <div class="header-controls">
+      <button id="btn-new" class="header-btn" title="New Session">New</button>
+      <button id="btn-stop" class="header-btn" title="Stop Session">Stop</button>
+    </div>
+  </div>
+
+  <!-- Chat messages -->
+  <div id="chat-area"></div>
+
+  <!-- Quick action buttons (shown when AI asks a question) -->
+  <div id="quick-actions"></div>
+
+  <!-- Input -->
+  <div class="input-area">
+    <textarea id="input" rows="1" placeholder="Type a message or HSD ID..."></textarea>
+    <button id="send-btn">Send</button>
+  </div>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>

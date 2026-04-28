@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Chat Mode Assistant",
+  "version": "0.1.0",
+  "description": "Interactive GNAI chat mode assistant with streaming responses and smart quick-action buttons.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "sidePanel",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8776/*"
+  ],
+  "icons": {
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "Chat Mode Assistant",
+    "default_icon": "icons/icon128.png"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
