@@ -138,7 +138,7 @@ function startStreaming(port) {
   currentEventSource = es;
 
   const eventTypes = [
-    "answer", "tool_start", "tool_request", "usage", "ready", "info", "end", "goodbye"
+    "answer", "tool_start", "tool_request", "usage", "ready", "info", "end", "goodbye", "error"
   ];
 
   for (const type of eventTypes) {

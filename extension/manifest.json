@@ -5,6 +5,7 @@
   "description": "Interactive GNAI chat mode assistant with streaming responses and smart quick-action buttons.",
   "permissions": [
     "activeTab",
+    "tabs",
     "storage",
     "sidePanel",
     "nativeMessaging"

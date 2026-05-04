@@ -395,6 +395,14 @@ class ChatSession:
             self._ignore_prompt = False   # next '> ' prompt is the real one
             return {"type": "usage", "usage": data["usage"]}
 
+        # Error from gnai (e.g. tool execution failure, connection abort)
+        # Reset _ignore_prompt so the next '> ' prompt is detected
+        if data.get("level") == "error":
+            self._ignore_prompt = False
+            error_msg = data.get("msg", "Unknown error")
+            _debug(f"[event] gnai error detected, resetting ignore_prompt: {error_msg[:200]}")
+            return {"type": "error", "text": error_msg}
+
         # Goodbye
         if data.get("msg") == "Goodbye!":
             return {"type": "goodbye"}
@@ -527,6 +535,16 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def _handle_start(self):
         body = self._read_json_body()
         assistant = body.get("assistant", DEFAULT_ASSISTANT)
+        # If session already active, return it instead of killing
+        existing = _get_session()
+        if existing and existing.is_alive:
+            self._json_response(200, {
+                "status": "already_active",
+                "assistant": existing.assistant,
+                "session_waiting_input": existing.is_waiting_input,
+                "message": "Session already running.",
+            })
+            return
         try:
             session = _start_session(assistant)
             self._json_response(200, {
