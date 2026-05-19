@@ -147,6 +147,31 @@
     }
     #send-btn:hover { background: #4a6a94; }
     #send-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+    #regression-input {
+      flex: 1;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      outline: none;
+      resize: none;
+      min-height: 38px;
+      max-height: 120px;
+      font-family: inherit;
+    }
+    #regression-input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(95,128,171,0.2); }
+    #regression-send-btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    #regression-send-btn:hover { background: #4a6a94; }
+    #regression-send-btn:disabled { background: #9ca3af; cursor: not-allowed; }
     #btn-bottom {
       background: #e5e7eb;
       color: #374151;
@@ -261,7 +286,7 @@
       </div>
       <button id="btn-new" class="header-btn" title="New Session">New</button>
       <button id="btn-stop" class="header-btn" title="Stop Session">Stop</button>
-      <button id="btn-regression" class="header-btn" title="Regression Tool" style="background:#d4a017;color:#fff;font-weight:700;">R</button>
+      <button id="btn-regression" class="header-btn" title="Regression Tool" style="background:#d4a017;color:#fff;font-weight:700;" disabled>R</button>
     </div>
   </div>
 

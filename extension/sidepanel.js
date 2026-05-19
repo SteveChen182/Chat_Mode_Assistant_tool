@@ -651,6 +651,7 @@ function updateHeaderTitle() {
   if (headerTitle) {
     headerTitle.textContent = activeHsdId ? `HSD ${activeHsdId}` : "Chat Mode Assistant";
   }
+  updateRegressionBtnState();
 }
 
 let activeHsdTitle = "";
@@ -659,6 +660,7 @@ let activeConversationId = "";  // GNAI conversation ID
 function updateHeaderSubtitle(title) {
   activeHsdTitle = title || "";
   _renderSubtitle();
+  updateRegressionBtnState();
 }
 
 function updateConversationId(cid) {
@@ -1117,6 +1119,11 @@ const btnBackToChat = document.getElementById("btn-back-to-chat");
 let isRegressionMode = false;
 const HEADER_COLOR_CHAT = "#5F80AB";
 const HEADER_COLOR_REGRESSION = "#b8860b";  // dark goldenrod (土黃色)
+
+function updateRegressionBtnState() {
+  // R button requires both HSD ID and title to be available
+  btnRegression.disabled = !(activeHsdId && activeHsdTitle);
+}
 
 function switchToRegressionMode() {
   isRegressionMode = true;
