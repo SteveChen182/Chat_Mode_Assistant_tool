@@ -132,6 +132,7 @@
       font-family: inherit;
     }
     #input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(95,128,171,0.2); }
+    #input:disabled { background: #f3f4f6; color: #9ca3af; cursor: not-allowed; }
     #send-btn {
       background: var(--primary);
       color: #fff;
@@ -207,8 +208,10 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      display: none;
+      justify-content: space-between;
     }
-    .header-subtitle.show { display: block; }
+    .header-subtitle.show { display: flex; }
   </style>
 </head>
 <body>
@@ -218,9 +221,10 @@
     <span id="header-title" class="header-title">Chat Mode Assistant</span>
     <span id="status-badge" class="header-status disconnected">Offline</span>
     <div class="header-controls">
+      <button id="btn-save" class="header-btn" title="Save chat as HTML">&#128190;</button>
       <button id="btn-import" class="header-btn" title="Import HSD from current tab">Import HSD</button>
       <div class="history-wrap">
-        <button id="btn-history" class="header-btn" title="Session History">↺</button>
+        <button id="btn-history" class="header-btn" title="Session History">&#8634;</button>
         <div id="historyMenu" class="history-menu"></div>
       </div>
       <button id="btn-new" class="header-btn" title="New Session">New</button>
@@ -228,8 +232,11 @@
     </div>
   </div>
 
-  <!-- HSD subtitle (shown when HSD title is available) -->
-  <div id="header-subtitle" class="header-subtitle"></div>
+  <!-- HSD subtitle (shown when HSD title or CID is available) -->
+  <div id="header-subtitle" class="header-subtitle">
+    <span id="subtitle-title"></span>
+    <span id="subtitle-cid" style="opacity:0.7; font-family:monospace;"></span>
+  </div>
 
   <!-- History viewer bar (shown when viewing read-only history) -->
   <div id="history-viewer-bar" class="history-viewer-bar">

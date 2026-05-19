@@ -173,8 +173,9 @@ class ChatSession:
     forcing line-buffered output.
     """
 
-    def __init__(self, assistant=None):
+    def __init__(self, assistant=None, conversation_id=None):
         self.assistant = assistant or DEFAULT_ASSISTANT
+        self.conversation_id = conversation_id  # user-specified conversation ID
         self._pty = None                         # PtyProcess instance
         self.event_queue = queue.Queue()
         self._reader_thread = None
@@ -196,6 +197,8 @@ class ChatSession:
             raise RuntimeError("dt command not found in PATH")
 
         cmd = f'{dt_cmd} gnai chat --json --assistant {self.assistant}'
+        if self.conversation_id:
+            cmd += f' --conversation-id {self.conversation_id}'
         _debug(f"starting via ConPTY: {cmd}")
 
         self._pty = PtyProcess.spawn(cmd)
@@ -383,11 +386,13 @@ class ChatSession:
             conv_id = config.get("conversation_id")
             if conv_id and not self.session_id:
                 self.session_id = conv_id
+                _debug(f"conversation_id captured: {conv_id}")
             return {
                 "type": "tool_request",
                 "name": req.get("name", ""),
                 "operation": req.get("operation", ""),
                 "request_id": req.get("request_id", ""),
+                "conversation_id": self.session_id or "",
             }
 
         # Usage (response complete): {"usage": {...}, ...}
@@ -433,12 +438,12 @@ def _get_session():
     return _current_session
 
 
-def _start_session(assistant=None):
+def _start_session(assistant=None, conversation_id=None):
     global _current_session
     with _session_lock:
         if _current_session and _current_session.is_alive:
             _current_session.stop()
-        session = ChatSession(assistant)
+        session = ChatSession(assistant, conversation_id)
         session.start()
         _current_session = session
         return session
@@ -530,26 +535,30 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "session_active": session is not None and session.is_alive,
             "session_waiting_input": session.is_waiting_input if session else False,
             "session_id": session.session_id if session else None,
+            "conversation_id": session.conversation_id if session else None,
         })
 
     def _handle_start(self):
         body = self._read_json_body()
         assistant = body.get("assistant", DEFAULT_ASSISTANT)
+        conversation_id = body.get("conversation_id", None)
         # If session already active, return it instead of killing
         existing = _get_session()
         if existing and existing.is_alive:
             self._json_response(200, {
                 "status": "already_active",
                 "assistant": existing.assistant,
+                "conversation_id": existing.conversation_id,
                 "session_waiting_input": existing.is_waiting_input,
                 "message": "Session already running.",
             })
             return
         try:
-            session = _start_session(assistant)
+            session = _start_session(assistant, conversation_id)
             self._json_response(200, {
                 "status": "starting",
                 "assistant": session.assistant,
+                "conversation_id": session.conversation_id,
                 "message": "Session spawned. Connect to /session/stream for events.",
             })
         except Exception as e:

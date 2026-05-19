@@ -22,6 +22,30 @@ Write-Host ""
 Write-Host "=== Chat Mode Assistant - Native Messaging Setup ===" -ForegroundColor Cyan
 Write-Host ""
 
+# ── Pre-flight checks ──────────────────────────────────────────────────
+if (-not (Get-Command dt -ErrorAction SilentlyContinue)) {
+    Write-Error "dt CLI not found in PATH. Please install Intel Developer Toolkit first."
+    exit 1
+}
+$dtVer = (dt version 2>&1) | Select-String "Version:" | ForEach-Object { $_.ToString().Trim() }
+Write-Host "[OK] dt found: $dtVer" -ForegroundColor Green
+
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+    Write-Error "Python not found in PATH. Please install Python 3.10+ first."
+    exit 1
+}
+$pyVer = (python --version 2>&1) | Out-String
+Write-Host "[OK] Python found: $($pyVer.Trim())" -ForegroundColor Green
+
+try {
+    python -c "import winpty" 2>$null
+    Write-Host "[OK] pywinpty installed" -ForegroundColor Green
+} catch {
+    Write-Warning "pywinpty not found. Run: pip install pywinpty"
+}
+
+Write-Host ""
+
 # ── Get Extension ID ────────────────────────────────────────────────────
 if (-not $ExtensionId) {
     Write-Host "To find your Extension ID:" -ForegroundColor Yellow

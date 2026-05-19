@@ -3,13 +3,18 @@ import time
 import re
 import sys
 
+import shutil
+
 try:
     from winpty import PtyProcess
 except ImportError:
     print("ERROR: pip install pywinpty")
     sys.exit(1)
 
-DT = r"C:\Users\steveche\bin\dt.EXE"
+DT = shutil.which("dt")
+if not DT:
+    print("ERROR: dt not found in PATH. Set BRIDGE_DT_PATH or add dt to PATH.")
+    sys.exit(1)
 ANSI_RE = re.compile(r'\x1b\[[^a-zA-Z]*[a-zA-Z]|\x1b\[\?[0-9]*[a-zA-Z]')
 
 def strip_ansi(s):

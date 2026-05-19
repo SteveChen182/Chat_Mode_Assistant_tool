@@ -16,9 +16,55 @@ const sendBtn = document.getElementById("send-btn");
 const btnNew = document.getElementById("btn-new");
 const btnStop = document.getElementById("btn-stop");
 const btnImport = document.getElementById("btn-import");
+const btnSave = document.getElementById("btn-save");
 const headerTitle = document.getElementById("header-title");
 const headerSubtitle = document.getElementById("header-subtitle");
 const statusBadge = document.getElementById("status-badge");
+
+// ── Save Chat as HTML ──────────────────────────────────────────────────────
+btnSave.addEventListener("click", () => {
+  const title = headerTitle.textContent || "Chat Mode Assistant";
+  const subtitle = headerSubtitle?.textContent || "";
+  const timestamp = new Date().toLocaleString();
+  const chatContent = chatArea.innerHTML;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>${title} - ${subtitle || "Export"}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f3f4f6; padding: 20px; max-width: 900px; margin: 0 auto; font-size: 14px; }
+  h1 { color: #5F80AB; font-size: 18px; margin-bottom: 4px; }
+  .meta { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
+  .chat-area { display: flex; flex-direction: column; gap: 8px; }
+  .msg { max-width: 90%; padding: 10px 14px; border-radius: 12px; line-height: 1.5; word-wrap: break-word; }
+  .msg-user { background: #dbeafe; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .msg-ai { background: #ffffff; align-self: flex-start; border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .msg-ai pre { background: #f9fafb; padding: 8px; border-radius: 6px; overflow-x: auto; font-size: 12px; margin: 6px 0; }
+  .msg-ai code { font-size: 12px; }
+  .msg-ai table { border-collapse: collapse; margin: 6px 0; font-size: 12px; }
+  .msg-ai th, .msg-ai td { border: 1px solid #d1d5db; padding: 4px 8px; text-align: left; }
+  .msg-ai th { background: #f3f4f6; }
+  .tool-indicator { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: #fef3c7; border-radius: 8px; font-size: 12px; color: #92400e; }
+</style>
+</head>
+<body>
+<h1>${title}</h1>
+<div class="meta">${subtitle ? subtitle + "<br>" : ""}Exported: ${timestamp}</div>
+<div class="chat-area">${chatContent}</div>
+</body>
+</html>`;
+
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const safeName = (subtitle || title).replace(/[^a-zA-Z0-9_\-]/g, "_").substring(0, 60);
+  a.download = `${safeName}_${new Date().toISOString().slice(0,10)}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
 // ── State ──────────────────────────────────────────────────────────────────
 let port = null;
@@ -27,10 +73,25 @@ let currentAiText = "";        // accumulated text for current AI turn
 let isStreaming = false;
 let renderTimer = null;
 const RENDER_DEBOUNCE_MS = 300;
+// Progressive render state
+const PROGRESSIVE_THRESHOLD = 6000;  // switch to progressive mode above 6KB
+let frozenHtml = "";                 // HTML rendered for frozen portion
+let frozenTextLen = 0;               // how many chars of currentAiText are frozen
+let frozenNode = null;               // frozen content DOM node (avoids full innerHTML rebuild)
+let tailNode = null;                 // tail content DOM node
+
+function getRenderDebounce() {
+  const len = currentAiText.length;
+  if (len > 50000) return 1200;
+  if (len > 30000) return 800;
+  if (len > 10000) return 500;
+  return RENDER_DEBOUNCE_MS;
+}
 
 // ── History State ──────────────────────────────────────────────────────────
 const MAX_HISTORY = 10;
 let activeHsdId = null;        // detected from user's first message
+let hsdImported = false;       // true after Import HSD, before first analysis sent
 let sessionMessages = [];      // [{role, content}] for current session
 let liveSessionHtml = "";      // saved chatArea HTML when viewing history
 let isViewingHistory = false;
@@ -55,6 +116,9 @@ function connectPort() {
           setStatus("connected", "Loading toolkits...");
           addSystemMsg("Session starting... waiting for toolkit to load.");
           // Input stays disabled until SSE 'ready' event
+        }
+        if (msg.conversation_id) {
+          updateConversationId(msg.conversation_id);
         }
         break;
       case "session_stopped":
@@ -86,6 +150,9 @@ function connectPort() {
         break;
       case "tool_request":
         onToolRequest(msg.name, msg.operation);
+        if (msg.conversation_id && !activeConversationId) {
+          updateConversationId(msg.conversation_id);
+        }
         break;
       case "usage":
         onUsage(msg.usage);
@@ -117,6 +184,7 @@ function connectPort() {
         if (msg.session_active) {
           setStatus("connected", msg.session_waiting_input ? "Connected" : "Processing...");
           setInputEnabled(!!msg.session_waiting_input);
+          if (msg.conversation_id) updateConversationId(msg.conversation_id);
         } else {
           setStatus("connected", "No Session");
         }
@@ -153,18 +221,55 @@ function onAnswerChunk(text) {
   if (!currentAiMsg) {
     currentAiMsg = addAiMsg("");
     currentAiText = "";
+    frozenHtml = "";
+    frozenTextLen = 0;
+    frozenNode = null;
+    tailNode = null;
   }
   currentAiText += text;
   isStreaming = true;
 
-  // Debounced render for performance
+  // Skip render entirely if tab is not visible
+  if (document.hidden) return;
+
+  // Debounced render for performance (dynamic interval based on text size)
   if (renderTimer) clearTimeout(renderTimer);
   renderTimer = setTimeout(() => {
-    if (currentAiMsg) {
+    if (!currentAiMsg) return;
+
+    if (currentAiText.length < PROGRESSIVE_THRESHOLD) {
+      // Small text: full render (accurate)
       currentAiMsg.innerHTML = renderMarkdown(currentAiText);
-      scrollToBottom();
+    } else {
+      // Large text: progressive render using split DOM nodes
+      if (frozenTextLen === 0 || currentAiText.length - frozenTextLen > PROGRESSIVE_THRESHOLD) {
+        const searchEnd = currentAiText.length - 500;
+        const lastSafeSplit = currentAiText.lastIndexOf("\n\n", searchEnd);
+        if (lastSafeSplit > frozenTextLen) {
+          frozenHtml = renderMarkdown(currentAiText.substring(0, lastSafeSplit));
+          frozenTextLen = lastSafeSplit;
+
+          // Rebuild DOM with frozen + tail nodes
+          if (!frozenNode) {
+            frozenNode = document.createElement("div");
+            tailNode = document.createElement("div");
+            currentAiMsg.innerHTML = "";
+            currentAiMsg.appendChild(frozenNode);
+            currentAiMsg.appendChild(tailNode);
+          }
+          frozenNode.innerHTML = frozenHtml;
+        }
+      }
+      // Only update the tail node (much cheaper DOM operation)
+      const tailText = currentAiText.substring(frozenTextLen);
+      if (tailNode) {
+        tailNode.innerHTML = renderMarkdown(tailText);
+      } else {
+        currentAiMsg.innerHTML = frozenHtml + renderMarkdown(tailText);
+      }
     }
-  }, RENDER_DEBOUNCE_MS);
+    scrollToBottom();
+  }, getRenderDebounce());
 }
 
 function onToolStart(name, args) {
@@ -234,11 +339,18 @@ function onEnd() {
 function finalizeAiMsg() {
   if (currentAiMsg && currentAiText) {
     if (renderTimer) clearTimeout(renderTimer);
+    // Always do a full re-render on finalize for correctness
+    frozenNode = null;
+    tailNode = null;
     currentAiMsg.innerHTML = renderMarkdown(currentAiText);
     scrollToBottom();
   }
   currentAiMsg = null;
   currentAiText = "";
+  frozenHtml = "";
+  frozenTextLen = 0;
+  frozenNode = null;
+  tailNode = null;
 }
 
 // ── Quick Action Buttons ───────────────────────────────────────────────────
@@ -318,6 +430,19 @@ function sendUserMessage(text) {
     if (hsdMatch) {
       activeHsdId = hsdMatch[1];
       updateHeaderTitle();
+      const cid = generateConversationId(activeHsdId);
+      updateConversationId(cid);
+    }
+  }
+
+  // If HSD was imported and user types a custom message, prepend HSD context
+  if (hsdImported && activeHsdId) {
+    hsdImported = false;
+    quickActions.innerHTML = "";
+    quickActions.classList.remove("show");
+    // Only prepend if user's message doesn't already contain the HSD ID
+    if (!text.includes(activeHsdId)) {
+      text = `[HSD ${activeHsdId}] ${text}`;
     }
   }
 
@@ -415,13 +540,31 @@ function updateHeaderTitle() {
 }
 
 let activeHsdTitle = "";
+let activeConversationId = "";  // GNAI conversation ID
 
 function updateHeaderSubtitle(title) {
   activeHsdTitle = title || "";
-  if (headerSubtitle) {
-    headerSubtitle.textContent = activeHsdTitle;
-    headerSubtitle.classList.toggle("show", !!activeHsdTitle);
-  }
+  _renderSubtitle();
+}
+
+function updateConversationId(cid) {
+  activeConversationId = cid || "";
+  _renderSubtitle();
+}
+
+function generateConversationId(hsdId) {
+  const ts = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14); // YYYYMMDDHHmmss
+  return `${hsdId}_${ts}`;
+}
+
+function _renderSubtitle() {
+  if (!headerSubtitle) return;
+  const titleSpan = document.getElementById("subtitle-title");
+  const cidSpan = document.getElementById("subtitle-cid");
+  if (titleSpan) titleSpan.textContent = activeHsdTitle;
+  if (cidSpan) cidSpan.textContent = activeConversationId ? `CID: ${activeConversationId}` : "";
+  const hasContent = !!(activeHsdTitle || activeConversationId);
+  headerSubtitle.classList.toggle("show", hasContent);
 }
 
 // ── Import HSD from Tab URL ────────────────────────────────────────────────
@@ -464,6 +607,8 @@ async function importHsdFromWebpage() {
 
     activeHsdId = hsdId;
     updateHeaderTitle();
+    const cid = generateConversationId(hsdId);
+    updateConversationId(cid);
 
     // Extract page title from tab
     const pageTitle = (tab.title || "").trim();
@@ -475,20 +620,37 @@ async function importHsdFromWebpage() {
     updateHeaderSubtitle(hsdTitle);
 
     addSystemMsg(`Imported HSD ID: ${hsdId}`);
+    hsdImported = true;
 
-    // Auto-send the HSD ID to start analysis
-    sendUserMessage(hsdId);
+    // Show quick-action button to start analysis (don't auto-send)
+    showImportQuickActions(hsdId);
   } catch (e) {
     addSystemMsg("Failed to read current tab. Make sure the extension has tab access.");
   }
 }
 
+function showImportQuickActions(hsdId) {
+  quickActions.innerHTML = "";
+  const btn = document.createElement("button");
+  btn.className = "quick-btn";
+  btn.textContent = `Analyze HSD ${hsdId}`;
+  btn.addEventListener("click", () => {
+    quickActions.classList.remove("show");
+    hsdImported = false;
+    sendUserMessage(hsdId);
+  });
+  quickActions.appendChild(btn);
+  quickActions.classList.add("show");
+}
+
 // ── Simple Markdown Renderer ───────────────────────────────────────────────
 
 function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function renderMarkdown(text) {
@@ -586,6 +748,7 @@ btnNew.addEventListener("click", () => {
   sessionMessages = [];
   updateHeaderTitle();
   updateHeaderSubtitle("");
+  updateConversationId("");
   if (port) {
     port.postMessage({ action: "start_session" });
   }

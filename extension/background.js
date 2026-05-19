@@ -3,6 +3,7 @@
  * Manages bridge connection, auto-launch, and relays events between sidepanel and bridge server.
  */
 
+// NOTE: Port must match BRIDGE_PORT in bridge/run_bridge.ps1 (default: 8776)
 const BRIDGE_URL = "http://127.0.0.1:8776";
 const NM_HOST_NAME = "com.chat_mode_assistant.bridge";
 
@@ -23,10 +24,12 @@ async function bridgeFetch(path, options = {}) {
   return resp;
 }
 
-async function startSession(assistant) {
+async function startSession(assistant, conversationId) {
+  const body = { assistant: assistant || "sighting_assistant" };
+  if (conversationId) body.conversation_id = conversationId;
   const resp = await bridgeFetch("/session/start", {
     method: "POST",
-    body: JSON.stringify({ assistant: assistant || "sighting_assistant" }),
+    body: JSON.stringify(body),
   });
   return resp.json();
 }
@@ -220,7 +223,7 @@ chrome.runtime.onConnect.addListener((port) => {
 
             // Start chat session
             port.postMessage({ type: "startup_status", message: "Starting chat session..." });
-            const startResult = await startSession(msg.assistant);
+            const startResult = await startSession(msg.assistant, msg.conversation_id);
             port.postMessage({ action: "session_started", ...startResult });
             startStreaming(port);
           } finally {
