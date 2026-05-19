@@ -66,6 +66,41 @@ def _debug_to_file(line):
         pass
 
 
+# ── Session I/O Logger ──────────────────────────────────────────────────────
+_session_log_path = None
+
+
+def _init_session_log():
+    """Create a new session log file in bridge/log/ with timestamp-based name."""
+    global _session_log_path
+    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "log")
+    os.makedirs(log_dir, exist_ok=True)
+    filename = f"session_{time.strftime('%Y%m%d_%H%M%S')}.log"
+    _session_log_path = os.path.join(log_dir, filename)
+    _session_log("SESSION", f"Log started: {filename}")
+    return _session_log_path
+
+
+def _session_log(direction, content):
+    """Log a single I/O entry. direction: INPUT, OUTPUT, EVENT, SESSION."""
+    if not _session_log_path:
+        return
+    try:
+        ts = time.strftime('%Y-%m-%d %H:%M:%S')
+        with open(_session_log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{ts}] [{direction}] {content}\n")
+    except Exception:
+        pass
+
+
+def _close_session_log():
+    """Mark session log as closed."""
+    global _session_log_path
+    if _session_log_path:
+        _session_log("SESSION", "Log closed")
+        _session_log_path = None
+
+
 # ── Utility ─────────────────────────────────────────────────────────────────
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\x1b[^[\x1b]|\[[0-9;]+m", re.I)
 
@@ -225,11 +260,14 @@ class ChatSession:
         with self._lock:
             if not self._pty or not self._pty.isalive():
                 raise RuntimeError("Chat process not running")
+            # Sanitize: replace newlines with spaces to prevent multi-command injection
+            clean_text = text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ").strip()
             self._waiting_input.clear()
             self._ignore_prompt = True           # ignore echo'd prompts until usage
             self.accumulated_answer = ""
-            self._pty.write(text + "\r")
-            _debug(f"sent: {text[:100]}...")
+            self._pty.write(clean_text + "\r")
+            _session_log("INPUT", clean_text)
+            _debug(f"sent: {clean_text[:100]}...")
 
     def stop(self):
         """Terminate the chat session."""
@@ -355,6 +393,20 @@ class ChatSession:
         event = self._classify_event(data)
         if event:
             _debug(f"[event] type={event['type']}")
+            # Log output events for session I/O debugging
+            etype = event['type']
+            if etype == 'answer':
+                _session_log("OUTPUT", f"[answer] {event.get('text', '')[:500]}")
+            elif etype in ('tool_start', 'tool_request'):
+                _session_log("EVENT", f"[{etype}] {event.get('name', '')}")
+            elif etype == 'usage':
+                _session_log("EVENT", f"[usage] turn complete")
+            elif etype == 'ready':
+                _session_log("EVENT", f"[ready] waiting for input")
+            elif etype == 'error':
+                _session_log("EVENT", f"[error] {event.get('text', '')[:200]}")
+            elif etype in ('end', 'goodbye'):
+                _session_log("EVENT", f"[{etype}] session ending")
             self.event_queue.put(event)
 
     def _classify_event(self, data):
@@ -443,8 +495,11 @@ def _start_session(assistant=None, conversation_id=None):
     with _session_lock:
         if _current_session and _current_session.is_alive:
             _current_session.stop()
+            _close_session_log()
+        _init_session_log()
         session = ChatSession(assistant, conversation_id)
         session.start()
+        _session_log("SESSION", f"assistant={session.assistant} conversation_id={session.conversation_id}")
         _current_session = session
         return session
 
@@ -455,6 +510,7 @@ def _stop_session():
         if _current_session:
             _current_session.stop()
             _current_session = None
+        _close_session_log()
 
 
 # ── HTTP Handler ────────────────────────────────────────────────────────────
@@ -568,6 +624,12 @@ class BridgeHandler(BaseHTTPRequestHandler):
         session = _get_session()
         if not session or not session.is_alive:
             self._json_response(400, {"error": "no_active_session"})
+            return
+
+        # Reject send if GNAI is still processing (prevents duplicate inputs)
+        if not session.is_waiting_input:
+            _debug("[BLOCKED] send rejected — session not waiting for input")
+            self._json_response(409, {"error": "session_busy", "message": "AI is still processing. Please wait."})
             return
 
         body = self._read_json_body()

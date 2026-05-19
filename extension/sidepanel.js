@@ -4,9 +4,35 @@
  * Handles:
  * - Chat message display (streaming markdown)
  * - Tool execution progress indicators
- * - Quick-action button generation (regex-based)
+ * - Quick-action button generation (table-driven)
  * - Two-phase HSD analysis flow
  */
+
+// ══════════════════════════════════════════════════════════════════════════════
+// QUICK ACTION TABLE — Edit this table to customize quick action buttons
+// ══════════════════════════════════════════════════════════════════════════════
+// Each entry:
+//   label    → 按鈕上顯示的文字
+//   prompt   → 按下去實際送給 GNAI 的 prompt
+//   display  → 按下去後 output 視窗 (chat area) 顯示的文字（使用者看到的）
+//   group    → 按鈕分組（同一組同時出現）: "start", "menu", "yesno", "custom"
+//   show     → 何時顯示: "always" = session ready 時常駐, "menu" = AI 回覆有選單時, "import" = HSD 匯入後
+// ──────────────────────────────────────────────────────────────────────────────
+const QUICK_ACTIONS_TABLE = [
+  // ── 常駐按鈕 (session ready 後顯示) ──
+  { label: "Analyze",     prompt: "Please analyze this sighting.",                          display: "Analyze",            group: "start", show: "always" },
+  { label: "Summary",     prompt: "Provide a brief summary of the current analysis.",       display: "Summary",            group: "start", show: "always" },
+  { label: "Root Cause",  prompt: "What is the most likely root cause?",                    display: "Root Cause",         group: "start", show: "always" },
+  { label: "Next Steps",  prompt: "What are the recommended next steps?",                   display: "Next Steps",         group: "start", show: "always" },
+
+  // ── 選單回覆按鈕 (AI 輸出 numbered list 時顯示) ──
+  { label: "All",         prompt: "all",                                                    display: "All",                group: "menu",  show: "menu" },
+  { label: "Skip",        prompt: "skip",                                                   display: "Skip",               group: "menu",  show: "menu" },
+
+  // ── Yes/No 回覆 ──
+  { label: "Yes",         prompt: "yes",                                                    display: "Yes",                group: "yesno", show: "yesno" },
+  { label: "No",          prompt: "no",                                                     display: "No",                 group: "yesno", show: "yesno" },
+];
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
 const chatArea = document.getElementById("chat-area");
@@ -17,6 +43,9 @@ const btnNew = document.getElementById("btn-new");
 const btnStop = document.getElementById("btn-stop");
 const btnImport = document.getElementById("btn-import");
 const btnSave = document.getElementById("btn-save");
+const btnBottom = document.getElementById("btn-bottom");
+const btnFontUp = document.getElementById("btn-font-up");
+const btnFontDown = document.getElementById("btn-font-down");
 const headerTitle = document.getElementById("header-title");
 const headerSubtitle = document.getElementById("header-subtitle");
 const statusBadge = document.getElementById("status-badge");
@@ -167,6 +196,11 @@ function connectPort() {
       case "ready":
         onReady(msg.accumulated_answer || "");
         break;
+      case "send_rejected":
+        // Bridge rejected send (session busy)
+        addSystemMsg(`⏳ ${msg.message || "AI is still processing. Please wait."}`);
+        setInputEnabled(true);
+        break;
       case "info":
         onInfo(msg.text || "");
         break;
@@ -312,10 +346,10 @@ function onReady(accumulatedAnswer) {
     addSystemMsg("Session ready. Type an HSD ID to begin analysis.");
   }
 
-  // Parse accumulated answer for quick-action buttons
-  if (accumulatedAnswer) {
-    generateQuickActions(accumulatedAnswer);
-  }
+  // Parse accumulated answer for quick-action buttons (disabled for manual testing)
+  // if (accumulatedAnswer) {
+  //   generateQuickActions(accumulatedAnswer);
+  // }
 
   setInputEnabled(true);
 }
@@ -353,62 +387,125 @@ function finalizeAiMsg() {
   tailNode = null;
 }
 
-// ── Quick Action Buttons ───────────────────────────────────────────────────
+// ── Quick Action Buttons (table-driven) ────────────────────────────────────
 
-function generateQuickActions(text) {
+function renderQuickButtons(filter) {
+  /**
+   * Render quick action buttons from QUICK_ACTIONS_TABLE.
+   * @param {string} filter - "always", "menu", "yesno", or "all"
+   * @param {Array} extras - additional dynamic buttons [{label, prompt, display}]
+   */
   quickActions.innerHTML = "";
   quickActions.classList.remove("show");
 
-  const buttons = [];
-  const lastLines = text.split("\n").slice(-30).join("\n");
-
-  // Pattern 1: Numbered list items "1) text" or "1. text"
-  const numberedItems = [...lastLines.matchAll(/^\s*(\d+)[).]\s+(.+)$/gm)];
-  if (numberedItems.length >= 2) {
-    for (const m of numberedItems) {
-      buttons.push({ label: `${m[1]}`, value: m[1], detail: m[2].substring(0, 40) });
-    }
-    buttons.push({ label: "All", value: "all" });
-    buttons.push({ label: "Skip", value: "skip" });
-  }
-
-  // Pattern 2: Yes/No question
-  if (!buttons.length && /\b(would you like|do you want|shall I|proceed\?|yes\/no|y\/n)/i.test(lastLines)) {
-    buttons.push({ label: "Yes", value: "yes" });
-    buttons.push({ label: "No", value: "no" });
-  }
-
-  // Pattern 3: Comma-separated options "Select: A, B, C"
-  if (!buttons.length) {
-    const optMatch = lastLines.match(/(?:select|choose|pick|options?).*?:\s*(.+(?:,\s*.+){2,})/i);
-    if (optMatch) {
-      const options = optMatch[1].split(",").map(s => s.trim()).filter(Boolean);
-      for (const opt of options) {
-        buttons.push({ label: opt, value: opt });
-      }
-    }
-  }
-
+  const buttons = QUICK_ACTIONS_TABLE.filter(btn => btn.show === filter);
   if (buttons.length === 0) return;
 
   for (const btn of buttons) {
     const el = document.createElement("button");
     el.className = "quick-btn";
-    el.textContent = btn.detail ? `${btn.label} — ${btn.detail}` : btn.label;
-    el.title = btn.value;
+    el.textContent = btn.label;
+    el.title = btn.prompt;
     el.addEventListener("click", () => {
       quickActions.classList.remove("show");
-      sendUserMessage(btn.value);
+      sendUserMessage(btn.prompt, btn.display);
+    });
+    quickActions.appendChild(el);
+  }
+  quickActions.classList.add("show");
+}
+
+function renderDynamicNumberButtons(numberedItems) {
+  /**
+   * For numbered menu items detected in AI output,
+   * render number buttons + the "All"/"Skip" from table.
+   */
+  quickActions.innerHTML = "";
+  quickActions.classList.remove("show");
+
+  // Number buttons (dynamic)
+  for (const m of numberedItems) {
+    const el = document.createElement("button");
+    el.className = "quick-btn";
+    const detail = m[2] ? m[2].substring(0, 40) : "";
+    el.textContent = detail ? `${m[1]} — ${detail}` : m[1];
+    el.title = m[1];
+    el.addEventListener("click", () => {
+      quickActions.classList.remove("show");
+      sendUserMessage(m[1], m[1]);
     });
     quickActions.appendChild(el);
   }
 
+  // Add "All" and "Skip" from table
+  const menuButtons = QUICK_ACTIONS_TABLE.filter(btn => btn.show === "menu");
+  for (const btn of menuButtons) {
+    const el = document.createElement("button");
+    el.className = "quick-btn";
+    el.textContent = btn.label;
+    el.title = btn.prompt;
+    el.addEventListener("click", () => {
+      quickActions.classList.remove("show");
+      sendUserMessage(btn.prompt, btn.display);
+    });
+    quickActions.appendChild(el);
+  }
   quickActions.classList.add("show");
+}
+
+function generateQuickActions(text) {
+  quickActions.innerHTML = "";
+  quickActions.classList.remove("show");
+
+  const lastLines = text.split("\n").slice(-30).join("\n");
+
+  // Pattern 1: Numbered list items "1) text" or "1. text"
+  const numberedItems = [...lastLines.matchAll(/^\s*(\d+)[).]\s+(.+)$/gm)];
+  if (numberedItems.length >= 2) {
+    renderDynamicNumberButtons(numberedItems);
+    return;
+  }
+
+  // Pattern 2: Yes/No question
+  if (/\b(would you like|do you want|shall I|proceed\?|yes\/no|y\/n)/i.test(lastLines)) {
+    renderQuickButtons("yesno");
+    return;
+  }
+
+  // Pattern 3: Comma-separated options "Select: A, B, C"
+  const optMatch = lastLines.match(/(?:select|choose|pick|options?).*?:\s*(.+(?:,\s*.+){2,})/i);
+  if (optMatch) {
+    const options = optMatch[1].split(",").map(s => s.trim()).filter(Boolean);
+    quickActions.innerHTML = "";
+    for (const opt of options) {
+      const el = document.createElement("button");
+      el.className = "quick-btn";
+      el.textContent = opt;
+      el.title = opt;
+      el.addEventListener("click", () => {
+        quickActions.classList.remove("show");
+        sendUserMessage(opt, opt);
+      });
+      quickActions.appendChild(el);
+    }
+    quickActions.classList.add("show");
+    return;
+  }
+
+  // No pattern matched — show persistent "always" buttons if session is ready
+  renderQuickButtons("always");
 }
 
 // ── Send Message ───────────────────────────────────────────────────────────
 
-function sendUserMessage(text) {
+/**
+ * Send a message to GNAI via the bridge.
+ * @param {string} text - The actual prompt sent to GNAI
+ * @param {string} [displayText] - What to show in chat area (defaults to text)
+ *   When called from quick buttons, displayText differs from text.
+ *   When called from input box, they are the same.
+ */
+function sendUserMessage(text, displayText) {
   if (!text.trim() || !port) return;
 
   // If viewing history, go back to live session first
@@ -416,12 +513,16 @@ function sendUserMessage(text) {
     backToLiveSession();
   }
 
-  addUserMsg(text);
+  // Reset scroll lock — user sending a message means they want to follow output
+  userScrolledUp = false;
+
+  const shown = displayText || text;
+  addUserMsg(shown);
   quickActions.classList.remove("show");
   setInputEnabled(false);
 
   // Track messages for history
-  sessionMessages.push({ role: "user", content: text });
+  sessionMessages.push({ role: "user", content: shown });
   debouncedSaveHistory();
 
   // Detect HSD ID from first user message (8-14 digit number)
@@ -435,28 +536,24 @@ function sendUserMessage(text) {
     }
   }
 
-  // If HSD was imported and user types a custom message, prepend HSD context
+  // ── Text modification logic ────────────────────────────────────────────────
+  // Modification 1: HSD prefix — prepends [HSD xxxxx] when hsdImported is true
   if (hsdImported && activeHsdId) {
     hsdImported = false;
     quickActions.innerHTML = "";
     quickActions.classList.remove("show");
-    // Only prepend if user's message doesn't already contain the HSD ID
     if (!text.includes(activeHsdId)) {
       text = `[HSD ${activeHsdId}] ${text}`;
     }
   }
 
-  // If this looks like a menu selection (numbers, "all", "skip"),
-  // prefix with strong context so the LLM correctly interprets it as a selection response.
-  // This is needed because in --json mode, the menu is output as answer text and
-  // the user's reply is a new turn — the LLM may not realize it's a menu response.
-  const trimmed = text.trim().toLowerCase();
-  // Menu selections: 1-2 digit numbers (with commas/ranges), "all", or "skip"
-  // Exclude long numbers (like HSD IDs which are 8+ digits)
-  const isMenuSelection = /^(\d{1,2}([\s,\-]+\d{1,2})*|all|skip)$/i.test(trimmed);
-  const messageToSend = (isMenuSelection && activeHsdId)
-    ? `I select: ${text}. Proceed with analyzing only the selected item(s) from the menu above. Do NOT repeat Phase 1 or re-read the article.`
-    : text;
+  // Modification 2: Menu selection prefix — wraps "1", "2", "all", "skip" with instruction
+  // if (isMenuSelection && activeHsdId) {
+  //   text = `I select: ${text}. Proceed with analyzing only the selected item(s) from the menu above. Do NOT repeat Phase 1 or re-read the article.`
+  // }
+
+  // Currently: send text (with HSD prefix if applicable)
+  const messageToSend = text;
 
   port.postMessage({ action: "send", message: messageToSend });
 }
@@ -518,7 +615,24 @@ function setInputEnabled(enabled) {
   if (enabled) inputEl.focus();
 }
 
+// ── Auto-scroll state ────────────────────────────────────────────────────────
+let userScrolledUp = false;
+
+chatArea.addEventListener("scroll", () => {
+  // If user is within 80px of bottom, consider them "at bottom"
+  const atBottom = chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight < 80;
+  userScrolledUp = !atBottom;
+});
+
 function scrollToBottom() {
+  if (userScrolledUp) return; // User is reading earlier content, don't jump
+  requestAnimationFrame(() => {
+    chatArea.scrollTop = chatArea.scrollHeight;
+  });
+}
+
+function forceScrollToBottom() {
+  userScrolledUp = false;
   requestAnimationFrame(() => {
     chatArea.scrollTop = chatArea.scrollHeight;
   });
@@ -637,7 +751,7 @@ function showImportQuickActions(hsdId) {
   btn.addEventListener("click", () => {
     quickActions.classList.remove("show");
     hsdImported = false;
-    sendUserMessage(hsdId);
+    sendUserMessage(hsdId, `Analyze HSD ${hsdId}`);
   });
   quickActions.appendChild(btn);
   quickActions.classList.add("show");
@@ -723,6 +837,33 @@ sendBtn.addEventListener("click", () => {
   sendUserMessage(inputEl.value);
   inputEl.value = "";
   inputEl.style.height = "auto";
+});
+
+btnBottom.addEventListener("click", () => {
+  forceScrollToBottom();
+});
+
+// ── Font Size Control ──────────────────────────────────────────────────────
+const FONT_SIZE_MIN = 10;
+const FONT_SIZE_MAX = 22;
+const FONT_SIZE_STEP = 1;
+let chatFontSize = parseInt(localStorage.getItem("chatFontSize") || "14", 10);
+chatArea.style.fontSize = chatFontSize + "px";
+
+btnFontUp.addEventListener("click", () => {
+  if (chatFontSize < FONT_SIZE_MAX) {
+    chatFontSize += FONT_SIZE_STEP;
+    chatArea.style.fontSize = chatFontSize + "px";
+    localStorage.setItem("chatFontSize", chatFontSize);
+  }
+});
+
+btnFontDown.addEventListener("click", () => {
+  if (chatFontSize > FONT_SIZE_MIN) {
+    chatFontSize -= FONT_SIZE_STEP;
+    chatArea.style.fontSize = chatFontSize + "px";
+    localStorage.setItem("chatFontSize", chatFontSize);
+  }
 });
 
 inputEl.addEventListener("keydown", (e) => {
@@ -958,6 +1099,103 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
     saveToHistory();
   }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// REGRESSION TOOL MODE
+// ══════════════════════════════════════════════════════════════════════════════
+
+const mainView = document.getElementById("main-view");
+const regressionView = document.getElementById("regression-view");
+const regressionArea = document.getElementById("regression-area");
+const regressionInput = document.getElementById("regression-input");
+const regressionSendBtn = document.getElementById("regression-send-btn");
+const regressionHsdInfo = document.getElementById("regression-hsd-info");
+const btnRegression = document.getElementById("btn-regression");
+const btnBackToChat = document.getElementById("btn-back-to-chat");
+
+let isRegressionMode = false;
+const HEADER_COLOR_CHAT = "#5F80AB";
+const HEADER_COLOR_REGRESSION = "#b8860b";  // dark goldenrod (土黃色)
+
+function switchToRegressionMode() {
+  isRegressionMode = true;
+
+  // Pass HSD ID + title info
+  const hsdInfo = activeHsdId ? `HSD: ${activeHsdId}` : "No HSD loaded";
+  const titleInfo = activeHsdTitle ? ` — ${activeHsdTitle}` : "";
+  regressionHsdInfo.textContent = ` | ${hsdInfo}${titleInfo}`;
+
+  // Switch views
+  mainView.style.display = "none";
+  regressionView.style.display = "flex";
+
+  // Change header appearance
+  document.querySelector(".header").style.background = HEADER_COLOR_REGRESSION;
+  headerTitle.textContent = "Regression Tool";
+  statusBadge.textContent = "Regression Check";
+  statusBadge.className = "header-status connected";
+
+  // Focus input
+  regressionInput.focus();
+}
+
+function switchToChatMode() {
+  isRegressionMode = false;
+
+  // Switch views
+  regressionView.style.display = "none";
+  mainView.style.display = "flex";
+
+  // Restore header appearance
+  document.querySelector(".header").style.background = HEADER_COLOR_CHAT;
+  updateHeaderTitle();
+  // Restore status based on connection
+  if (port) {
+    port.postMessage({ action: "health" });
+  } else {
+    setStatus("disconnected", "Offline");
+  }
+
+  inputEl.focus();
+}
+
+// Regression input/output (placeholder — to be developed further)
+function addRegressionMsg(text, role) {
+  const el = document.createElement("div");
+  el.className = role === "user" ? "msg msg-user" : "msg msg-ai";
+  el.textContent = text;
+  regressionArea.appendChild(el);
+  regressionArea.scrollTop = regressionArea.scrollHeight;
+}
+
+function sendRegressionMessage() {
+  const text = regressionInput.value.trim();
+  if (!text) return;
+
+  addRegressionMsg(text, "user");
+  regressionInput.value = "";
+  regressionInput.style.height = "auto";
+
+  // TODO: Hook up regression logic here
+  // For now, echo back with placeholder response
+  addRegressionMsg(`[Regression Tool] Received: "${text}"\n\nHSD: ${activeHsdId || "N/A"}\nTitle: ${activeHsdTitle || "N/A"}\n\n(Regression logic not yet implemented)`, "system");
+}
+
+// Event listeners
+btnRegression.addEventListener("click", switchToRegressionMode);
+btnBackToChat.addEventListener("click", switchToChatMode);
+
+regressionSendBtn.addEventListener("click", sendRegressionMessage);
+regressionInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendRegressionMessage();
+  }
+});
+regressionInput.addEventListener("input", () => {
+  regressionInput.style.height = "auto";
+  regressionInput.style.height = Math.min(regressionInput.scrollHeight, 120) + "px";
 });
 
 // ── Init ───────────────────────────────────────────────────────────────────

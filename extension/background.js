@@ -122,6 +122,28 @@ async function ensureBridgeRunning(sendStatus) {
   return false;
 }
 
+// ── Service Worker keep-alive ───────────────────────────────────────────────
+// Chrome suspends Service Workers after ~30s of inactivity. During long tool
+// execution (RAG search, Sherlog), no events flow back, causing suspension.
+// This keep-alive prevents that by periodic self-ping while a session is active.
+
+let keepAliveInterval = null;
+
+function startKeepAlive() {
+  if (keepAliveInterval) return;
+  keepAliveInterval = setInterval(() => {
+    // Any async operation keeps the Service Worker alive
+    fetch(`${BRIDGE_URL}/health`).catch(() => {});
+  }, 20000); // every 20s
+}
+
+function stopKeepAlive() {
+  if (keepAliveInterval) {
+    clearInterval(keepAliveInterval);
+    keepAliveInterval = null;
+  }
+}
+
 // ── SSE Stream consumer ────────────────────────────────────────────────────
 
 let currentEventSource = null;
@@ -199,6 +221,7 @@ chrome.runtime.onConnect.addListener((port) => {
           if (health.session_active && !currentEventSource) {
             console.log("[bg] Re-establishing SSE stream after health check");
             startStreaming(port);
+            startKeepAlive();
           }
           break;
         }
@@ -226,17 +249,23 @@ chrome.runtime.onConnect.addListener((port) => {
             const startResult = await startSession(msg.assistant, msg.conversation_id);
             port.postMessage({ action: "session_started", ...startResult });
             startStreaming(port);
+            startKeepAlive();
           } finally {
             isStarting = false;
           }
           break;
         }
 
-        case "send":
-          await sendMessage(msg.message);
+        case "send": {
+          const sendResult = await sendMessage(msg.message);
+          if (sendResult.error === "session_busy") {
+            port.postMessage({ type: "send_rejected", reason: "session_busy", message: sendResult.message || "AI is still processing." });
+          }
           break;
+        }
 
         case "stop_session":
+          stopKeepAlive();
           if (currentEventSource) {
             currentEventSource.close();
             currentEventSource = null;
@@ -254,9 +283,11 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 
   port.onDisconnect.addListener(() => {
-    if (currentEventSource) {
-      currentEventSource.close();
-      currentEventSource = null;
+    // Don't close SSE on port disconnect — Service Worker may revive and
+    // sidepanel will reconnect. Keep SSE alive to avoid losing events.
+    // Only stop keep-alive if no EventSource is active.
+    if (!currentEventSource) {
+      stopKeepAlive();
     }
   });
 });
