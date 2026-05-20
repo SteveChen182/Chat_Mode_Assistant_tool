@@ -49,6 +49,7 @@ const btnFontDown = document.getElementById("btn-font-down");
 const headerTitle = document.getElementById("header-title");
 const headerSubtitle = document.getElementById("header-subtitle");
 const statusBadge = document.getElementById("status-badge");
+const btnHistory = document.getElementById("btn-history");
 
 // ── Save Chat as HTML ──────────────────────────────────────────────────────
 btnSave.addEventListener("click", () => {
@@ -117,15 +118,12 @@ function getRenderDebounce() {
   return RENDER_DEBOUNCE_MS;
 }
 
-// ── History State ──────────────────────────────────────────────────────────
-const MAX_HISTORY = 10;
+// ── Session State ─────────────────────────────────────────────────────────
+const MAX_SESSIONS = 6;        // 1 active + 5 saved
 let activeHsdId = null;        // detected from user's first message
 let hsdImported = false;       // true after Import HSD, before first analysis sent
 let sessionMessages = [];      // [{role, content}] for current session
-let liveSessionHtml = "";      // saved chatArea HTML when viewing history
-let isViewingHistory = false;
-let historySaveTimer = null;
-const HISTORY_SAVE_DEBOUNCE_MS = 3000;
+let sessions = [];             // [{hsdId, hsdTitle, conversationId, messages[], timestamp}]
 
 // ── Port connection ────────────────────────────────────────────────────────
 
@@ -329,7 +327,6 @@ function onUsage(usage) {
   if (currentAiText) {
     sessionMessages.push({ role: "assistant", content: currentAiText });
   }
-  debouncedSaveHistory();
 }
 
 function onReady(accumulatedAnswer) {
@@ -350,6 +347,12 @@ function onReady(accumulatedAnswer) {
   // if (accumulatedAnswer) {
   //   generateQuickActions(accumulatedAnswer);
   // }
+
+  // Save session when analysis completes
+  if (sessionMessages.length > 0) {
+    saveCurrentSession();
+    persistSessions();
+  }
 
   setInputEnabled(true);
 }
@@ -508,11 +511,6 @@ function generateQuickActions(text) {
 function sendUserMessage(text, displayText) {
   if (!text.trim() || !port) return;
 
-  // If viewing history, go back to live session first
-  if (isViewingHistory) {
-    backToLiveSession();
-  }
-
   // Reset scroll lock — user sending a message means they want to follow output
   userScrolledUp = false;
 
@@ -521,9 +519,8 @@ function sendUserMessage(text, displayText) {
   quickActions.classList.remove("show");
   setInputEnabled(false);
 
-  // Track messages for history
+  // Track messages for session
   sessionMessages.push({ role: "user", content: shown });
-  debouncedSaveHistory();
 
   // Detect HSD ID from first user message (8-14 digit number)
   if (!activeHsdId) {
@@ -614,6 +611,7 @@ function setInputEnabled(enabled) {
   inputEl.disabled = !enabled;
   sendBtn.disabled = !enabled;
   btnImport.disabled = !enabled;
+  btnHistory.disabled = !enabled;
   if (enabled) inputEl.focus();
 }
 
@@ -880,20 +878,32 @@ inputEl.addEventListener("keydown", (e) => {
 });
 
 btnNew.addEventListener("click", () => {
-  // Reset history viewing state
-  if (isViewingHistory) {
-    isViewingHistory = false;
-    document.getElementById("history-viewer-bar").classList.remove("show");
-  }
+  // Save current session before creating new
+  saveCurrentSession();
+
+  // Reset chat area and state
   chatArea.innerHTML = "";
   quickActions.classList.remove("show");
   quickActions.innerHTML = "";
-  // Reset session tracking
   activeHsdId = null;
+  activeHsdTitle = "";
+  activeConversationId = "";
   sessionMessages = [];
   updateHeaderTitle();
   updateHeaderSubtitle("");
   updateConversationId("");
+
+  // Push new empty session at front, shift others down
+  sessions.unshift({
+    hsdId: "",
+    hsdTitle: "",
+    conversationId: "",
+    messages: [],
+    timestamp: Date.now(),
+  });
+  sessions = sessions.slice(0, MAX_SESSIONS);
+  persistSessions();
+
   if (port) {
     port.postMessage({ action: "start_session" });
   }
@@ -907,37 +917,75 @@ btnStop.addEventListener("click", () => {
 
 // ── Initialize ─────────────────────────────────────────────────────────────
 
-// ── History Functions ──────────────────────────────────────────────────────
+// ── Session Functions ─────────────────────────────────────────────────────
 
-function debouncedSaveHistory() {
-  if (historySaveTimer) clearTimeout(historySaveTimer);
-  historySaveTimer = setTimeout(() => {
-    historySaveTimer = null;
-    saveToHistory();
-  }, HISTORY_SAVE_DEBOUNCE_MS);
+function saveCurrentSession() {
+  if (!activeHsdId && sessionMessages.length === 0) return;
+  if (sessions.length === 0) {
+    sessions.push({});
+  }
+  sessions[0] = {
+    hsdId: activeHsdId || "",
+    hsdTitle: activeHsdTitle || "",
+    conversationId: activeConversationId || "",
+    messages: [...sessionMessages],
+    timestamp: Date.now(),
+  };
 }
 
-async function saveToHistory() {
-  if (!activeHsdId || sessionMessages.length === 0) return;
+async function persistSessions() {
   try {
-    const stored = await chrome.storage.local.get({ chatHistory: [] });
-    const history = Array.isArray(stored.chatHistory) ? stored.chatHistory : [];
-
-    // Remove existing entry for same HSD (will re-add at front)
-    const filtered = history.filter(e => e.hsdId !== activeHsdId);
-
-    filtered.unshift({
-      hsdId: activeHsdId,
-      messages: [...sessionMessages],
-      timestamp: Date.now(),
-    });
-
-    // Trim to max
-    const trimmed = filtered.slice(0, MAX_HISTORY);
-    await chrome.storage.local.set({ chatHistory: trimmed });
+    await chrome.storage.local.set({ chatSessions: sessions.slice(0, MAX_SESSIONS) });
   } catch (e) {
-    console.error("[history] save error:", e);
+    console.error("[sessions] persist error:", e);
   }
+}
+
+async function loadSessions() {
+  try {
+    const stored = await chrome.storage.local.get({ chatSessions: [] });
+    sessions = Array.isArray(stored.chatSessions) ? stored.chatSessions : [];
+  } catch (e) {
+    sessions = [];
+  }
+}
+
+function switchToSession(index) {
+  if (index < 1 || index >= sessions.length) return;
+
+  // Save current active session
+  saveCurrentSession();
+
+  // Move target to front
+  const target = sessions.splice(index, 1)[0];
+  sessions.unshift(target);
+
+  // Load into active state
+  activeHsdId = target.hsdId || null;
+  activeHsdTitle = target.hsdTitle || "";
+  activeConversationId = target.conversationId || "";
+  sessionMessages = [...(target.messages || [])];
+
+  // Update UI
+  updateHeaderTitle();
+  updateHeaderSubtitle(activeHsdTitle);
+  updateConversationId(activeConversationId);
+  rebuildChatArea();
+
+  persistSessions();
+}
+
+function rebuildChatArea() {
+  chatArea.innerHTML = "";
+  for (const msg of sessionMessages) {
+    if (msg.role === "user") {
+      addUserMsg(msg.content);
+    } else if (msg.role === "assistant") {
+      const el = addAiMsg("");
+      el.innerHTML = renderMarkdown(msg.content);
+    }
+  }
+  forceScrollToBottom();
 }
 
 function closeHistoryMenu() {
@@ -945,7 +993,7 @@ function closeHistoryMenu() {
   if (menu) menu.classList.remove("show");
 }
 
-async function openHistoryMenu() {
+function openHistoryMenu() {
   const menu = document.getElementById("historyMenu");
   if (!menu) return;
 
@@ -955,113 +1003,51 @@ async function openHistoryMenu() {
     return;
   }
 
-  let stored = { chatHistory: [] };
-  try {
-    stored = await chrome.storage.local.get({ chatHistory: [] });
-  } catch (_) {}
+  // Save current session state before showing menu
+  saveCurrentSession();
 
-  const history = Array.isArray(stored.chatHistory) ? stored.chatHistory : [];
   menu.innerHTML = "";
 
   // Title
+  const savedCount = sessions.length > 1 ? sessions.length - 1 : 0;
   const title = document.createElement("div");
   title.className = "history-menu-title";
-  title.textContent = `Recent Sessions (${history.length})`;
+  title.textContent = `Saved Sessions (${savedCount})`;
   menu.appendChild(title);
 
-  if (history.length === 0) {
+  // Show sessions 1+ (skip index 0 = current active)
+  const savedSessions = sessions.slice(1);
+  if (savedSessions.length === 0) {
     const empty = document.createElement("div");
     empty.className = "history-empty";
-    empty.textContent = "No history yet";
+    empty.textContent = "No saved sessions";
     menu.appendChild(empty);
   } else {
-    for (const entry of history) {
+    savedSessions.forEach((entry, i) => {
       const btn = document.createElement("button");
       btn.className = "history-item";
 
       const hsdLine = document.createElement("div");
       hsdLine.className = "history-item-hsd";
-      hsdLine.textContent = `HSD ${entry.hsdId}`;
+      hsdLine.textContent = entry.hsdId ? `HSD ${entry.hsdId}` : "Session";
       btn.appendChild(hsdLine);
 
-      const timeLine = document.createElement("div");
-      timeLine.className = "history-item-time";
-      timeLine.textContent = formatTimestamp(entry.timestamp);
-      btn.appendChild(timeLine);
+      const infoLine = document.createElement("div");
+      infoLine.className = "history-item-time";
+      const cidText = entry.conversationId ? `CID: ${entry.conversationId}` : "";
+      const timeText = formatTimestamp(entry.timestamp);
+      infoLine.textContent = cidText || timeText;
+      btn.appendChild(infoLine);
 
       btn.addEventListener("click", () => {
         closeHistoryMenu();
-        viewHistoryEntry(entry);
+        switchToSession(i + 1);
       });
       menu.appendChild(btn);
-    }
-  }
-
-  // Clear All button
-  if (history.length > 0) {
-    const clearBtn = document.createElement("button");
-    clearBtn.className = "history-clear-btn";
-    clearBtn.textContent = "Clear All History";
-    clearBtn.addEventListener("click", async () => {
-      await chrome.storage.local.set({ chatHistory: [] });
-      closeHistoryMenu();
     });
-    menu.appendChild(clearBtn);
   }
 
   menu.classList.add("show");
-}
-
-function viewHistoryEntry(entry) {
-  // Save current live session HTML
-  if (!isViewingHistory) {
-    liveSessionHtml = chatArea.innerHTML;
-  }
-  isViewingHistory = true;
-
-  // Update header title to show history HSD
-  headerTitle.textContent = `HSD ${entry.hsdId} (history)`;
-  updateHeaderSubtitle("");  // no subtitle for history view
-
-  // Show viewer bar
-  const bar = document.getElementById("history-viewer-bar");
-  const label = document.getElementById("history-viewer-label");
-  label.textContent = `📋 Viewing: HSD ${entry.hsdId} (${formatTimestamp(entry.timestamp)})`;
-  bar.classList.add("show");
-
-  // Hide quick actions and disable input
-  quickActions.classList.remove("show");
-  quickActions.innerHTML = "";
-  setInputEnabled(false);
-
-  // Render history messages
-  chatArea.innerHTML = "";
-  for (const msg of entry.messages) {
-    if (msg.role === "user") {
-      addUserMsg(msg.content);
-    } else if (msg.role === "assistant") {
-      const el = addAiMsg("");
-      el.innerHTML = renderMarkdown(msg.content);
-    }
-  }
-  scrollToBottom();
-}
-
-function backToLiveSession() {
-  isViewingHistory = false;
-
-  // Hide viewer bar
-  document.getElementById("history-viewer-bar").classList.remove("show");
-
-  // Restore header title + subtitle
-  updateHeaderTitle();
-  updateHeaderSubtitle(activeHsdTitle);
-
-  // Restore live session
-  chatArea.innerHTML = liveSessionHtml;
-  liveSessionHtml = "";
-  scrollToBottom();
-  setInputEnabled(true);
 }
 
 function formatTimestamp(ts) {
@@ -1074,19 +1060,16 @@ function formatTimestamp(ts) {
   return `${month}/${day} ${hours}:${minutes}`;
 }
 
-// ── History Event Listeners ────────────────────────────────────────────────
+// ── Session Event Listeners ───────────────────────────────────────────────
 
-document.getElementById("btn-history").addEventListener("click", openHistoryMenu);
-
-document.getElementById("history-viewer-back").addEventListener("click", backToLiveSession);
+btnHistory.addEventListener("click", openHistoryMenu);
 
 btnImport.addEventListener("click", importHsdFromWebpage);
 
 // Close history menu on click outside
 document.addEventListener("click", (e) => {
   const menu = document.getElementById("historyMenu");
-  const btn = document.getElementById("btn-history");
-  if (menu && menu.classList.contains("show") && !menu.contains(e.target) && e.target !== btn) {
+  if (menu && menu.classList.contains("show") && !menu.contains(e.target) && e.target !== btnHistory) {
     closeHistoryMenu();
   }
 });
@@ -1098,10 +1081,11 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-// Save to history when page is being hidden (fire-and-forget)
+// Save session when page is being hidden
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
-    saveToHistory();
+    saveCurrentSession();
+    persistSessions();
   }
 });
 
@@ -1210,13 +1194,27 @@ regressionInput.addEventListener("input", () => {
 // ── Init ───────────────────────────────────────────────────────────────────
 
 connectPort();
-
-// Auto-start: check health first, only start new session if none active
 setInputEnabled(false);
+
+// Load saved sessions and restore active session UI
+loadSessions().then(() => {
+  if (sessions.length > 0 && sessions[0].messages && sessions[0].messages.length > 0) {
+    const active = sessions[0];
+    activeHsdId = active.hsdId || null;
+    activeHsdTitle = active.hsdTitle || "";
+    activeConversationId = active.conversationId || "";
+    sessionMessages = [...active.messages];
+    updateHeaderTitle();
+    updateHeaderSubtitle(activeHsdTitle);
+    updateConversationId(activeConversationId);
+    rebuildChatArea();
+  }
+});
+
+// Auto-start: connect to bridge
 setTimeout(async () => {
   if (!port) return;
   setStatus("connected", "Connecting...");
   addSystemMsg("Connecting to bridge server...");
-  // Ask background for health — it will start session only if needed
   port.postMessage({ action: "start_session" });
 }, 300);
