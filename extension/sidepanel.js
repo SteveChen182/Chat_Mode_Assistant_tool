@@ -545,6 +545,8 @@ function sendUserMessage(text, displayText) {
     if (!text.includes(activeHsdId)) {
       text = `[HSD ${activeHsdId}] ${text}`;
     }
+    // Modification 1b: Output style instruction (disabled)
+    // text += ` (Output format: Do NOT use inline code style. Use markdown table format for structured data.)`;
   }
 
   // Modification 2: Menu selection prefix — wraps "1", "2", "all", "skip" with instruction

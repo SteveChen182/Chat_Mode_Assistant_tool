@@ -30,5 +30,7 @@ bridge/bridge_debug.log
 bridge/log/
 bridge/native_host.cmd
 bridge/com.chat_mode_assistant.bridge.json
+bridge/native_host.cmd
+bridge/com.chat_mode_assistant.bridge.json
 bridge/.output/
 bridge/.dumps/
