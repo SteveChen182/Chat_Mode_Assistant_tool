@@ -706,11 +706,53 @@ class BridgeServer(ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
 
+def _is_port_in_use(host, port):
+    """Check if another process is already listening on the port."""
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(1)
+        try:
+            s.connect((host, port))
+            return True
+        except (ConnectionRefusedError, OSError):
+            return False
+
+
+_PID_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bridge.pid")
+
+
+def _write_pid_file():
+    """Write current PID to lock file."""
+    try:
+        with open(_PID_FILE, "w") as f:
+            f.write(str(os.getpid()))
+    except OSError:
+        pass
+
+
+def _remove_pid_file():
+    """Remove PID lock file on shutdown."""
+    try:
+        if os.path.exists(_PID_FILE):
+            os.remove(_PID_FILE)
+    except OSError:
+        pass
+
+
 def main():
     if not HAS_WINPTY:
         sys.stderr.write(
             "[bridge] ERROR: pywinpty is required.\n"
             "  Install: pip install pywinpty\n"
+        )
+        sys.exit(1)
+
+    # ── Singleton check: ensure only one bridge runs at a time ──
+    if _is_port_in_use(HOST, PORT):
+        sys.stderr.write(
+            f"[bridge] ERROR: Port {PORT} is already in use.\n"
+            f"  Another bridge_server is likely running.\n"
+            f"  Kill it first or check: netstat -ano | findstr {PORT}\n"
         )
         sys.exit(1)
 
@@ -727,8 +769,10 @@ def main():
     _debug(f"listening on port: {PORT}")
     _debug(f"auto-close pause windows: {AUTO_CLOSE_PAUSE_WINDOWS}")
 
+    _write_pid_file()
+
     server = BridgeServer((HOST, PORT), BridgeHandler)
-    print(f"[bridge] Chat Mode Bridge Server running on http://{HOST}:{PORT}")
+    print(f"[bridge] Chat Mode Bridge Server running on http://{HOST}:{PORT} (PID: {os.getpid()})")
     print(f"[bridge] Press Ctrl+C to stop")
 
     try:
@@ -737,6 +781,8 @@ def main():
         print("\n[bridge] Shutting down...")
         _stop_session()
         server.shutdown()
+    finally:
+        _remove_pid_file()
 
 
 if __name__ == "__main__":
