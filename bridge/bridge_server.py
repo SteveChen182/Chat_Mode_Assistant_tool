@@ -145,6 +145,51 @@ def _is_disconnect(err):
     return False
 
 
+# ── Regression module (Check-gfx-driver-regression) ───────────────────────
+_REGRESSION_MODULE_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "external", "Check-gfx-driver-regression")
+)
+if os.path.isdir(_REGRESSION_MODULE_DIR) and _REGRESSION_MODULE_DIR not in sys.path:
+    sys.path.insert(0, _REGRESSION_MODULE_DIR)
+
+try:
+    import regression_checker as _rc
+    import regression_bridge as _rb
+    _rc._debug = _debug
+    _rb._rc = _rc       # share already-imported module so debug injection works
+    _HAS_REGRESSION = True
+    _debug("regression_checker loaded from " + _REGRESSION_MODULE_DIR)
+except ImportError as _e:
+    _HAS_REGRESSION = False
+    _rb = None
+    _debug(f"Warning: regression modules not found at {_REGRESSION_MODULE_DIR}: {_e}")
+
+
+# ── Driver History Cache + Build Version Cache ────────────────────────────────
+# Classes live in external/Check-gfx-driver-regression/regression_cache.py
+# so that the standalone server.py can share the same implementation.
+try:
+    from regression_cache import _DriverHistoryStore, _BuildVersionCache
+    _debug("regression_cache loaded from " + _REGRESSION_MODULE_DIR)
+except ImportError as _e:
+    _debug(f"Warning: regression_cache not found: {_e}")
+    # Fallback stubs (should never happen if external/ is present)
+    class _DriverHistoryStore:
+        def __init__(self, data_dir=None): pass
+        def lookup(self, *a): return None
+        def save(self, *a): pass
+        def list_all(self, bt): return []
+        def delete(self, *a): return False
+    class _BuildVersionCache:
+        def __init__(self, data_dir=None): pass
+        def lookup_multi(self, *a): return {}
+        def save_multi(self, *a): pass
+
+_BRIDGE_DIR = os.path.dirname(os.path.abspath(__file__))
+_driver_history      = _DriverHistoryStore(data_dir=_BRIDGE_DIR)
+_build_version_cache = _BuildVersionCache(data_dir=_BRIDGE_DIR)
+
+
 # ── Child Window Auto-Close (pause windows) ────────────────────────────────
 def _collect_descendants_win(root_pid):
     """Get all descendant processes of root_pid on Windows."""
@@ -745,6 +790,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._handle_health()
         elif self.path == "/session/stream":
             self._handle_stream()
+        elif self.path.startswith("/driver-history"):
+            self._handle_driver_history_get()
         else:
             self._json_response(404, {"error": "not_found"})
 
@@ -759,6 +806,18 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._handle_send()
         elif self.path == "/session/stop":
             self._handle_stop()
+        elif self.path == "/driver-history":
+            self._handle_driver_history_post()
+        elif self.path == "/driver-history/delete":
+            self._handle_driver_history_delete()
+        elif self.path == "/build-cache/lookup":
+            self._handle_build_cache_lookup()
+        elif self.path == "/build-cache/save":
+            self._handle_build_cache_save()
+        elif _HAS_REGRESSION and self.path in _rb.PATHS:
+            body = self._read_json_body()
+            status, result = _rb.dispatch(self.path, body, _debug)
+            self._json_response(status, result)
         else:
             self._json_response(404, {"error": "not_found"})
 
@@ -773,6 +832,75 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "session_id": session.session_id if session else None,
             "conversation_id": session.conversation_id if session else None,
         })
+
+    # ── Driver History endpoints ─────────────────────────────────────────────
+
+    def _handle_driver_history_get(self):
+        """GET /driver-history?hsd_id=X&build_type=Y  →  lookup one record
+           GET /driver-history?build_type=Y            →  list all records"""
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(self.path)
+        qs = parse_qs(parsed.query)
+        hsd_id     = (qs.get("hsd_id")     or [""])[0].strip()
+        build_type = (qs.get("build_type") or ["gfx"])[0].strip()
+        list_mode = (qs.get("list", ["0"])[0] == "1")
+        if hsd_id and list_mode:
+            records = _driver_history.list_for_hsd(hsd_id, build_type)
+            self._json_response(200, {"ok": True, "records": records})
+        elif hsd_id:
+            record = _driver_history.lookup(hsd_id, build_type)
+            if record:
+                self._json_response(200, {"ok": True, "cached": True, "record": record})
+            else:
+                self._json_response(200, {"ok": True, "cached": False})
+        else:
+            records = _driver_history.list_all(build_type)
+            self._json_response(200, {"ok": True, "records": records})
+
+    def _handle_driver_history_post(self):
+        """POST /driver-history  body: {hsd_id, build_type, hsd_data, qb_data}"""
+        body = self._read_json_body()
+        hsd_id     = str(body.get("hsd_id")     or "").strip()
+        build_type = str(body.get("build_type") or "gfx").strip()
+        if not hsd_id:
+            self._json_response(400, {"ok": False, "error": "hsd_id required"})
+            return
+        record_id = _driver_history.save(hsd_id, build_type,
+                                         body.get("hsd_data") or {},
+                                         body.get("qb_data"))
+        _debug(f"driver-history saved hsd_id={hsd_id} type={build_type} record_id={record_id}")
+        self._json_response(200, {"ok": True, "record_id": record_id})
+
+    def _handle_driver_history_delete(self):
+        """POST /driver-history/delete  body: {record_id, build_type}"""
+        body = self._read_json_body()
+        record_id  = str(body.get("record_id")  or "").strip()
+        build_type = str(body.get("build_type") or "gfx").strip()
+        if not record_id:
+            self._json_response(400, {"ok": False, "error": "record_id required"})
+            return
+        removed = _driver_history.delete(record_id, build_type)
+        _debug(f"driver-history delete record_id={record_id} removed={removed}")
+        self._json_response(200, {"ok": True, "removed": removed})
+
+    def _handle_build_cache_lookup(self):
+        """POST /build-cache/lookup  body: {versions: [...], build_type}"""
+        body = self._read_json_body()
+        versions   = [str(v) for v in (body.get("versions") or []) if v]
+        build_type = str(body.get("build_type") or "gfx").strip()
+        found   = _build_version_cache.lookup_multi(versions, build_type)
+        missing = [v for v in versions if v not in found]
+        _debug(f"build-cache lookup type={build_type} versions={versions} found={list(found.keys())}")
+        self._json_response(200, {"ok": True, "found": found, "missing": missing})
+
+    def _handle_build_cache_save(self):
+        """POST /build-cache/save  body: {build_type, entries: [{version, build_data}]}"""
+        body       = self._read_json_body()
+        build_type = str(body.get("build_type") or "gfx").strip()
+        entries    = body.get("entries") or []
+        _build_version_cache.save_multi(entries, build_type)
+        _debug(f"build-cache saved {len(entries)} entries type={build_type}")
+        self._json_response(200, {"ok": True, "saved": len(entries)})
 
     def _handle_start(self):
         body = self._read_json_body()

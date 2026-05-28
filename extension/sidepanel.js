@@ -44,6 +44,7 @@ const QUICK_ACTIONS_TABLE = [
 // ── DOM refs ───────────────────────────────────────────────────────────────
 const chatArea = document.getElementById("chat-area");
 const quickActions = document.getElementById("quick-actions");
+const quickActionsRegression = document.getElementById("quick-actions-regression");
 const inputEl = document.getElementById("input");
 const sendBtn = document.getElementById("send-btn");
 const btnNew = document.getElementById("btn-new");
@@ -1735,11 +1736,22 @@ btnPopout.addEventListener("click", async () => {
   }
 });
 
-// Close settings menu on Escape
+// Close settings menu on Escape; C = clear active area
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     const settingsMenu = document.getElementById("settingsMenu");
     if (settingsMenu) settingsMenu.classList.remove("show");
+  }
+  if ((e.key === "c" || e.key === "C") && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    const tag = document.activeElement?.tagName;
+    if (tag !== "INPUT" && tag !== "TEXTAREA") {
+      if (typeof isRegressionMode !== "undefined" && isRegressionMode) {
+        const ra = document.getElementById("regression-area");
+        if (ra) ra.innerHTML = "";
+      } else {
+        chatArea.innerHTML = "";
+      }
+    }
   }
 });
 
@@ -1856,6 +1868,40 @@ regressionInput.addEventListener("input", () => {
 // ── Init ───────────────────────────────────────────────────────────────────
 
 connectPort();
+
+// Regression button wiring
+document.getElementById("reg-gfx-btn").addEventListener("click", () => {
+  if (typeof checkGfxRegression === "function") checkGfxRegression();
+});
+document.getElementById("reg-gop-btn").addEventListener("click", () => {
+  if (typeof checkGopRegression === "function") checkGopRegression();
+});
+document.getElementById("reg-clear-btn").addEventListener("click", () => {
+  regressionArea.innerHTML = "";
+});
+
+// ── Driver History panel wiring ───────────────────────────────────────────────
+document.getElementById("reg-history-btn").addEventListener("click", () => {
+  if (typeof showDriverHistoryPanel === "function") showDriverHistoryPanel();
+});
+
+document.getElementById("dh-close-btn").addEventListener("click", () => {
+  document.getElementById("driver-history-panel").style.display = "none";
+});
+
+document.querySelectorAll(".dh-tab").forEach(tab => {
+  tab.addEventListener("click", async () => {
+    document.querySelectorAll(".dh-tab").forEach(t => {
+      t.style.borderBottomColor = "transparent";
+      t.style.color = "#6b7280";
+    });
+    tab.style.borderBottomColor = "#3b82f6";
+    tab.style.color = "#1d4ed8";
+    if (typeof _renderHistoryList === "function")
+      await _renderHistoryList(tab.dataset.type);
+  });
+});
+
 setInputEnabled(false);
 
 // Check for pop-out/pop-in transfer data first

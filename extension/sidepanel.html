@@ -136,6 +136,107 @@
     .quick-btn:hover { background: #4338ca; color: #fff; }
     .quick-btn.selected { background: #4338ca; color: #fff; }
 
+    /* ── Regression Quick Buttons ─── */
+    #quick-actions-regression {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 6px 14px;
+      background: #fffbeb;
+      border-top: 1px solid #fde68a;
+    }
+    #quick-actions-regression.show { display: flex; }
+    .quick-btn-regression {
+      background: #fef3c7;
+      border: 1px solid #fbbf24;
+      color: #92400e;
+      border-radius: 16px;
+      padding: 5px 14px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .quick-btn-regression:hover { background: #f59e0b; color: #fff; border-color: #f59e0b; }
+    .quick-btn-regression:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── QB / Regression Overlays ─── */
+    .qb-login-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .qb-login-overlay.show { display: flex; }
+    .qb-login-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 290px;
+      width: calc(100% - 32px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+    }
+    .qb-login-title { font-size: 15px; font-weight: 700; color: #1f2937; margin-bottom: 10px; }
+    .qb-login-msg { font-size: 13px; color: #374151; line-height: 1.55; margin-bottom: 16px; }
+    .qb-login-input {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1.5px solid #d1d5db;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    .qb-login-input:focus { outline: none; border-color: #5F80AB; }
+    .qb-login-error { color: #dc2626; font-size: 12px; margin-bottom: 8px; display: none; }
+    .qb-login-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .qb-btn-primary {
+      background: #5F80AB; color: #fff; border: none; border-radius: 6px;
+      padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    .qb-btn-primary:hover { background: #4a6691; }
+    .qb-btn-cancel {
+      background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;
+      border-radius: 6px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+    }
+    .qb-btn-cancel:hover { background: #e5e7eb; }
+    .ver-input-label { display: block; font-size: 12px; font-weight: 600; color: #374151; margin-bottom: 4px; }
+    .ver-input-label.fail { color: #dc2626; }
+    .ver-input-label.pass { color: #16a34a; }
+
+    /* ── QB / Regression Progress Bar ─── */
+    .qb-progress-container { display: none; margin-top: 12px; }
+    .qb-progress-container.show { display: block; }
+    .qb-progress-label {
+      font-size: 12px; color: #374151; margin-bottom: 6px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .qb-progress-spinner {
+      display: inline-block; width: 12px; height: 12px;
+      border: 2px solid #d1d5db; border-top-color: #5F80AB;
+      border-radius: 50%; animation: qb-spin 0.8s linear infinite;
+    }
+    @keyframes qb-spin { to { transform: rotate(360deg); } }
+    .qb-progress-track {
+      width: 100%; height: 6px; background: #e5e7eb;
+      border-radius: 3px; overflow: hidden;
+    }
+    .qb-progress-bar {
+      height: 100%; width: 0%;
+      background: linear-gradient(90deg, #5F80AB, #7BA0D0);
+      border-radius: 3px; transition: width 0.4s ease;
+    }
+    .qb-progress-bar.indeterminate {
+      width: 40%;
+      animation: qb-indeterminate 1.5s ease-in-out infinite;
+    }
+    @keyframes qb-indeterminate {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(350%); }
+    }
+
     /* ── Input Area ─── */
     .input-area {
       display: flex;
@@ -913,13 +1014,31 @@
   </div>
 
   <!-- ══ Regression Tool View (hidden by default) ══ -->
-  <div id="regression-view" style="display:none; flex:1; flex-direction:column;">
+  <div id="regression-view" style="display:none; flex:1; flex-direction:column; position:relative;">
     <div id="regression-info" style="padding:8px 16px; background:#fef3c7; border-bottom:1px solid #d4a017; font-size:12px; color:#92400e;">
       <strong>Regression Check</strong>
       <span id="regression-hsd-info"></span>
     </div>
     <div id="regression-back-bar" style="padding:6px 12px; background:#fffbeb; border-bottom:1px solid #e5e7eb;">
       <button id="btn-back-to-chat" style="font-size:12px; padding:4px 10px; border:1px solid #d4a017; border-radius:4px; background:#fff; cursor:pointer;">← Back to Chat Mode</button>
+    </div>
+    <!-- GFX / GOP regression trigger buttons -->
+    <div id="quick-actions-regression">
+      <button id="reg-gfx-btn" class="quick-btn-regression">🔍 Check GFX Regression</button>
+      <button id="reg-gop-btn" class="quick-btn-regression">🔍 Check GOP Regression</button>
+      <button id="reg-history-btn" class="quick-btn-regression" style="background:#eff6ff;border-color:#93c5fd;color:#1d4ed8;font-weight:700;" title="📋 History — view past GFX/GOP regression checks">H</button>
+      <button id="reg-clear-btn" class="quick-btn-regression" style="background:#fee2e2;border-color:#fca5a5;color:#991b1b;font-weight:700;" title="🗑 Clear — clear the results area">C</button>
+    </div>
+    <!-- Regression progress bar -->
+    <div id="regressionProgressContainer" class="qb-progress-container" style="padding:0 14px;">
+      <div class="qb-progress-label">
+        <span class="qb-progress-spinner"></span>
+        <span id="regressionProgressText">Checking...</span>
+        <span id="regressionProgressPct" style="margin-left:auto;font-weight:600;"></span>
+      </div>
+      <div class="qb-progress-track">
+        <div id="regressionProgressBar" class="qb-progress-bar"></div>
+      </div>
     </div>
     <div id="regression-area" style="flex:1; overflow-y:auto; padding:12px 16px; display:flex; flex-direction:column; gap:8px;"></div>
     <div class="input-area">
@@ -928,6 +1047,77 @@
     </div>
   </div>
 
+  <!-- Driver History Panel (slides over regression-area) -->
+  <div id="driver-history-panel" style="
+    display:none; position:absolute; top:0; left:0; right:0; bottom:0;
+    flex-direction:column; background:#fff; z-index:20; border-top:1px solid #e5e7eb;">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;padding:8px 12px;
+                background:#1e293b;border-bottom:1px solid #334155;">
+      <span style="font-weight:700;font-size:13px;color:#fff;">📋 Driver History</span>
+      <button id="dh-close-btn" style="margin-left:auto;font-size:13px;padding:2px 8px;
+        border:1px solid #475569;border-radius:4px;background:transparent;
+        color:#cbd5e1;cursor:pointer;">✕ Close</button>
+    </div>
+    <!-- GFX / GOP tabs -->
+    <div style="display:flex;border-bottom:2px solid #e5e7eb;background:#f9fafb;">
+      <button class="dh-tab active" data-type="gfx" style="
+        flex:1;padding:7px;font-size:12.5px;font-weight:600;border:none;
+        border-bottom:2px solid #3b82f6;background:transparent;color:#1d4ed8;cursor:pointer;">
+        🖥 GFX
+      </button>
+      <button class="dh-tab" data-type="gop" style="
+        flex:1;padding:7px;font-size:12.5px;font-weight:600;border:none;
+        border-bottom:2px solid transparent;background:transparent;color:#6b7280;cursor:pointer;">
+        🎮 GOP
+      </button>
+    </div>
+    <!-- Record list -->
+    <div id="dh-list" style="flex:1;overflow-y:auto;"></div>
+  </div>
+
+  <!-- Version input overlay -->
+  <div id="versionInputOverlay" class="qb-login-overlay">
+    <div class="qb-login-box">
+      <div id="versionInputTitle" class="qb-login-title">Driver Version</div>
+      <div id="versionInputMsg" class="qb-login-msg">版本無法從 HSD 自動讀取，請手動填寫：</div>
+      <label id="versionFailLabel" class="ver-input-label fail" for="versionFailInput">❌ Fail Driver Version</label>
+      <input id="versionFailInput" class="qb-login-input" type="text" placeholder="e.g. 101.6651 or 32.0.101.6651" />
+      <label id="versionPassLabel" class="ver-input-label pass" for="versionPassInput">✅ Last Passing Version</label>
+      <input id="versionPassInput" class="qb-login-input" type="text" placeholder="e.g. 101.6650 or 32.0.101.6650" />
+      <div id="versionInputError" class="qb-login-error"></div>
+      <div class="qb-login-actions">
+        <button id="versionInputCancelBtn" class="qb-btn-cancel">Cancel</button>
+        <button id="versionInputConfirmBtn" class="qb-btn-primary">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- QB Login overlay -->
+  <div id="qbLoginOverlay" class="qb-login-overlay">
+    <div class="qb-login-box">
+      <div id="qbLoginTitle" class="qb-login-title"></div>
+      <div id="qbLoginMsg" class="qb-login-msg"></div>
+      <input id="qbUsername" class="qb-login-input" type="text" placeholder="Username (IDSID)" autocomplete="username" />
+      <input id="qbPassword" class="qb-login-input" type="password" placeholder="Password" autocomplete="current-password" />
+      <div id="qbLoginError" class="qb-login-error"></div>
+      <div class="qb-login-actions">
+        <button id="qbCancelBtn" class="qb-btn-cancel"></button>
+        <button id="qbContinueBtn" class="qb-btn-primary"></button>
+      </div>
+      <div id="qbProgressContainer" class="qb-progress-container">
+        <div class="qb-progress-label">
+          <span class="qb-progress-spinner"></span>
+          <span id="qbProgressText">Logging in...</span>
+        </div>
+        <div class="qb-progress-track">
+          <div id="qbProgressBar" class="qb-progress-bar"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="regression_ui.js"></script>
   <script src="sidepanel.js"></script>
 </body>
 </html>
