@@ -37,11 +37,14 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 $pyVer = (python --version 2>&1) | Out-String
 Write-Host "[OK] Python found: $($pyVer.Trim())" -ForegroundColor Green
 
-try {
-    python -c "import winpty" 2>$null
-    Write-Host "[OK] pywinpty installed" -ForegroundColor Green
-} catch {
-    Write-Warning "pywinpty not found. Run: pip install pywinpty"
+# ── Install Python dependencies ─────────────────────────────────────────
+$reqFile = Join-Path $ScriptDir "requirements.txt"
+Write-Host "Installing Python dependencies from requirements.txt..." -ForegroundColor Yellow
+python -m pip install -r $reqFile --quiet
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "[OK] Python dependencies installed" -ForegroundColor Green
+} else {
+    Write-Warning "pip install may have failed. Check manually: pip install -r bridge/requirements.txt"
 }
 
 Write-Host ""

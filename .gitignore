@@ -18,6 +18,10 @@ Thumbs.db
 # Env
 .env
 
+# Regression cache (local only, not committed)
+bridge/driver_history_*.json
+bridge/build_cache_*.json
+
 # Large files
 *.etl
 *.dmp
