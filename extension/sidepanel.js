@@ -675,6 +675,11 @@ function sendUserMessage(text, displayText) {
   quickActions.classList.remove("show");
   setInputEnabled(false);
 
+  // Auto-collapse post-analysis panel when user starts next action
+  if (postAnalysisPanel.classList.contains("show")) {
+    postAnalysisPanel.classList.add("collapsed");
+  }
+
   // Track messages for session
   sessionMessages.push({ role: "user", content: shown });
 
