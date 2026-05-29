@@ -126,6 +126,37 @@ function showOnboarding() {
   if (onboardingEl) onboardingEl.style.display = "flex";
 }
 
+// ── Connection Splash ────────────────────────────────────────────────────────────────────────
+const splashEl = document.getElementById("connection-splash");
+const splashText = document.getElementById("splash-text");
+const splashSub = document.getElementById("splash-sub");
+const splashProgress = document.getElementById("splash-progress");
+
+function showConnectionSplash(text, sub) {
+  if (!splashEl) return;
+  splashEl.classList.remove("fade-out");
+  splashEl.style.display = "flex";
+  if (text) splashText.textContent = text;
+  if (sub) splashSub.textContent = sub;
+  splashProgress.classList.remove("done");
+}
+
+function updateConnectionSplash(text, sub) {
+  if (splashText && text) splashText.textContent = text;
+  if (splashSub && sub) splashSub.textContent = sub;
+}
+
+function hideConnectionSplash() {
+  if (!splashEl) return;
+  splashProgress.classList.add("done");
+  splashText.textContent = "Connected!";
+  splashSub.textContent = "";
+  setTimeout(() => {
+    splashEl.classList.add("fade-out");
+    setTimeout(() => { splashEl.style.display = "none"; }, 400);
+  }, 600);
+}
+
 // ── Post-Analysis Panel ────────────────────────────────────────────────────────────────────
 let _postAnalysisShown = false;
 
@@ -447,6 +478,7 @@ function onReady(accumulatedAnswer) {
 
   // Update status to Connected (handles initial toolkit-loaded ready too)
   setStatus("connected", "Connected");
+  hideConnectionSplash();
 
   // If this is the first ready after session start, show welcome
   if (!accumulatedAnswer) {
@@ -477,8 +509,10 @@ function onInfo(text) {
   // Loading messages, toolkit progress, etc.
   if (text.includes("Loading toolkits") || text.includes("Loading")) {
     setStatus("connected", "Loading toolkits...");
+    updateConnectionSplash("Loading toolkits...", "Preparing AI environment");
   } else if (text) {
     setStatus("connected", text.substring(0, 40));
+    updateConnectionSplash(text.substring(0, 40), "");
   }
 }
 
@@ -1402,6 +1436,6 @@ loadSessions().then(() => {
 setTimeout(async () => {
   if (!port) return;
   setStatus("connected", "Connecting...");
-  addSystemMsg("Connecting to bridge server...");
+  showConnectionSplash("Connecting to bridge server...", "Initializing session");
   port.postMessage({ action: "start_session" });
 }, 300);
