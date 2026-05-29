@@ -158,15 +158,20 @@ function hideConnectionSplash() {
 }
 
 // ── Post-Analysis Panel ────────────────────────────────────────────────────────────────────
-const DEBUG_POST_ANALYSIS = true; // DEBUG: set to false to restore normal behavior
 let _postAnalysisShown = false;
+const _POST_TITLE_FULL = "✅ Analysis Complete — What's next?";
+const _POST_TITLE_SHORT = "What's next?";
 
 function showPostAnalysisPanel() {
-  if (!DEBUG_POST_ANALYSIS && _postAnalysisShown) return;
+  if (_postAnalysisShown) return;
   _postAnalysisShown = true;
 
   const buttons = QUICK_ACTIONS_TABLE.filter(btn => btn.show === "post-analysis");
   if (buttons.length === 0) return;
+
+  // Set full title on first show
+  const titleEl = postAnalysisPanel.querySelector(".post-analysis-title");
+  if (titleEl) titleEl.textContent = _POST_TITLE_FULL;
 
   postAnalysisGrid.innerHTML = "";
   for (const btn of buttons) {
@@ -192,6 +197,11 @@ function hidePostAnalysisPanel() {
 // Toggle collapse on header click
 document.getElementById("post-analysis-header").addEventListener("click", () => {
   postAnalysisPanel.classList.toggle("collapsed");
+  // After first collapse, shorten the title
+  const titleEl = postAnalysisPanel.querySelector(".post-analysis-title");
+  if (titleEl && postAnalysisPanel.classList.contains("collapsed")) {
+    titleEl.textContent = _POST_TITLE_SHORT;
+  }
 });
 
 // ── Save Chat as HTML ──────────────────────────────────────────────────────
@@ -681,6 +691,8 @@ function sendUserMessage(text, displayText) {
   // Auto-collapse post-analysis panel when user starts next action
   if (postAnalysisPanel.classList.contains("show")) {
     postAnalysisPanel.classList.add("collapsed");
+    const titleEl = postAnalysisPanel.querySelector(".post-analysis-title");
+    if (titleEl) titleEl.textContent = _POST_TITLE_SHORT;
   }
 
   // Track messages for session
@@ -1091,11 +1103,6 @@ function startNewSession() {
   heroCta.classList.remove("show");
   hidePostAnalysisPanel();
   _postAnalysisShown = false;
-
-  // DEBUG: show post-analysis panel immediately for testing
-  if (DEBUG_POST_ANALYSIS) {
-    setTimeout(() => showPostAnalysisPanel(), 300);
-  }
 
   // Push new empty session at front, shift others down
   sessions.unshift({
