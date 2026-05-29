@@ -27,8 +27,11 @@ if (-not (Get-Command dt -ErrorAction SilentlyContinue)) {
     Write-Error "dt CLI not found in PATH. Please install Intel Developer Toolkit first."
     exit 1
 }
-$dtVer = (dt version 2>$null) | Select-String "Version:" | ForEach-Object { $_.ToString().Trim() }
-if (-not $dtVer) { $dtVer = "OK" }
+# Run dt version in a child scope with Continue to avoid dt's stderr decorations
+# triggering $ErrorActionPreference = "Stop" in the outer scope
+$dtVerLines = & { $ErrorActionPreference = "Continue"; dt version 2>&1 }
+$dtVer = ($dtVerLines | Where-Object { "$_" -match "Version:" } | Select-Object -First 1)
+if (-not $dtVer) { $dtVer = "detected" }
 Write-Host "[OK] dt found: $dtVer" -ForegroundColor Green
 
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
