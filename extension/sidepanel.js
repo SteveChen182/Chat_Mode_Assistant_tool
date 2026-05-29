@@ -179,6 +179,7 @@ function showPostAnalysisPanel() {
     });
     postAnalysisGrid.appendChild(el);
   }
+  postAnalysisPanel.classList.remove("collapsed");
   postAnalysisPanel.classList.add("show");
   scrollToBottom();
 }
@@ -186,6 +187,11 @@ function showPostAnalysisPanel() {
 function hidePostAnalysisPanel() {
   postAnalysisPanel.classList.remove("show");
 }
+
+// Toggle collapse on header click
+document.getElementById("post-analysis-header").addEventListener("click", () => {
+  postAnalysisPanel.classList.toggle("collapsed");
+});
 
 // ── Save Chat as HTML ──────────────────────────────────────────────────────
 btnSave.addEventListener("click", () => {
