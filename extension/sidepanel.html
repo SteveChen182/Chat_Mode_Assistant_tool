@@ -23,16 +23,20 @@
       padding: 10px 16px;
       display: flex;
       align-items: center;
-      position: relative;
       box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+    }
+    .header-status-wrap {
+      width: 100px;
+      min-width: 100px;
+      display: flex;
+      align-items: center;
     }
     .header-title {
       font-size: 15px; font-weight: 700;
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
       white-space: nowrap;
-      pointer-events: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-right: auto;
     }
     .header-status {
       font-size: 11px;
@@ -590,7 +594,9 @@
 
   <!-- Header -->
   <div class="header">
-    <span id="status-badge" class="header-status disconnected">Offline</span>
+    <div class="header-status-wrap">
+      <span id="status-badge" class="header-status disconnected">Offline</span>
+    </div>
     <span id="header-title" class="header-title">Chat Mode Assistant</span>
     <div class="header-controls">
       <button id="btn-save" class="header-btn" title="Save chat as HTML">&#128190;</button>
