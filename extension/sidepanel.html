@@ -23,19 +23,38 @@
       padding: 10px 16px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      position: relative;
       box-shadow: 0 2px 4px rgba(0,0,0,0.12);
     }
-    .header-title { font-size: 15px; font-weight: 700; }
+    .header-title {
+      font-size: 15px; font-weight: 700;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      pointer-events: none;
+    }
     .header-status {
       font-size: 11px;
       padding: 2px 8px;
       border-radius: 10px;
       background: rgba(255,255,255,0.2);
+      transition: all 0.4s ease;
+      white-space: nowrap;
+      overflow: hidden;
     }
-    .header-status.connected { background: #22c55e; color: #fff; }
+    .header-status.connected {
+      background: #22c55e;
+      color: #22c55e;
+      font-size: 0;
+      width: 10px;
+      height: 10px;
+      padding: 0;
+      border-radius: 50%;
+      box-shadow: 0 0 6px rgba(34,197,94,0.6);
+    }
     .header-status.disconnected { background: #ef4444; color: #fff; }
-    .header-controls { display: flex; gap: 6px; }
+    .header-controls { display: flex; gap: 6px; margin-left: auto; }
     .header-btn {
       background: rgba(255,255,255,0.2);
       border: none;
@@ -571,8 +590,8 @@
 
   <!-- Header -->
   <div class="header">
-    <span id="header-title" class="header-title">Chat Mode Assistant</span>
     <span id="status-badge" class="header-status disconnected">Offline</span>
+    <span id="header-title" class="header-title">Chat Mode Assistant</span>
     <div class="header-controls">
       <button id="btn-save" class="header-btn" title="Save chat as HTML">&#128190;</button>
       <button id="btn-import" class="header-btn" title="Import HSD from current tab">Import HSD</button>
