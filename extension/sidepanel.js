@@ -37,8 +37,8 @@ const QUICK_ACTIONS_TABLE = [
   { label: "📋 Summary",        prompt: "Provide a brief summary of this sighting analysis.",              display: "Summary",         group: "post", show: "post-analysis" },
   { label: "🔍 Root Cause",     prompt: "What is the most likely root cause?",                            display: "Root Cause",      group: "post", show: "post-analysis" },
   { label: "📝 Action Items",   prompt: "List comment's action items and who is action owner.",                             display: "Action Items",    group: "post", show: "post-analysis" },
-  { label: "🔄 Deep Dive",      prompt: "Perform a deeper analysis on the most critical finding.",        display: "Deep Dive",       group: "post", show: "post-analysis" },
-  { label: "💾 Export Report",  prompt: "Generate a formatted analysis report.",                          display: "Export Report",   group: "post", show: "post-analysis" },
+  { label: "🔄 More Similiar issues",      prompt: "List 10 similar issues' ID, title and score by table style.",        display: "List 10 similiar issues",       group: "post", show: "post-analysis" },
+ 
 ];
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
@@ -158,10 +158,11 @@ function hideConnectionSplash() {
 }
 
 // ── Post-Analysis Panel ────────────────────────────────────────────────────────────────────
+const DEBUG_POST_ANALYSIS = true; // DEBUG: set to false to restore normal behavior
 let _postAnalysisShown = false;
 
 function showPostAnalysisPanel() {
-  if (_postAnalysisShown) return;
+  if (!DEBUG_POST_ANALYSIS && _postAnalysisShown) return;
   _postAnalysisShown = true;
 
   const buttons = QUICK_ACTIONS_TABLE.filter(btn => btn.show === "post-analysis");
@@ -1090,6 +1091,11 @@ function startNewSession() {
   heroCta.classList.remove("show");
   hidePostAnalysisPanel();
   _postAnalysisShown = false;
+
+  // DEBUG: show post-analysis panel immediately for testing
+  if (DEBUG_POST_ANALYSIS) {
+    setTimeout(() => showPostAnalysisPanel(), 300);
+  }
 
   // Push new empty session at front, shift others down
   sessions.unshift({
