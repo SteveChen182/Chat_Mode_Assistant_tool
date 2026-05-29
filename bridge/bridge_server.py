@@ -25,6 +25,8 @@ import sys
 import shutil
 import threading
 import time
+import ctypes
+import ctypes.wintypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 try:
@@ -195,6 +197,45 @@ def _close_paused_children(root_pid):
                 _debug(f"auto-closed paused child pid={pid}")
             except Exception as e:
                 _debug(f"failed to close paused child pid={pid}: {e}")
+
+
+# ── GDHM Analysis Window Auto-Close ────────────────────────────────────────
+_GDHM_TITLE_KEYWORD = "gdhm analysis"
+
+def _close_gdhm_analysis_windows():
+    """Find and close Windows Terminal windows with 'GDHM Analysis' in title.
+
+    These windows are spawned by GNAI for ETL/sherlog analysis and block
+    the main ConPTY session when they stop at 'Press any key to continue'.
+    Strategy: find the window by title, then send WM_CLOSE to terminate it.
+    """
+    if os.name != "nt" or not AUTO_CLOSE_PAUSE_WINDOWS:
+        return
+
+    user32 = ctypes.windll.user32
+
+    target_hwnds = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
+    def enum_callback(hwnd, lparam):
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        length = user32.GetWindowTextLengthW(hwnd)
+        if length == 0:
+            return True
+        buf = ctypes.create_unicode_buffer(length + 1)
+        user32.GetWindowTextW(hwnd, buf, length + 1)
+        title = buf.value.lower()
+        if _GDHM_TITLE_KEYWORD in title:
+            target_hwnds.append((hwnd, buf.value))
+        return True
+
+    user32.EnumWindows(enum_callback, 0)
+
+    for hwnd, title in target_hwnds:
+        WM_CLOSE = 0x0010
+        user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+        _debug(f"auto-closed GDHM Analysis window: '{title}'")
 
 
 # ── ChatSession: manages one dt gnai chat --json process ────────────────────
@@ -471,13 +512,14 @@ class ChatSession:
         return None
 
     def _scan_pause_windows(self):
-        """Periodically scan and close paused child cmd windows."""
+        """Periodically scan and close paused child cmd/GDHM windows."""
         while not self._stop_event.is_set():
             self._stop_event.wait(PAUSE_SCAN_INTERVAL)
             if self._stop_event.is_set():
                 break
             if self._pty and self._pty.isalive():
                 _close_paused_children(self._pty.pid)
+                _close_gdhm_analysis_windows()
 
 
 # ── Global Session Manager ──────────────────────────────────────────────────

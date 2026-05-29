@@ -32,6 +32,13 @@ const QUICK_ACTIONS_TABLE = [
   // ── Yes/No 回覆 ──
   { label: "Yes",         prompt: "yes",                                                    display: "Yes",                group: "yesno", show: "yesno" },
   { label: "No",          prompt: "no",                                                     display: "No",                 group: "yesno", show: "yesno" },
+
+  // ── 第一次分析完成後顯示 ──
+  { label: "📋 Summary",        prompt: "Provide a brief summary of this sighting analysis.",              display: "Summary",         group: "post", show: "post-analysis" },
+  { label: "🔍 Root Cause",     prompt: "What is the most likely root cause?",                            display: "Root Cause",      group: "post", show: "post-analysis" },
+  { label: "📝 Action Items",   prompt: "List all recommended action items.",                             display: "Action Items",    group: "post", show: "post-analysis" },
+  { label: "🔄 Deep Dive",      prompt: "Perform a deeper analysis on the most critical finding.",        display: "Deep Dive",       group: "post", show: "post-analysis" },
+  { label: "💾 Export Report",  prompt: "Generate a formatted analysis report.",                          display: "Export Report",   group: "post", show: "post-analysis" },
 ];
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
@@ -50,6 +57,104 @@ const headerTitle = document.getElementById("header-title");
 const headerSubtitle = document.getElementById("header-subtitle");
 const statusBadge = document.getElementById("status-badge");
 const btnHistory = document.getElementById("btn-history");
+const onboardingEl = document.getElementById("onboarding");
+const heroCta = document.getElementById("hero-cta");
+const heroCtaBtn = document.getElementById("hero-cta-btn");
+const postAnalysisPanel = document.getElementById("post-analysis-panel");
+const postAnalysisGrid = document.getElementById("post-analysis-grid");
+const toastContainer = document.getElementById("toast-container");
+const modalOverlay = document.getElementById("modal-overlay");
+const modalTitle = document.getElementById("modal-title");
+const modalMessage = document.getElementById("modal-message");
+const modalConfirmBtn = document.getElementById("modal-confirm");
+const modalCancelBtn = document.getElementById("modal-cancel");
+
+// ── Custom Modal ─────────────────────────────────────────────────────────────────────────
+let _modalResolve = null;
+
+function showModal(title, message, confirmText = "Confirm", cancelText = "Cancel") {
+  return new Promise((resolve) => {
+    _modalResolve = resolve;
+    modalTitle.textContent = title;
+    modalMessage.textContent = message;
+    modalConfirmBtn.textContent = confirmText;
+    modalCancelBtn.textContent = cancelText;
+    modalOverlay.classList.add("show");
+  });
+}
+
+modalConfirmBtn.addEventListener("click", () => {
+  modalOverlay.classList.remove("show");
+  if (_modalResolve) { _modalResolve(true); _modalResolve = null; }
+});
+modalCancelBtn.addEventListener("click", () => {
+  modalOverlay.classList.remove("show");
+  if (_modalResolve) { _modalResolve(false); _modalResolve = null; }
+});
+
+// ── Toast Notifications ────────────────────────────────────────────────────────────────────────
+function showToast(text, type = "") {
+  const el = document.createElement("div");
+  el.className = `toast${type ? ` toast-${type}` : ""}`;
+  el.textContent = text;
+  toastContainer.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ── Typing Indicator ─────────────────────────────────────────────────────────────────────────
+function showTypingIndicator() {
+  removeTypingIndicator();
+  const el = document.createElement("div");
+  el.className = "typing-indicator";
+  el.id = "typing-indicator";
+  el.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+  chatArea.appendChild(el);
+  scrollToBottom();
+}
+
+function removeTypingIndicator() {
+  const el = document.getElementById("typing-indicator");
+  if (el) el.remove();
+}
+
+// ── Onboarding ───────────────────────────────────────────────────────────────────────────────
+function hideOnboarding() {
+  if (onboardingEl) onboardingEl.style.display = "none";
+}
+
+function showOnboarding() {
+  if (onboardingEl) onboardingEl.style.display = "flex";
+}
+
+// ── Post-Analysis Panel ────────────────────────────────────────────────────────────────────
+let _postAnalysisShown = false;
+
+function showPostAnalysisPanel() {
+  if (_postAnalysisShown) return;
+  _postAnalysisShown = true;
+
+  const buttons = QUICK_ACTIONS_TABLE.filter(btn => btn.show === "post-analysis");
+  if (buttons.length === 0) return;
+
+  postAnalysisGrid.innerHTML = "";
+  for (const btn of buttons) {
+    const el = document.createElement("button");
+    el.className = "post-analysis-btn";
+    el.textContent = btn.label;
+    el.title = btn.prompt;
+    el.addEventListener("click", () => {
+      hidePostAnalysisPanel();
+      sendUserMessage(btn.prompt, btn.display);
+    });
+    postAnalysisGrid.appendChild(el);
+  }
+  postAnalysisPanel.classList.add("show");
+  scrollToBottom();
+}
+
+function hidePostAnalysisPanel() {
+  postAnalysisPanel.classList.remove("show");
+}
 
 // ── Save Chat as HTML ──────────────────────────────────────────────────────
 btnSave.addEventListener("click", () => {
@@ -94,6 +199,7 @@ btnSave.addEventListener("click", () => {
   a.download = `${safeName}_${new Date().toISOString().slice(0,10)}.html`;
   a.click();
   URL.revokeObjectURL(url);
+  showToast("Chat saved as HTML", "success");
 });
 
 // ── State ──────────────────────────────────────────────────────────────────
@@ -151,10 +257,12 @@ function connectPort() {
       case "session_stopped":
         setStatus("disconnected", "Offline");
         removeToolIndicator();
+        removeTypingIndicator();
         isStreaming = false;
         currentAiMsg = null;
         currentAiText = "";
         addSystemMsg("Session ended.");
+        showToast("Session ended");
         setInputEnabled(false);
         break;
 
@@ -250,6 +358,7 @@ function connectPort() {
 // ── Event Handlers ─────────────────────────────────────────────────────────
 
 function onAnswerChunk(text) {
+  removeTypingIndicator();
   if (!currentAiMsg) {
     currentAiMsg = addAiMsg("");
     currentAiText = "";
@@ -307,6 +416,7 @@ function onAnswerChunk(text) {
 function onToolStart(name, args) {
   // Remove previous tool indicator if exists
   removeToolIndicator();
+  removeTypingIndicator();
 
   const friendlyName = formatToolName(name);
   const detail = args.id ? ` (ID: ${args.id})` : "";
@@ -340,6 +450,7 @@ function onReady(accumulatedAnswer) {
 
   // If this is the first ready after session start, show welcome
   if (!accumulatedAnswer) {
+    hideOnboarding();
     addSystemMsg("Session ready. Type an HSD ID to begin analysis.");
   }
 
@@ -347,6 +458,11 @@ function onReady(accumulatedAnswer) {
   // if (accumulatedAnswer) {
   //   generateQuickActions(accumulatedAnswer);
   // }
+
+  // Show post-analysis fancy panel after first HSD analysis completes
+  if (accumulatedAnswer && activeHsdId && !_postAnalysisShown) {
+    showPostAnalysisPanel();
+  }
 
   // Save session when analysis completes
   if (sessionMessages.length > 0) {
@@ -555,6 +671,8 @@ function sendUserMessage(text, displayText) {
   const messageToSend = text;
 
   port.postMessage({ action: "send", message: messageToSend });
+  showTypingIndicator();
+  hideOnboarding();
 }
 
 // ── UI Helpers ─────────────────────────────────────────────────────────────
@@ -717,12 +835,18 @@ async function importHsdFromWebpage() {
 
     // If already have an active HSD, confirm
     if (activeHsdId && activeHsdId !== hsdId) {
-      const confirmed = confirm(`Switch from HSD ${activeHsdId} to HSD ${hsdId}? This will send the new ID to the current session.`);
+      const confirmed = await showModal(
+        "Switch HSD",
+        `Switch from HSD ${activeHsdId} to HSD ${hsdId}? This will send the new ID to the current session.`,
+        "Switch",
+        "Cancel"
+      );
       if (!confirmed) return;
     }
 
     activeHsdId = hsdId;
     updateHeaderTitle();
+    hideOnboarding();
     const cid = generateConversationId(hsdId);
     updateConversationId(cid);
 
@@ -736,6 +860,7 @@ async function importHsdFromWebpage() {
     updateHeaderSubtitle(hsdTitle);
 
     addSystemMsg(`Imported HSD ID: ${hsdId}`);
+    showToast(`HSD ${hsdId} imported`, "success");
     hsdImported = true;
 
     // Show quick-action button to start analysis (don't auto-send)
@@ -747,16 +872,20 @@ async function importHsdFromWebpage() {
 
 function showImportQuickActions(hsdId) {
   quickActions.innerHTML = "";
-  const btn = document.createElement("button");
-  btn.className = "quick-btn";
-  btn.textContent = `Analyze HSD ${hsdId}`;
-  btn.addEventListener("click", () => {
-    quickActions.classList.remove("show");
+  quickActions.classList.remove("show");
+
+  // Show large centered hero CTA button
+  heroCtaBtn.textContent = `🚀 Analyze HSD ${hsdId}`;
+  heroCta.classList.add("show");
+
+  // One-time click handler
+  const handler = () => {
+    heroCta.classList.remove("show");
     hsdImported = false;
-    sendUserMessage(hsdId, `Analyze HSD ${hsdId}`);
-  });
-  quickActions.appendChild(btn);
-  quickActions.classList.add("show");
+    sendUserMessage(`${hsdId} skip any attachment check`, `Analyze HSD ${hsdId}`);
+    heroCtaBtn.removeEventListener("click", handler);
+  };
+  heroCtaBtn.addEventListener("click", handler);
 }
 
 // ── Simple Markdown Renderer ───────────────────────────────────────────────
@@ -877,7 +1006,25 @@ inputEl.addEventListener("keydown", (e) => {
   }
 });
 
-btnNew.addEventListener("click", () => {
+btnNew.addEventListener("click", async () => {
+  // Skip confirmation if session is empty
+  if (sessionMessages.length === 0 && !activeHsdId) {
+    startNewSession();
+    return;
+  }
+
+  const confirmed = await showModal(
+    "Start New Session",
+    "Leave current session and start a new one? Current session will be saved to history.",
+    "New Session",
+    "Cancel"
+  );
+  if (!confirmed) return;
+
+  startNewSession();
+});
+
+function startNewSession() {
   // Save current session before creating new
   saveCurrentSession();
 
@@ -892,6 +1039,10 @@ btnNew.addEventListener("click", () => {
   updateHeaderTitle();
   updateHeaderSubtitle("");
   updateConversationId("");
+  showOnboarding();
+  heroCta.classList.remove("show");
+  hidePostAnalysisPanel();
+  _postAnalysisShown = false;
 
   // Push new empty session at front, shift others down
   sessions.unshift({
@@ -907,7 +1058,7 @@ btnNew.addEventListener("click", () => {
   if (port) {
     port.postMessage({ action: "start_session" });
   }
-});
+}
 
 btnStop.addEventListener("click", () => {
   if (port) {
@@ -1012,7 +1163,7 @@ function openHistoryMenu() {
   const savedCount = sessions.length > 1 ? sessions.length - 1 : 0;
   const title = document.createElement("div");
   title.className = "history-menu-title";
-  title.textContent = `Saved Sessions (${savedCount})`;
+  title.textContent = `Session History (${savedCount})`;
   menu.appendChild(title);
 
   // Show sessions 1+ (skip index 0 = current active)
@@ -1020,30 +1171,65 @@ function openHistoryMenu() {
   if (savedSessions.length === 0) {
     const empty = document.createElement("div");
     empty.className = "history-empty";
-    empty.textContent = "No saved sessions";
+    empty.textContent = "No saved sessions yet";
     menu.appendChild(empty);
   } else {
     savedSessions.forEach((entry, i) => {
-      const btn = document.createElement("button");
-      btn.className = "history-item";
+      const row = document.createElement("div");
+      row.className = "history-item";
+
+      // Info section (clickable to load)
+      const info = document.createElement("div");
+      info.className = "history-item-info";
+      info.style.cursor = "pointer";
 
       const hsdLine = document.createElement("div");
       hsdLine.className = "history-item-hsd";
       hsdLine.textContent = entry.hsdId ? `HSD ${entry.hsdId}` : "Session";
-      btn.appendChild(hsdLine);
+      info.appendChild(hsdLine);
 
-      const infoLine = document.createElement("div");
-      infoLine.className = "history-item-time";
+      if (entry.hsdTitle) {
+        const titleLine = document.createElement("div");
+        titleLine.className = "history-item-title";
+        titleLine.textContent = entry.hsdTitle;
+        info.appendChild(titleLine);
+      }
+
+      const timeLine = document.createElement("div");
+      timeLine.className = "history-item-time";
       const cidText = entry.conversationId ? `CID: ${entry.conversationId}` : "";
       const timeText = formatTimestamp(entry.timestamp);
-      infoLine.textContent = cidText || timeText;
-      btn.appendChild(infoLine);
+      timeLine.textContent = [cidText, timeText].filter(Boolean).join(" \u2022 ");
+      info.appendChild(timeLine);
 
-      btn.addEventListener("click", () => {
+      info.addEventListener("click", () => {
         closeHistoryMenu();
         switchToSession(i + 1);
       });
-      menu.appendChild(btn);
+      row.appendChild(info);
+
+      // Delete button
+      const delBtn = document.createElement("button");
+      delBtn.className = "history-delete-btn";
+      delBtn.innerHTML = "&#128465;"; // trash can
+      delBtn.title = "Delete this session";
+      delBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const confirmed = await showModal(
+          "Delete Session",
+          `Delete history for HSD ${entry.hsdId || "this session"}?`,
+          "Delete",
+          "Cancel"
+        );
+        if (!confirmed) return;
+        sessions.splice(i + 1, 1);
+        persistSessions();
+        showToast("Session deleted", "success");
+        openHistoryMenu(); // refresh menu
+      });
+      row.appendChild(delBtn);
+
+      menu.appendChild(row);
     });
   }
 
@@ -1208,6 +1394,7 @@ loadSessions().then(() => {
     updateHeaderSubtitle(activeHsdTitle);
     updateConversationId(activeConversationId);
     rebuildChatArea();
+    hideOnboarding();
   }
 });
 
