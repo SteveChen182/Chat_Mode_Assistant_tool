@@ -38,10 +38,22 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 $pyVer = (python --version 2>&1) | Out-String
 Write-Host "[OK] Python found: $($pyVer.Trim())" -ForegroundColor Green
 
+# ── Detect Intel network and set proxy ──────────────────────────────────
+$proxy = $null
+try {
+    $wpad = (Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -ErrorAction SilentlyContinue).AutoConfigURL
+    if ($wpad -like "*intel.com*") {
+        $proxy = "http://proxy-chain.intel.com:911"
+        Write-Host "[INFO] Intel network detected, pip will use proxy: $proxy" -ForegroundColor Yellow
+    }
+} catch {}
+
 # ── Install Python dependencies ─────────────────────────────────────────
 $reqFile = Join-Path $ScriptDir "requirements.txt"
 Write-Host "Installing Python dependencies from requirements.txt..." -ForegroundColor Yellow
-python -m pip install -r $reqFile --quiet
+$pipArgs = @("-m", "pip", "install", "-r", $reqFile, "--quiet", "--disable-pip-version-check")
+if ($proxy) { $pipArgs += @("--proxy", $proxy) }
+python @pipArgs
 if ($LASTEXITCODE -eq 0) {
     Write-Host "[OK] Python dependencies installed" -ForegroundColor Green
 } else {
@@ -68,13 +80,17 @@ if ($ExtensionId.Length -lt 20) {
 
 Write-Host "  Extension ID: $ExtensionId"
 
-# ── Resolve Python path ─────────────────────────────────────────────────
-$pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pythonCmd) {
-    Write-Host "ERROR: python not found in PATH." -ForegroundColor Red
-    exit 1
+# ── Resolve real Python executable path ─────────────────────────────────
+# Use sys.executable to get the actual binary (avoids Windows App Store redirect
+# at WindowsApps\python.exe which may not resolve site-packages correctly)
+$PythonPath = (python -c "import sys; print(sys.executable)" 2>&1 | Out-String).Trim()
+if (-not $PythonPath -or -not (Test-Path $PythonPath)) {
+    # Fallback: filter out WindowsApps redirect from Get-Command results
+    $realPython = Get-Command python -All -ErrorAction SilentlyContinue |
+        Where-Object { $_.Source -notlike "*WindowsApps*" } |
+        Select-Object -First 1 -ExpandProperty Source
+    $PythonPath = if ($realPython) { $realPython } else { (Get-Command python).Source }
 }
-$PythonPath = $pythonCmd.Source
 Write-Host "  Python: $PythonPath"
 
 # ── Create native_host.cmd wrapper ──────────────────────────────────────
