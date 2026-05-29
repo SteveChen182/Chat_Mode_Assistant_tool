@@ -36,7 +36,7 @@ const QUICK_ACTIONS_TABLE = [
   // ── 第一次分析完成後顯示 ──
   { label: "📋 Summary",        prompt: "Provide a brief summary of this sighting analysis.",              display: "Summary",         group: "post", show: "post-analysis" },
   { label: "🔍 Root Cause",     prompt: "What is the most likely root cause?",                            display: "Root Cause",      group: "post", show: "post-analysis" },
-  { label: "📝 Action Items",   prompt: "List all recommended action items.",                             display: "Action Items",    group: "post", show: "post-analysis" },
+  { label: "📝 Action Items",   prompt: "List comment's action items and who is action owner.",                             display: "Action Items",    group: "post", show: "post-analysis" },
   { label: "🔄 Deep Dive",      prompt: "Perform a deeper analysis on the most critical finding.",        display: "Deep Dive",       group: "post", show: "post-analysis" },
   { label: "💾 Export Report",  prompt: "Generate a formatted analysis report.",                          display: "Export Report",   group: "post", show: "post-analysis" },
 ];
@@ -281,6 +281,7 @@ function connectPort() {
           // Session was already running (e.g. sidepanel reloaded) — just reconnect
           setStatus("connected", msg.session_waiting_input ? "Connected" : "Processing...");
           setInputEnabled(!!msg.session_waiting_input);
+          if (msg.session_waiting_input) hideConnectionSplash();
         } else {
           // New session starting — toolkit still loading
           setStatus("connected", "Loading toolkits...");
@@ -362,6 +363,7 @@ function connectPort() {
           setStatus("connected", msg.session_waiting_input ? "Connected" : "Processing...");
           setInputEnabled(!!msg.session_waiting_input);
           if (msg.conversation_id) updateConversationId(msg.conversation_id);
+          if (msg.session_waiting_input) hideConnectionSplash();
         } else {
           setStatus("connected", "No Session");
         }
