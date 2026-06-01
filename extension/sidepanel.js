@@ -180,7 +180,9 @@ function showPostAnalysisPanel() {
     el.textContent = btn.label;
     el.title = btn.prompt;
     el.addEventListener("click", () => {
-      hidePostAnalysisPanel();
+      postAnalysisPanel.classList.add("collapsed");
+      const titleEl = postAnalysisPanel.querySelector(".post-analysis-title");
+      if (titleEl) titleEl.textContent = _POST_TITLE_SHORT;
       sendUserMessage(btn.prompt, btn.display);
     });
     postAnalysisGrid.appendChild(el);
