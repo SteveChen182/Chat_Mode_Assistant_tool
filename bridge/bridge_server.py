@@ -201,7 +201,9 @@ def _close_paused_children(root_pid):
 
 # ── GDHM Analysis Window Auto-Close ────────────────────────────────────────
 _GDHM_TITLE_KEYWORD = "gdhm analysis"
-_gdhm_window_cpu_snapshot = {}  # {hwnd: (pid, last_cpu_time, idle_count)}
+_gdhm_window_cpu_snapshot = {}  # {sighting_id: (cmd_pid, last_cpu_time, idle_count)}
+
+import re as _re
 
 def _get_process_cpu_time(pid):
     """Get total CPU time (user + kernel) for a process in seconds. Returns None on error."""
@@ -216,17 +218,46 @@ def _get_process_cpu_time(pid):
     except Exception:
         return None
 
-def _get_window_pid(hwnd):
-    """Get the process ID that owns a window handle."""
-    pid = ctypes.wintypes.DWORD()
-    ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-    return pid.value
+def _find_gdhm_cmd_processes():
+    """Find cmd.exe processes running GDHM analysis bat files.
+
+    Returns dict: {sighting_id: pid} for cmd.exe processes whose CommandLine
+    contains 'gdhm_analysis_<id>'.
+    """
+    results = {}
+    try:
+        out = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             "Get-CimInstance Win32_Process -Filter \"Name='cmd.exe'\" | "
+             "Select-Object ProcessId, CommandLine | ConvertTo-Json"],
+            capture_output=True, text=True, timeout=10,
+        )
+        import json as _json
+        data = _json.loads(out.stdout) if out.stdout.strip() else []
+        if isinstance(data, dict):
+            data = [data]
+        for proc in data:
+            cmdline = proc.get("CommandLine") or ""
+            match = _re.search(r"gdhm_analysis_(\d+)", cmdline, _re.IGNORECASE)
+            if match:
+                sid = match.group(1)
+                # Prefer the inner cmd (child) — it's the one actually running the bat
+                if sid not in results:
+                    results[sid] = proc["ProcessId"]
+                else:
+                    # Keep the higher PID (child spawned later)
+                    results[sid] = max(results[sid], proc["ProcessId"])
+    except Exception:
+        pass
+    return results
 
 def _close_gdhm_analysis_windows():
-    """Find and close Windows Terminal windows with 'GDHM Analysis' in title.
+    """Find and close GDHM Analysis windows that are idle (waiting at pause).
 
-    Only closes windows whose process CPU time has stopped changing (i.e., the
-    analysis is done and it's waiting at 'Press any key to close').
+    Strategy: The window belongs to WindowsTerminal.exe (always has CPU activity),
+    so instead we find the actual cmd.exe running the gdhm_analysis_*.bat file and
+    check ITS CPU. When cmd.exe is idle for 2 consecutive scan cycles (~6s), the
+    analysis is done and we send WM_CLOSE to the matching window.
     """
     global _gdhm_window_cpu_snapshot
     if os.name != "nt" or not AUTO_CLOSE_PAUSE_WINDOWS:
@@ -234,7 +265,8 @@ def _close_gdhm_analysis_windows():
 
     user32 = ctypes.windll.user32
 
-    target_hwnds = []
+    # Step 1: Find GDHM windows and extract sighting IDs from titles
+    gdhm_windows = []  # [(hwnd, title, sighting_id)]
 
     @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.wintypes.HWND, ctypes.wintypes.LPARAM)
     def enum_callback(hwnd, lparam):
@@ -245,49 +277,56 @@ def _close_gdhm_analysis_windows():
             return True
         buf = ctypes.create_unicode_buffer(length + 1)
         user32.GetWindowTextW(hwnd, buf, length + 1)
-        title = buf.value.lower()
-        if _GDHM_TITLE_KEYWORD in title:
-            target_hwnds.append((hwnd, buf.value))
+        title = buf.value
+        if _GDHM_TITLE_KEYWORD in title.lower():
+            # Extract sighting ID from title like "GDHM Analysis - ID 3254128063"
+            m = _re.search(r"(\d{5,})", title)
+            if m:
+                gdhm_windows.append((hwnd, title, m.group(1)))
         return True
 
     user32.EnumWindows(enum_callback, 0)
 
-    # Clean up stale entries (windows that no longer exist)
-    current_hwnds = {hwnd for hwnd, _ in target_hwnds}
-    _gdhm_window_cpu_snapshot = {k: v for k, v in _gdhm_window_cpu_snapshot.items() if k in current_hwnds}
+    if not gdhm_windows:
+        _gdhm_window_cpu_snapshot.clear()
+        return
 
-    for hwnd, title in target_hwnds:
-        pid = _get_window_pid(hwnd)
-        if pid <= 0:
+    # Step 2: Find cmd.exe processes running gdhm_analysis bat files
+    cmd_procs = _find_gdhm_cmd_processes()  # {sighting_id: pid}
+
+    # Clean up stale entries
+    active_ids = {sid for _, _, sid in gdhm_windows}
+    _gdhm_window_cpu_snapshot = {k: v for k, v in _gdhm_window_cpu_snapshot.items() if k in active_ids}
+
+    # Step 3: For each GDHM window, check if its cmd.exe is idle
+    for hwnd, title, sid in gdhm_windows:
+        cmd_pid = cmd_procs.get(sid)
+        if not cmd_pid:
             continue
 
-        cpu_time = _get_process_cpu_time(pid)
+        cpu_time = _get_process_cpu_time(cmd_pid)
         if cpu_time is None:
             continue
 
-        if hwnd in _gdhm_window_cpu_snapshot:
-            prev_pid, prev_cpu, idle_count = _gdhm_window_cpu_snapshot[hwnd]
-            if prev_pid != pid:
-                # Window reused by different process — reset
-                _gdhm_window_cpu_snapshot[hwnd] = (pid, cpu_time, 0)
+        if sid in _gdhm_window_cpu_snapshot:
+            prev_pid, prev_cpu, idle_count = _gdhm_window_cpu_snapshot[sid]
+            if prev_pid != cmd_pid:
+                _gdhm_window_cpu_snapshot[sid] = (cmd_pid, cpu_time, 0)
                 continue
             if abs(cpu_time - prev_cpu) < 0.01:
-                # CPU hasn't changed — process is idle (waiting at pause)
                 idle_count += 1
             else:
-                # Still working — reset idle counter
                 idle_count = 0
-            _gdhm_window_cpu_snapshot[hwnd] = (pid, cpu_time, idle_count)
+            _gdhm_window_cpu_snapshot[sid] = (cmd_pid, cpu_time, idle_count)
 
-            # Only close after 2 consecutive idle checks (~6 seconds of no CPU activity)
+            # Close after 2 consecutive idle checks (~6 seconds of no CPU)
             if idle_count >= 2:
                 WM_CLOSE = 0x0010
                 user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
-                _debug(f"auto-closed idle GDHM window: '{title}' (pid={pid}, idle={idle_count})")
-                del _gdhm_window_cpu_snapshot[hwnd]
+                _debug(f"auto-closed idle GDHM window: '{title}' (cmd_pid={cmd_pid}, idle={idle_count})")
+                del _gdhm_window_cpu_snapshot[sid]
         else:
-            # First time seeing this window — record baseline
-            _gdhm_window_cpu_snapshot[hwnd] = (pid, cpu_time, 0)
+            _gdhm_window_cpu_snapshot[sid] = (cmd_pid, cpu_time, 0)
 
 
 # ── ChatSession: manages one dt gnai chat --json process ────────────────────
