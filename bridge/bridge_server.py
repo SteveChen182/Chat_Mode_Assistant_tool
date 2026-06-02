@@ -321,9 +321,17 @@ def _close_gdhm_analysis_windows():
 
             # Close after 2 consecutive idle checks (~6 seconds of no CPU)
             if idle_count >= 2:
-                WM_CLOSE = 0x0010
-                user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
-                _debug(f"auto-closed idle GDHM window: '{title}' (cmd_pid={cmd_pid}, idle={idle_count})")
+                # Kill the cmd.exe process tree directly instead of sending
+                # WM_CLOSE to the window (which could close the entire
+                # Windows Terminal instance including unrelated tabs)
+                try:
+                    subprocess.run(
+                        ["taskkill", "/PID", str(cmd_pid), "/F", "/T"],
+                        capture_output=True, text=True, timeout=6,
+                    )
+                    _debug(f"auto-closed idle GDHM cmd: '{title}' (cmd_pid={cmd_pid}, idle={idle_count})")
+                except Exception as e:
+                    _debug(f"failed to close GDHM cmd_pid={cmd_pid}: {e}")
                 del _gdhm_window_cpu_snapshot[sid]
         else:
             _gdhm_window_cpu_snapshot[sid] = (cmd_pid, cpu_time, 0)
