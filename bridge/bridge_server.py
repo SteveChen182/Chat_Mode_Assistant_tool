@@ -179,7 +179,11 @@ def _collect_descendants_win(root_pid):
 
 
 def _close_paused_children(root_pid):
-    """Kill descendant cmd.exe windows that contain 'pause' in command line."""
+    """Kill descendant cmd.exe that are running a script ending with 'pause'.
+
+    Only matches explicit pause commands at word boundaries to avoid
+    false positives (e.g. paths containing 'pause').
+    """
     if os.name != "nt" or not AUTO_CLOSE_PAUSE_WINDOWS:
         return
     for row in _collect_descendants_win(root_pid):
@@ -188,13 +192,14 @@ def _close_paused_children(root_pid):
         pid = int(row.get("ProcessId", 0) or 0)
         if pid <= 0 or name not in {"cmd.exe", "powershell.exe", "pwsh.exe"}:
             continue
-        if " pause" in cmdline or "&& pause" in cmdline or " /k " in cmdline:
+        # Match explicit pause commands: "& pause", "&& pause", "& pause>nul", etc.
+        if _re.search(r'[&|]\s*pause\s*(>|$|"|\))', cmdline):
             try:
                 subprocess.run(
                     ["taskkill", "/PID", str(pid), "/F", "/T"],
                     capture_output=True, text=True, timeout=6,
                 )
-                _debug(f"auto-closed paused child pid={pid}")
+                _debug(f"auto-closed paused child pid={pid} cmdline={cmdline[:100]}")
             except Exception as e:
                 _debug(f"failed to close paused child pid={pid}: {e}")
 
