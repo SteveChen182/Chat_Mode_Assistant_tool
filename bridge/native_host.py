@@ -58,15 +58,12 @@ def launch_bridge():
     env["BRIDGE_PORT"] = str(BRIDGE_PORT)
     env["BRIDGE_DEBUG"] = "1"
 
-    flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
+    flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NEW_CONSOLE
     subprocess.Popen(
         [python_exe, BRIDGE_SCRIPT],
         cwd=SCRIPT_DIR,
         env=env,
         creationflags=flags,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
     )
 
 
