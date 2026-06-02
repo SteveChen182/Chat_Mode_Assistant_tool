@@ -201,14 +201,34 @@ def _close_paused_children(root_pid):
 
 # ── GDHM Analysis Window Auto-Close ────────────────────────────────────────
 _GDHM_TITLE_KEYWORD = "gdhm analysis"
+_gdhm_window_cpu_snapshot = {}  # {hwnd: (pid, last_cpu_time, idle_count)}
+
+def _get_process_cpu_time(pid):
+    """Get total CPU time (user + kernel) for a process in seconds. Returns None on error."""
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             f"(Get-Process -Id {pid} -ErrorAction SilentlyContinue).TotalProcessorTime.TotalSeconds"],
+            capture_output=True, text=True, timeout=5,
+        )
+        val = result.stdout.strip()
+        return float(val) if val else None
+    except Exception:
+        return None
+
+def _get_window_pid(hwnd):
+    """Get the process ID that owns a window handle."""
+    pid = ctypes.wintypes.DWORD()
+    ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    return pid.value
 
 def _close_gdhm_analysis_windows():
     """Find and close Windows Terminal windows with 'GDHM Analysis' in title.
 
-    These windows are spawned by GNAI for ETL/sherlog analysis and block
-    the main ConPTY session when they stop at 'Press any key to continue'.
-    Strategy: find the window by title, then send WM_CLOSE to terminate it.
+    Only closes windows whose process CPU time has stopped changing (i.e., the
+    analysis is done and it's waiting at 'Press any key to close').
     """
+    global _gdhm_window_cpu_snapshot
     if os.name != "nt" or not AUTO_CLOSE_PAUSE_WINDOWS:
         return
 
@@ -232,10 +252,42 @@ def _close_gdhm_analysis_windows():
 
     user32.EnumWindows(enum_callback, 0)
 
+    # Clean up stale entries (windows that no longer exist)
+    current_hwnds = {hwnd for hwnd, _ in target_hwnds}
+    _gdhm_window_cpu_snapshot = {k: v for k, v in _gdhm_window_cpu_snapshot.items() if k in current_hwnds}
+
     for hwnd, title in target_hwnds:
-        WM_CLOSE = 0x0010
-        user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
-        _debug(f"auto-closed GDHM Analysis window: '{title}'")
+        pid = _get_window_pid(hwnd)
+        if pid <= 0:
+            continue
+
+        cpu_time = _get_process_cpu_time(pid)
+        if cpu_time is None:
+            continue
+
+        if hwnd in _gdhm_window_cpu_snapshot:
+            prev_pid, prev_cpu, idle_count = _gdhm_window_cpu_snapshot[hwnd]
+            if prev_pid != pid:
+                # Window reused by different process — reset
+                _gdhm_window_cpu_snapshot[hwnd] = (pid, cpu_time, 0)
+                continue
+            if abs(cpu_time - prev_cpu) < 0.01:
+                # CPU hasn't changed — process is idle (waiting at pause)
+                idle_count += 1
+            else:
+                # Still working — reset idle counter
+                idle_count = 0
+            _gdhm_window_cpu_snapshot[hwnd] = (pid, cpu_time, idle_count)
+
+            # Only close after 2 consecutive idle checks (~6 seconds of no CPU activity)
+            if idle_count >= 2:
+                WM_CLOSE = 0x0010
+                user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+                _debug(f"auto-closed idle GDHM window: '{title}' (pid={pid}, idle={idle_count})")
+                del _gdhm_window_cpu_snapshot[hwnd]
+        else:
+            # First time seeing this window — record baseline
+            _gdhm_window_cpu_snapshot[hwnd] = (pid, cpu_time, 0)
 
 
 # ── ChatSession: manages one dt gnai chat --json process ────────────────────
