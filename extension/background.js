@@ -295,3 +295,37 @@ chrome.runtime.onConnect.addListener((port) => {
 // ── Side panel setup ───────────────────────────────────────────────────────
 
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+
+// ── Pop-out / Pop-in Window Management ─────────────────────────────────────
+
+let popoutWindowId = null;
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === "popout_open") {
+    // Open sidepanel.html in a standalone popup window
+    chrome.windows.create({
+      url: chrome.runtime.getURL("sidepanel.html?popup=1"),
+      type: "popup",
+      width: 480,
+      height: 780,
+    }, (win) => {
+      popoutWindowId = win.id;
+    });
+  } else if (msg.action === "popout_close") {
+    // Close the popup window
+    if (popoutWindowId) {
+      chrome.windows.remove(popoutWindowId, () => {
+        popoutWindowId = null;
+      });
+    } else if (sender.tab) {
+      chrome.windows.remove(sender.tab.windowId);
+    }
+  }
+});
+
+// Clean up popoutWindowId when the window is closed by user
+chrome.windows.onRemoved.addListener((windowId) => {
+  if (windowId === popoutWindowId) {
+    popoutWindowId = null;
+  }
+});

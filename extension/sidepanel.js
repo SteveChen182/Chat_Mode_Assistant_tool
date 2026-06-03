@@ -57,6 +57,7 @@ const headerTitle = document.getElementById("header-title");
 const headerSubtitle = document.getElementById("header-subtitle");
 const statusBadge = document.getElementById("status-badge");
 const btnHistory = document.getElementById("btn-history");
+const btnPopout = document.getElementById("btn-popout");
 const onboardingEl = document.getElementById("onboarding");
 const heroCta = document.getElementById("hero-cta");
 const heroCtaBtn = document.getElementById("hero-cta-btn");
@@ -1313,6 +1314,25 @@ function formatTimestamp(ts) {
 btnHistory.addEventListener("click", openHistoryMenu);
 
 btnImport.addEventListener("click", importHsdFromWebpage);
+
+// ── Pop-out / Pop-in Toggle ──────────────────────────────────────────────────
+const _isPopup = new URLSearchParams(window.location.search).has("popup");
+
+// Update button icon based on mode
+if (_isPopup) {
+  btnPopout.textContent = "⧉"; // indicate "back to sidepanel"
+  btnPopout.title = "Back to sidepanel";
+}
+
+btnPopout.addEventListener("click", () => {
+  if (_isPopup) {
+    // In popup mode → close this window (sidepanel will reopen automatically)
+    chrome.runtime.sendMessage({ action: "popout_close" });
+  } else {
+    // In sidepanel mode → open as popup window
+    chrome.runtime.sendMessage({ action: "popout_open" });
+  }
+});
 
 // Close history menu on click outside
 document.addEventListener("click", (e) => {
