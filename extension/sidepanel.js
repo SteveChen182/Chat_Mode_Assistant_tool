@@ -1324,12 +1324,25 @@ if (_isPopup) {
   btnPopout.title = "Back to sidepanel";
 }
 
-btnPopout.addEventListener("click", () => {
+async function _saveStateForTransfer() {
+  // Save full UI state so the new window can restore it exactly
+  const transferData = {
+    chatHtml: chatArea.innerHTML,
+    sessionMessages: sessionMessages,
+    activeHsdId: activeHsdId,
+    activeHsdTitle: activeHsdTitle,
+    activeConversationId: activeConversationId,
+    postAnalysisShown: _postAnalysisShown,
+    timestamp: Date.now(),
+  };
+  await chrome.storage.local.set({ _popoutTransfer: transferData });
+}
+
+btnPopout.addEventListener("click", async () => {
+  await _saveStateForTransfer();
   if (_isPopup) {
-    // In popup mode → close this window (sidepanel will reopen automatically)
     chrome.runtime.sendMessage({ action: "popout_close" });
   } else {
-    // In sidepanel mode → open as popup window
     chrome.runtime.sendMessage({ action: "popout_open" });
   }
 });
@@ -1464,20 +1477,66 @@ regressionInput.addEventListener("input", () => {
 connectPort();
 setInputEnabled(false);
 
-// Load saved sessions and restore active session UI
-loadSessions().then(() => {
-  if (sessions.length > 0 && sessions[0].messages && sessions[0].messages.length > 0) {
-    const active = sessions[0];
-    activeHsdId = active.hsdId || null;
-    activeHsdTitle = active.hsdTitle || "";
-    activeConversationId = active.conversationId || "";
-    sessionMessages = [...active.messages];
+// Check for pop-out/pop-in transfer data first
+async function _restoreTransferState() {
+  try {
+    const stored = await chrome.storage.local.get({ _popoutTransfer: null });
+    const data = stored._popoutTransfer;
+    if (!data || (Date.now() - data.timestamp > 30000)) {
+      // No transfer data or stale (>30s) — ignore
+      return false;
+    }
+    // Restore state
+    activeHsdId = data.activeHsdId || null;
+    activeHsdTitle = data.activeHsdTitle || "";
+    activeConversationId = data.activeConversationId || "";
+    sessionMessages = data.sessionMessages || [];
+    _postAnalysisShown = data.postAnalysisShown || false;
+
+    // Restore chat HTML directly (preserves rendered markdown, tool indicators, etc.)
+    chatArea.innerHTML = data.chatHtml || "";
     updateHeaderTitle();
     updateHeaderSubtitle(activeHsdTitle);
     updateConversationId(activeConversationId);
-    rebuildChatArea();
     hideOnboarding();
+
+    // Re-show post-analysis panel if it was shown
+    if (_postAnalysisShown) {
+      showPostAnalysisPanel();
+      postAnalysisPanel.classList.add("collapsed");
+      const titleEl = postAnalysisPanel.querySelector(".post-analysis-title");
+      if (titleEl) titleEl.textContent = _POST_TITLE_SHORT;
+    }
+
+    forceScrollToBottom();
+
+    // Clear transfer data
+    await chrome.storage.local.remove("_popoutTransfer");
+    return true;
+  } catch (e) {
+    console.error("[popout] restore error:", e);
+    return false;
   }
+}
+
+_restoreTransferState().then((restored) => {
+  if (restored) return; // Skip normal session loading if we restored from transfer
+
+  // Load saved sessions and restore active session UI
+  loadSessions().then(() => {
+    if (sessions.length > 0 && sessions[0].messages && sessions[0].messages.length > 0) {
+      const active = sessions[0];
+      activeHsdId = active.hsdId || null;
+      activeHsdTitle = active.hsdTitle || "";
+      activeConversationId = active.conversationId || "";
+      sessionMessages = [...active.messages];
+      updateHeaderTitle();
+      updateHeaderSubtitle(activeHsdTitle);
+      updateConversationId(activeConversationId);
+      rebuildChatArea();
+      hideOnboarding();
+    }
+  });
 });
 
 // Auto-start: connect to bridge
