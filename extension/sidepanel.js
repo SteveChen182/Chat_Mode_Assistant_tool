@@ -317,7 +317,7 @@ function connectPort() {
           // Session was already running (e.g. sidepanel reloaded) — just reconnect
           setStatus("connected", msg.session_waiting_input ? "Connected" : "Processing...");
           setInputEnabled(!!msg.session_waiting_input);
-          if (msg.session_waiting_input) hideConnectionSplash();
+          hideConnectionSplash();
         } else {
           // New session starting — toolkit still loading
           setStatus("connected", "Loading toolkits...");
@@ -1579,7 +1579,12 @@ async function _restoreTransferState() {
 }
 
 _restoreTransferState().then((restored) => {
-  if (restored) return; // Skip normal session loading if we restored from transfer
+  if (restored) {
+    // Session already running — just do a health check to sync status & re-attach SSE
+    hideConnectionSplash();
+    if (port) port.postMessage({ action: "health" });
+    return;
+  }
 
   // Load saved sessions and restore active session UI
   loadSessions().then(() => {
