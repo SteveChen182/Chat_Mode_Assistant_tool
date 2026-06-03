@@ -148,9 +148,19 @@ function stopKeepAlive() {
 
 let currentEventSource = null;
 let sseReconnectTimer = null;
+let activePort = null; // Global reference to current sidepanel/popup port
 const SSE_RECONNECT_DELAY = 2000; // ms
 
-function startStreaming(port) {
+function _postToActivePort(msg) {
+  try {
+    if (activePort) activePort.postMessage(msg);
+  } catch (e) {
+    // Port disconnected — ignore, new port will be set on reconnect
+    activePort = null;
+  }
+}
+
+function startStreaming() {
   if (currentEventSource) {
     currentEventSource.close();
   }
@@ -170,9 +180,9 @@ function startStreaming(port) {
     es.addEventListener(type, (e) => {
       try {
         const data = JSON.parse(e.data);
-        port.postMessage({ type, ...data });
+        _postToActivePort({ type, ...data });
       } catch {
-        port.postMessage({ type, raw: e.data });
+        _postToActivePort({ type, raw: e.data });
       }
     });
   }
@@ -190,12 +200,12 @@ function startStreaming(port) {
           const health = await healthCheck();
           if (health.status === "ok" && health.session_active) {
             console.log("[bg] SSE reconnecting...");
-            startStreaming(port);
+            startStreaming();
           } else {
-            port.postMessage({ type: "stream_error" });
+            _postToActivePort({ type: "stream_error" });
           }
         } catch {
-          port.postMessage({ type: "stream_error" });
+          _postToActivePort({ type: "stream_error" });
         }
       }, SSE_RECONNECT_DELAY);
     }
@@ -211,6 +221,9 @@ let isStarting = false;
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "sidepanel") return;
 
+  // Update global active port — SSE events will now route to this port
+  activePort = port;
+
   port.onMessage.addListener(async (msg) => {
     try {
       switch (msg.action) {
@@ -220,7 +233,7 @@ chrome.runtime.onConnect.addListener((port) => {
           // If session is active but SSE stream is disconnected, re-establish it
           if (health.session_active && !currentEventSource) {
             console.log("[bg] Re-establishing SSE stream after health check");
-            startStreaming(port);
+            startStreaming();
             startKeepAlive();
           }
           break;
@@ -248,7 +261,7 @@ chrome.runtime.onConnect.addListener((port) => {
             port.postMessage({ type: "startup_status", message: "Starting chat session..." });
             const startResult = await startSession(msg.assistant, msg.conversation_id);
             port.postMessage({ action: "session_started", ...startResult });
-            startStreaming(port);
+            startStreaming();
             startKeepAlive();
           } finally {
             isStarting = false;
@@ -283,6 +296,8 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 
   port.onDisconnect.addListener(() => {
+    // Clear active port reference if it's the one disconnecting
+    if (activePort === port) activePort = null;
     // Don't close SSE on port disconnect — Service Worker may revive and
     // sidepanel will reconnect. Keep SSE alive to avoid losing events.
     // Only stop keep-alive if no EventSource is active.
