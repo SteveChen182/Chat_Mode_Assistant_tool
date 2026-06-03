@@ -944,7 +944,7 @@ function showImportQuickActions(hsdId) {
   const handler = () => {
     heroCta.classList.remove("show");
     hsdImported = false;
-    sendUserMessage(`${hsdId} skip any attachment check`, `Analyze HSD ${hsdId}`);
+    sendUserMessage(`${hsdId} skip any attachment check and skip gdhm sherlog and etl log check`, `Analyze HSD ${hsdId}`);
     heroCtaBtn.removeEventListener("click", handler);
   };
   heroCtaBtn.addEventListener("click", handler);
