@@ -59,6 +59,9 @@ const statusBadge = document.getElementById("status-badge");
 const btnHistory = document.getElementById("btn-history");
 const btnPopout = document.getElementById("btn-popout");
 const onboardingEl = document.getElementById("onboarding");
+const onboardingImportBtn = document.getElementById("onboarding-import-btn");
+const onboardingHsdInput = document.getElementById("onboarding-hsd-input");
+const onboardingGoBtn = document.getElementById("onboarding-go-btn");
 const heroCta = document.getElementById("hero-cta");
 const heroCtaBtn = document.getElementById("hero-cta-btn");
 const postAnalysisPanel = document.getElementById("post-analysis-panel");
@@ -121,11 +124,30 @@ function removeTypingIndicator() {
 // ── Onboarding ───────────────────────────────────────────────────────────────────────────────
 function hideOnboarding() {
   if (onboardingEl) onboardingEl.style.display = "none";
+  enableBottomInput();
 }
 
 function showOnboarding() {
   if (onboardingEl) onboardingEl.style.display = "flex";
+  disableBottomInput();
 }
+
+function disableBottomInput() {
+  inputEl.disabled = true;
+  sendBtn.disabled = true;
+  btnFontUp.disabled = true;
+  btnFontDown.disabled = true;
+}
+
+function enableBottomInput() {
+  inputEl.disabled = false;
+  sendBtn.disabled = false;
+  btnFontUp.disabled = false;
+  btnFontDown.disabled = false;
+}
+
+// Initially disable bottom input (onboarding is visible)
+disableBottomInput();
 
 // ── Connection Splash ────────────────────────────────────────────────────────────────────────
 const splashEl = document.getElementById("connection-splash");
@@ -1332,6 +1354,33 @@ const _isPopup = new URLSearchParams(window.location.search).has("popup");
 if (_isPopup) {
   btnPopout.textContent = "⧉"; // indicate "back to sidepanel"
   btnPopout.title = "Back to sidepanel";
+  // In popup mode, hide Import button — only show HSD ID input
+  if (onboardingImportBtn) onboardingImportBtn.style.display = "none";
+  const divider = onboardingEl && onboardingEl.querySelector(".onboarding-divider");
+  if (divider) divider.style.display = "none";
+}
+
+// ── Onboarding Import & Go handlers ─────────────────────────────────────────
+if (onboardingImportBtn) {
+  onboardingImportBtn.addEventListener("click", () => {
+    importHsdFromWebpage();
+  });
+}
+
+if (onboardingGoBtn && onboardingHsdInput) {
+  onboardingGoBtn.addEventListener("click", () => {
+    const val = onboardingHsdInput.value.trim();
+    if (!val) return;
+    hideOnboarding();
+    sendUserMessage(val);
+    onboardingHsdInput.value = "";
+  });
+  onboardingHsdInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onboardingGoBtn.click();
+    }
+  });
 }
 
 async function _saveStateForTransfer() {
