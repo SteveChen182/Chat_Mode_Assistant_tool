@@ -321,12 +321,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     popoutWindowId = null;
     if (winId) {
       chrome.windows.remove(winId, () => {
-        // Re-open the sidepanel in the user's current browser window
-        chrome.windows.getLastFocused({ windowTypes: ["normal"] }, (browserWin) => {
-          if (browserWin) {
-            chrome.sidePanel.open({ windowId: browserWin.id });
-          }
-        });
+        // Give Chrome a moment to focus the browser window, then open sidepanel
+        setTimeout(() => {
+          chrome.windows.getLastFocused({ windowTypes: ["normal"] }, (browserWin) => {
+            if (!browserWin) return;
+            // Focus the window first, then get its active tab to open sidepanel
+            chrome.windows.update(browserWin.id, { focused: true }, () => {
+              chrome.tabs.query({ active: true, windowId: browserWin.id }, (tabs) => {
+                if (tabs && tabs[0]) {
+                  chrome.sidePanel.open({ tabId: tabs[0].id });
+                } else {
+                  chrome.sidePanel.open({ windowId: browserWin.id });
+                }
+              });
+            });
+          });
+        }, 200);
       });
     }
   }
