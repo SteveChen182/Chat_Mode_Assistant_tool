@@ -302,23 +302,32 @@ let popoutWindowId = null;
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === "popout_open") {
-    // Open sidepanel.html in a standalone popup window
-    chrome.windows.create({
-      url: chrome.runtime.getURL("sidepanel.html?popup=1"),
-      type: "popup",
-      width: 480,
-      height: 780,
-    }, (win) => {
-      popoutWindowId = win.id;
+    // Close sidepanel by disabling it, then open popup window
+    chrome.sidePanel.setOptions({ enabled: false }, () => {
+      chrome.windows.create({
+        url: chrome.runtime.getURL("sidepanel.html?popup=1"),
+        type: "popup",
+        width: 480,
+        height: 780,
+      }, (win) => {
+        popoutWindowId = win.id;
+        // Re-enable sidepanel option (won't show until user clicks action icon)
+        chrome.sidePanel.setOptions({ enabled: true });
+      });
     });
   } else if (msg.action === "popout_close") {
-    // Close the popup window
-    if (popoutWindowId) {
-      chrome.windows.remove(popoutWindowId, () => {
-        popoutWindowId = null;
+    // Close popup window → re-open sidepanel
+    const winId = popoutWindowId || (sender.tab ? sender.tab.windowId : null);
+    popoutWindowId = null;
+    if (winId) {
+      chrome.windows.remove(winId, () => {
+        // Re-open the sidepanel in the user's current browser window
+        chrome.windows.getLastFocused({ windowTypes: ["normal"] }, (browserWin) => {
+          if (browserWin) {
+            chrome.sidePanel.open({ windowId: browserWin.id });
+          }
+        });
       });
-    } else if (sender.tab) {
-      chrome.windows.remove(sender.tab.windowId);
     }
   }
 });
