@@ -881,7 +881,17 @@ function extractHsdIdFromUrl(url) {
 }
 
 async function getCurrentTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  // In popup mode, currentWindow is the popup itself (no tabs).
+  // Fall back to the last focused normal browser window.
+  let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab && _isPopup) {
+    [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  }
+  if (!tab && _isPopup) {
+    // Still nothing — try any normal window
+    const tabs = await chrome.tabs.query({ active: true, windowType: "normal" });
+    tab = tabs[0];
+  }
   return tab;
 }
 
