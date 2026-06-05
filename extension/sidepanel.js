@@ -35,7 +35,7 @@ const QUICK_ACTIONS_TABLE = [
 
   // ── 第一次分析完成後顯示 ──
   { label: "📋 Summary",        prompt: "Provide a brief summary bersion of this sighting analysis with table style.Skip all attachment check, include latest action item if issue still open",              display: "Summary",         group: "post", show: "post-analysis" },
-  { label: "🔍 Root Cause",     prompt: "What is the most likely root cause? (skip all attachment check)",                            display: "Root Cause",      group: "post", show: "post-analysis" },
+  { label: "🔍 Potential Root Cause",     prompt: "What is the most likely root cause? (skip all attachment check)",                            display: "Root Cause",      group: "post", show: "post-analysis" },
   { label: "📝 Lastest Action Items",   prompt: "List latest three comment's action items and who is action owner.",                             display: "Latest Action Items",    group: "post", show: "post-analysis" },
   { label: "🔄 More Similiar issues",      prompt: "List 10 similar issues' ID, title and score by table style.",        display: "List 10 similiar issues",       group: "post", show: "post-analysis" },
  
