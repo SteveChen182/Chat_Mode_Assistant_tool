@@ -3,7 +3,7 @@
  *
  * Handles:
  * - Chat message display (streaming markdown)
- * - Tool execution progress indicators
+ * - Tool execution progress indicatorj
  * - Quick-action button generation (table-driven)
  * - Two-phase HSD analysis flow
  */
@@ -1560,7 +1560,8 @@ async function _restoreTransferState() {
     hideOnboarding();
 
     // Re-show post-analysis panel if it was shown
-    if (_postAnalysisShown) {
+    if (data.postAnalysisShown) {
+      _postAnalysisShown = false; // reset so showPostAnalysisPanel() actually runs
       showPostAnalysisPanel();
       postAnalysisPanel.classList.add("collapsed");
       const titleEl = postAnalysisPanel.querySelector(".post-analysis-title");
