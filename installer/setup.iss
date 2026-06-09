@@ -110,11 +110,13 @@ begin
   ManifestPath   := AppDir + '\nm_manifest.json';
 
   { JSON content — escape backslashes for the "path" field }
+  { StringChange is the Inno Setup built-in for in-place string replacement }
+  StringChange(NativeHostPath, '\', '\\');
   Content :=
     '{' + #13#10 +
     '  "name": "com.chat_mode_assistant.bridge",' + #13#10 +
     '  "description": "Chat Mode Assistant Bridge Launcher",' + #13#10 +
-    '  "path": "' + StringReplace(NativeHostPath, '\', '\\', [rfReplaceAll]) + '",' + #13#10 +
+    '  "path": "' + NativeHostPath + '",' + #13#10 +
     '  "type": "stdio",' + #13#10 +
     '  "allowed_origins": ["chrome-extension://PLACEHOLDER_EXTENSION_ID/"]' + #13#10 +
     '}';
