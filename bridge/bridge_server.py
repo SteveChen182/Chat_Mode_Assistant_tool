@@ -35,6 +35,14 @@ try:
 except ImportError:
     HAS_WINPTY = False
 
+# ── PyInstaller compatibility ─────────────────────────────────────────────────
+# When bundled as a standalone exe, __file__ points to the temp extraction dir.
+# Use sys.executable directory instead so logs/pid are written next to the exe.
+if getattr(sys, "frozen", False):
+    _SCRIPT_DIR = os.path.dirname(sys.executable)
+else:
+    _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # ── Configuration ───────────────────────────────────────────────────────────
 HOST = os.environ.get("BRIDGE_HOST", "127.0.0.1")
 PORT = int(os.environ.get("BRIDGE_PORT", "8776"))       # NOTE: 8776 to avoid conflict with old bridge (8775)
@@ -61,7 +69,7 @@ def _debug(msg):
 def _debug_to_file(line):
     """Append to bridge_debug.log in the same directory as this script."""
     try:
-        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bridge_debug.log")
+        log_path = os.path.join(_SCRIPT_DIR, "bridge_debug.log")
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(f"{time.strftime('%H:%M:%S')} {line}")
     except Exception:
@@ -75,7 +83,7 @@ _session_log_path = None
 def _init_session_log():
     """Create a new session log file in bridge/log/ with timestamp-based name."""
     global _session_log_path
-    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "log")
+    log_dir = os.path.join(_SCRIPT_DIR, "log")
     os.makedirs(log_dir, exist_ok=True)
     filename = f"session_{time.strftime('%Y%m%d_%H%M%S')}.log"
     _session_log_path = os.path.join(log_dir, filename)
@@ -862,7 +870,7 @@ def _is_port_in_use(host, port):
             return False
 
 
-_PID_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bridge.pid")
+_PID_FILE = os.path.join(_SCRIPT_DIR, "bridge.pid")
 
 
 def _write_pid_file():

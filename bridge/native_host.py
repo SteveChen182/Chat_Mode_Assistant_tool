@@ -18,8 +18,15 @@ import urllib.request
 
 BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", "8776"))
 BRIDGE_URL = f"http://127.0.0.1:{BRIDGE_PORT}"
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BRIDGE_SCRIPT = os.path.join(SCRIPT_DIR, "bridge_server.py")
+
+# When bundled as native_host.exe via PyInstaller, __file__ points to the
+# temp extraction dir. Use sys.executable directory to find bridge_server.exe.
+if getattr(sys, "frozen", False):
+    SCRIPT_DIR = os.path.dirname(sys.executable)
+    BRIDGE_SCRIPT = os.path.join(SCRIPT_DIR, "bridge_server.exe")
+else:
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    BRIDGE_SCRIPT = os.path.join(SCRIPT_DIR, "bridge_server.py")
 
 
 def read_message():
@@ -52,19 +59,19 @@ def is_bridge_running():
 
 
 def launch_bridge():
-    """Spawn bridge_server.py as a detached background process."""
-    python_exe = sys.executable
+    """Spawn bridge server as a detached background process."""
     env = os.environ.copy()
     env["BRIDGE_PORT"] = str(BRIDGE_PORT)
     env["BRIDGE_DEBUG"] = "1"
 
     flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NEW_CONSOLE
-    subprocess.Popen(
-        [python_exe, BRIDGE_SCRIPT],
-        cwd=SCRIPT_DIR,
-        env=env,
-        creationflags=flags,
-    )
+    if getattr(sys, "frozen", False):
+        # Bundled exe: launch bridge_server.exe directly (no Python needed)
+        cmd = [BRIDGE_SCRIPT]
+    else:
+        # Dev mode: launch bridge_server.py with the current Python interpreter
+        cmd = [sys.executable, BRIDGE_SCRIPT]
+    subprocess.Popen(cmd, cwd=SCRIPT_DIR, env=env, creationflags=flags)
 
 
 def main():
