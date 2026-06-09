@@ -29,19 +29,24 @@ import ctypes
 import ctypes.wintypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-try:
-    from winpty import PtyProcess
-    HAS_WINPTY = True
-except ImportError:
-    HAS_WINPTY = False
-
 # ── PyInstaller compatibility ─────────────────────────────────────────────────
 # When bundled as a standalone exe, __file__ points to the temp extraction dir.
 # Use sys.executable directory instead so logs/pid are written next to the exe.
 if getattr(sys, "frozen", False):
     _SCRIPT_DIR = os.path.dirname(sys.executable)
+    # Add the bundled winpty/ sub-directory to PATH so Windows can find
+    # conpty.dll, winpty.dll, winpty-agent.exe, OpenConsole.exe before importing.
+    _winpty_bin = os.path.join(sys._MEIPASS, "winpty")
+    if os.path.isdir(_winpty_bin):
+        os.environ["PATH"] = _winpty_bin + os.pathsep + os.environ.get("PATH", "")
 else:
     _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+try:
+    from winpty import PtyProcess
+    HAS_WINPTY = True
+except ImportError:
+    HAS_WINPTY = False
 
 # ── Configuration ───────────────────────────────────────────────────────────
 HOST = os.environ.get("BRIDGE_HOST", "127.0.0.1")

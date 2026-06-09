@@ -89,14 +89,45 @@ OK "dist/ and build/ cleaned"
 Step "Bundling bridge_server.exe (includes pywinpty DLLs)..."
 $bridgeScript = Join-Path $ProjectRoot "bridge\bridge_server.py"
 
+# Locate pywinpty package directory to manually include native DLLs/EXEs.
+# PyInstaller's --collect-all skips these because winpty appears as a module
+# rather than a package in newer Python versions.
+$winptyDir = python -c "import winpty, os; print(os.path.dirname(winpty.__file__))"
+if (-not $winptyDir -or -not (Test-Path $winptyDir)) {
+    Fail "Cannot locate pywinpty package directory."
+}
+Write-Host "  pywinpty dir: $winptyDir" -ForegroundColor DarkGray
+
+# Build --add-binary flags for each native file in the winpty package
+$winptyNativeFiles = @("conpty.dll", "winpty.dll", "winpty-agent.exe", "OpenConsole.exe")
+$addBinaryArgs = @()
+foreach ($f in $winptyNativeFiles) {
+    $src = Join-Path $winptyDir $f
+    if (Test-Path $src) {
+        $addBinaryArgs += "--add-binary"
+        $addBinaryArgs += "${src};winpty"
+        Write-Host "  + including $f" -ForegroundColor DarkGray
+    } else {
+        Write-Host "  ! $f not found (skipping)" -ForegroundColor DarkYellow
+    }
+}
+
+# Also include the .pyd extension module
+$pydFiles = Get-ChildItem "$winptyDir\winpty.*.pyd" -ErrorAction SilentlyContinue
+foreach ($pyd in $pydFiles) {
+    $addBinaryArgs += "--add-binary"
+    $addBinaryArgs += "$($pyd.FullName);winpty"
+    Write-Host "  + including $($pyd.Name)" -ForegroundColor DarkGray
+}
+
 python -m PyInstaller `
     --onefile `
     --name bridge_server `
-    --collect-all pywinpty `
     --distpath $DistDir `
     --workpath $BuildDir `
     --specpath $InstallerDir `
     --noconfirm `
+    @addBinaryArgs `
     $bridgeScript
 
 if ($LASTEXITCODE -ne 0) { Fail "PyInstaller failed for bridge_server.py" }
