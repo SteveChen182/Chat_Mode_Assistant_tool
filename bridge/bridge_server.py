@@ -472,7 +472,14 @@ class ChatSession:
                 if not self._pty.isalive():
                     # Process remaining buffer
                     if buf.strip():
-                        self._process_line(buf.strip())
+                        _debug(f"pty exited, remaining buf: {repr(buf[:300])}")
+                        # Apply same \r handling as the main loop
+                        remaining = buf.rstrip("\r")
+                        if "\r" in remaining:
+                            remaining = remaining.rsplit("\r", 1)[-1]
+                        remaining = _strip_ansi(remaining).strip()
+                        if remaining:
+                            self._process_line(remaining)
                     break
 
                 # When idle (waiting for user input), sleep longer to avoid
@@ -494,11 +501,12 @@ class ChatSession:
                 # Process complete lines
                 while "\n" in buf:
                     line, buf = buf.split("\n", 1)
-                    # dt uses \r (carriage return) to overwrite the status bar with
-                    # JSON output. The raw PTY data looks like:
-                    #   STATUS BAR TEXT\r{"answer":"text"}\r\n
-                    # Splitting only on \n gives us the full \r-separated segment.
-                    # Take the LAST \r-separated part — that is the actual content.
+                    # ConPTY uses \r\n line endings — strip the trailing \r first.
+                    line = line.rstrip("\r")
+                    # dt also uses \r (carriage return) to overwrite the status bar
+                    # with JSON output in-place. After stripping the line-ending \r,
+                    # any remaining \r means: STATUS_BAR\r{"answer":"text"}.
+                    # Take the LAST \r-separated segment — that is the actual content.
                     if "\r" in line:
                         line = line.rsplit("\r", 1)[-1]
                     line = _strip_ansi(line).strip()
@@ -508,7 +516,9 @@ class ChatSession:
                 # Check for prompt in remaining buffer (may not end with \n)
                 # Only check if we're NOT already in waiting state (avoid redraw spam)
                 if not self._waiting_input.is_set():
-                    clean_buf = buf.rsplit("\r", 1)[-1] if "\r" in buf else buf
+                    clean_buf = buf.rstrip("\r")
+                    if "\r" in clean_buf:
+                        clean_buf = clean_buf.rsplit("\r", 1)[-1]
                     clean_buf = _strip_ansi(clean_buf).strip()
                     if clean_buf.startswith("> ") or clean_buf == ">":
                         self._process_line(clean_buf)
