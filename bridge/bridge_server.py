@@ -494,6 +494,13 @@ class ChatSession:
                 # Process complete lines
                 while "\n" in buf:
                     line, buf = buf.split("\n", 1)
+                    # dt uses \r (carriage return) to overwrite the status bar with
+                    # JSON output. The raw PTY data looks like:
+                    #   STATUS BAR TEXT\r{"answer":"text"}\r\n
+                    # Splitting only on \n gives us the full \r-separated segment.
+                    # Take the LAST \r-separated part — that is the actual content.
+                    if "\r" in line:
+                        line = line.rsplit("\r", 1)[-1]
                     line = _strip_ansi(line).strip()
                     if line:
                         self._process_line(line)
@@ -501,7 +508,8 @@ class ChatSession:
                 # Check for prompt in remaining buffer (may not end with \n)
                 # Only check if we're NOT already in waiting state (avoid redraw spam)
                 if not self._waiting_input.is_set():
-                    clean_buf = _strip_ansi(buf).strip()
+                    clean_buf = buf.rsplit("\r", 1)[-1] if "\r" in buf else buf
+                    clean_buf = _strip_ansi(clean_buf).strip()
                     if clean_buf.startswith("> ") or clean_buf == ">":
                         self._process_line(clean_buf)
                         buf = ""
