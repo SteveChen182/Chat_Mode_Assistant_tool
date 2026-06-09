@@ -260,6 +260,11 @@ chrome.runtime.onConnect.addListener((port) => {
             // Start chat session
             port.postMessage({ type: "startup_status", message: "Starting chat session..." });
             const startResult = await startSession(msg.assistant, msg.conversation_id);
+            // Surface errors from /session/start (e.g. dt not found in PATH)
+            if (startResult.error) {
+              port.postMessage({ action: "session_start_error", error: startResult.error });
+              break;
+            }
             port.postMessage({ action: "session_started", ...startResult });
             startStreaming();
             startKeepAlive();
