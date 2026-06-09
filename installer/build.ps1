@@ -15,7 +15,6 @@
       - Inno Setup 6  (https://jrsoftware.org/isinfo.php)
 #>
 
-Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
