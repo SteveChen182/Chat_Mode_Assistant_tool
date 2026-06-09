@@ -8,6 +8,7 @@
 #define MyAppVersion   "0.1.0"
 #define MyAppPublisher "Intel"
 #define MyNmName       "com.chat_mode_assistant.bridge"
+#define ExtensionId    "pmbnnkfhdkommfpphknjpppmlmbihomi"
 
 ; ── Setup ────────────────────────────────────────────────────────────────────
 [Setup]
@@ -44,11 +45,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 ; ── Finish page message ───────────────────────────────────────────────────────
 [Messages]
-FinishedLabel=Setup has finished installing [name].%n%nNext: run "Configure Extension ID" to link your Chrome extension.
+FinishedLabel=Installation complete. See instructions below.
 
-; ── Optional tasks ────────────────────────────────────────────────────────────
-[Tasks]
-Name: "desktopicon"; Description: "Create a Desktop shortcut for 'Configure Extension ID'"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 ; ── Files ─────────────────────────────────────────────────────────────────────
 [Files]
@@ -57,9 +55,6 @@ Source: "dist\bridge_server.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Native Messaging host launcher
 Source: "dist\native_host.exe";   DestDir: "{app}"; Flags: ignoreversion
-
-; Extension ID configurator GUI
-Source: "dist\configure.exe";     DestDir: "{app}"; Flags: ignoreversion
 
 ; Chrome Extension files (user loads these manually in chrome://extensions/)
 Source: "..\extension\*"; DestDir: "{app}\extension"; \
@@ -76,16 +71,13 @@ Root: HKCU; \
 
 ; ── Shortcuts ─────────────────────────────────────────────────────────────────
 [Icons]
-Name: "{group}\Configure Extension ID";      Filename: "{app}\configure.exe"
-Name: "{group}\Uninstall {#MyAppName}";      Filename: "{uninstallexe}"
-Name: "{userdesktop}\Configure Chat Mode Assistant"; \
-    Filename: "{app}\configure.exe"; Tasks: desktopicon
+Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 
 ; ── Post-install: launch Configure wizard ────────────────────────────────────
 [Run]
-Filename: "{app}\configure.exe"; \
-    Description: "Configure Chrome Extension ID (recommended)"; \
-    Flags: nowait postinstall skipifsilent
+Filename: "{app}\extension"; \
+    Description: "Open extension folder (for Chrome 'Load unpacked')"; \
+    Flags: shellexec nowait postinstall skipifsilent
 
 ; ── Uninstall cleanup ─────────────────────────────────────────────────────────
 [UninstallDelete]
@@ -118,10 +110,26 @@ begin
     '  "description": "Chat Mode Assistant Bridge Launcher",' + #13#10 +
     '  "path": "' + NativeHostPath + '",' + #13#10 +
     '  "type": "stdio",' + #13#10 +
-    '  "allowed_origins": ["chrome-extension://PLACEHOLDER_EXTENSION_ID/"]' + #13#10 +
+    '  "allowed_origins": ["chrome-extension://{#ExtensionId}/"]' + #13#10 +
     '}';
 
   SaveStringToFile(ManifestPath, Content, False);
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if CurPageID = wpFinished then
+  begin
+    WizardForm.FinishedLabel.Caption :=
+      'Installation complete!' + #13#10 + #13#10 +
+      'Last step: load the Chrome extension.' + #13#10 + #13#10 +
+      '  1. Open Chrome  >>  chrome://extensions/' + #13#10 +
+      '  2. Enable "Developer Mode" (top-right toggle)' + #13#10 +
+      '  3. Click "Load unpacked"' + #13#10 +
+      '  4. Select this folder:' + #13#10 +
+      '     ' + ExpandConstant('{app}\extension');
+    WizardForm.FinishedLabel.AutoSize := True;
+  end;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

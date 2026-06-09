@@ -149,26 +149,9 @@ python -m PyInstaller `
 if ($LASTEXITCODE -ne 0) { Fail "PyInstaller failed for native_host.py" }
 OK "native_host.exe built"
 
-# 6. Bundle configure.exe
-Step "Bundling configure.exe (Extension ID setup GUI)..."
-$configScript = Join-Path $InstallerDir "configure.py"
-
-python -m PyInstaller `
-    --onefile `
-    --name configure `
-    --noconsole `
-    --distpath $DistDir `
-    --workpath $BuildDir `
-    --specpath $InstallerDir `
-    --noconfirm `
-    $configScript
-
-if ($LASTEXITCODE -ne 0) { Fail "PyInstaller failed for configure.py" }
-OK "configure.exe built"
-
-# 7. Verify all exes exist
+# 6. Verify all exes exist
 Step "Verifying build artifacts..."
-@("bridge_server.exe", "native_host.exe", "configure.exe") | ForEach-Object {
+@("bridge_server.exe", "native_host.exe") | ForEach-Object {
     $p = Join-Path $DistDir $_
     if (-not (Test-Path $p)) { Fail "Missing: $p" }
     $size = "{0:N0}" -f (Get-Item $p).Length
@@ -220,7 +203,6 @@ Write-Host "===============================================" -ForegroundColor Gr
 Write-Host "  Installer : $outputExe"                      -ForegroundColor Cyan
 Write-Host "  Size      : $finalSize bytes"                 -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  Run the installer and follow the wizard."     -ForegroundColor White
-Write-Host "  After install, launch Configure Extension ID" -ForegroundColor White
-Write-Host "  to register your Chrome extension."           -ForegroundColor White
+Write-Host "  Run the installer and follow the wizard."        -ForegroundColor White
+Write-Host "  Follow the prompts to load the Chrome extension." -ForegroundColor White
 Write-Host ""
