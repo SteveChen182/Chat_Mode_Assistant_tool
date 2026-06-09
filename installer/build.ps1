@@ -32,15 +32,15 @@ Write-Host "===============================================" -ForegroundColor Cy
 Write-Host ""
 
 # ── Helper: banner ────────────────────────────────────────────────────────────
-function Step([string]$msg) {
+function Step { param([string]$msg)
     Write-Host "`n[STEP] $msg" -ForegroundColor Yellow
 }
 
-function OK([string]$msg) {
+function OK { param([string]$msg)
     Write-Host "  [OK] $msg" -ForegroundColor Green
 }
 
-function Fail([string]$msg) {
+function Fail { param([string]$msg)
     Write-Host "`n[FAIL] $msg" -ForegroundColor Red
     exit 1
 }
