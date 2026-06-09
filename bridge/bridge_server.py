@@ -392,7 +392,10 @@ class ChatSession:
             cmd += f' --conversation-id {self.conversation_id}'
         _debug(f"starting via ConPTY: {cmd}")
 
-        self._pty = PtyProcess.spawn(cmd)
+        # Use a very wide terminal (500 cols) so dt's JSON output lines are never
+        # wrapped by ConPTY. At 80 cols, dt inserts ANSI cursor codes mid-JSON,
+        # corrupting every answer chunk and causing json.loads() to fail.
+        self._pty = PtyProcess.spawn(cmd, dimensions=(50, 500))
         _debug(f"pty pid={self._pty.pid}")
 
         self._reader_thread = threading.Thread(
