@@ -29,6 +29,19 @@ import ctypes
 import ctypes.wintypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+# ── PyInstaller compatibility ─────────────────────────────────────────────────
+# When bundled as a standalone exe, __file__ points to the temp extraction dir.
+# Use sys.executable directory instead so logs/pid are written next to the exe.
+if getattr(sys, "frozen", False):
+    _SCRIPT_DIR = os.path.dirname(sys.executable)
+    # Add the bundled winpty/ sub-directory to PATH so Windows can find
+    # conpty.dll, winpty.dll, winpty-agent.exe, OpenConsole.exe before importing.
+    _winpty_bin = os.path.join(sys._MEIPASS, "winpty")
+    if os.path.isdir(_winpty_bin):
+        os.environ["PATH"] = _winpty_bin + os.pathsep + os.environ.get("PATH", "")
+else:
+    _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 try:
     from winpty import PtyProcess
     HAS_WINPTY = True
@@ -37,7 +50,9 @@ except ImportError:
 
 # ── Configuration ───────────────────────────────────────────────────────────
 HOST = os.environ.get("BRIDGE_HOST", "127.0.0.1")
-PORT = int(os.environ.get("BRIDGE_PORT", "8776"))       # NOTE: 8776 to avoid conflict with old bridge (8775)
+# Port 0 = OS picks a free port automatically (recommended).
+# Set BRIDGE_PORT env-var to force a specific port (e.g. for dev/testing).
+PORT = int(os.environ.get("BRIDGE_PORT", "0"))
 REQUIRE_API_KEY = os.environ.get("BRIDGE_API_KEY", "").strip()
 DEFAULT_ASSISTANT = os.environ.get("BRIDGE_ASSISTANT", "sighting_assistant")
 DT_PATH_OVERRIDE = os.environ.get("BRIDGE_DT_PATH", "").strip()
@@ -61,7 +76,7 @@ def _debug(msg):
 def _debug_to_file(line):
     """Append to bridge_debug.log in the same directory as this script."""
     try:
-        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bridge_debug.log")
+        log_path = os.path.join(_SCRIPT_DIR, "bridge_debug.log")
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(f"{time.strftime('%H:%M:%S')} {line}")
     except Exception:
@@ -75,7 +90,7 @@ _session_log_path = None
 def _init_session_log():
     """Create a new session log file in bridge/log/ with timestamp-based name."""
     global _session_log_path
-    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "log")
+    log_dir = os.path.join(_SCRIPT_DIR, "log")
     os.makedirs(log_dir, exist_ok=True)
     filename = f"session_{time.strftime('%Y%m%d_%H%M%S')}.log"
     _session_log_path = os.path.join(log_dir, filename)
@@ -379,7 +394,10 @@ class ChatSession:
             cmd += f' --conversation-id {self.conversation_id}'
         _debug(f"starting via ConPTY: {cmd}")
 
-        self._pty = PtyProcess.spawn(cmd)
+        # Use a very wide terminal (500 cols) so dt's JSON output lines are never
+        # wrapped by ConPTY. At 80 cols, dt inserts ANSI cursor codes mid-JSON,
+        # corrupting every answer chunk and causing json.loads() to fail.
+        self._pty = PtyProcess.spawn(cmd, dimensions=(50, 500))
         _debug(f"pty pid={self._pty.pid}")
 
         self._reader_thread = threading.Thread(
@@ -456,7 +474,14 @@ class ChatSession:
                 if not self._pty.isalive():
                     # Process remaining buffer
                     if buf.strip():
-                        self._process_line(buf.strip())
+                        _debug(f"pty exited, remaining buf: {repr(buf[:300])}")
+                        # Apply same \r handling as the main loop
+                        remaining = buf.rstrip("\r")
+                        if "\r" in remaining:
+                            remaining = remaining.rsplit("\r", 1)[-1]
+                        remaining = _strip_ansi(remaining).strip()
+                        if remaining:
+                            self._process_line(remaining)
                     break
 
                 # When idle (waiting for user input), sleep longer to avoid
@@ -478,6 +503,14 @@ class ChatSession:
                 # Process complete lines
                 while "\n" in buf:
                     line, buf = buf.split("\n", 1)
+                    # ConPTY uses \r\n line endings — strip the trailing \r first.
+                    line = line.rstrip("\r")
+                    # dt also uses \r (carriage return) to overwrite the status bar
+                    # with JSON output in-place. After stripping the line-ending \r,
+                    # any remaining \r means: STATUS_BAR\r{"answer":"text"}.
+                    # Take the LAST \r-separated segment — that is the actual content.
+                    if "\r" in line:
+                        line = line.rsplit("\r", 1)[-1]
                     line = _strip_ansi(line).strip()
                     if line:
                         self._process_line(line)
@@ -485,7 +518,10 @@ class ChatSession:
                 # Check for prompt in remaining buffer (may not end with \n)
                 # Only check if we're NOT already in waiting state (avoid redraw spam)
                 if not self._waiting_input.is_set():
-                    clean_buf = _strip_ansi(buf).strip()
+                    clean_buf = buf.rstrip("\r")
+                    if "\r" in clean_buf:
+                        clean_buf = clean_buf.rsplit("\r", 1)[-1]
+                    clean_buf = _strip_ansi(clean_buf).strip()
                     if clean_buf.startswith("> ") or clean_buf == ">":
                         self._process_line(clean_buf)
                         buf = ""
@@ -862,7 +898,8 @@ def _is_port_in_use(host, port):
             return False
 
 
-_PID_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bridge.pid")
+_PID_FILE  = os.path.join(_SCRIPT_DIR, "bridge.pid")
+_PORT_FILE = os.path.join(_SCRIPT_DIR, "bridge.port")
 
 
 def _write_pid_file():
@@ -883,20 +920,29 @@ def _remove_pid_file():
         pass
 
 
+def _write_port_file(port: int):
+    """Write the actual listening port so native_host can discover it."""
+    try:
+        with open(_PORT_FILE, "w") as f:
+            f.write(str(port))
+    except OSError:
+        pass
+
+
+def _remove_port_file():
+    """Remove port file on shutdown."""
+    try:
+        if os.path.exists(_PORT_FILE):
+            os.remove(_PORT_FILE)
+    except OSError:
+        pass
+
+
 def main():
     if not HAS_WINPTY:
         sys.stderr.write(
             "[bridge] ERROR: pywinpty is required.\n"
             "  Install: pip install pywinpty\n"
-        )
-        sys.exit(1)
-
-    # ── Singleton check: ensure only one bridge runs at a time ──
-    if _is_port_in_use(HOST, PORT):
-        sys.stderr.write(
-            f"[bridge] ERROR: Port {PORT} is already in use.\n"
-            f"  Another bridge_server is likely running.\n"
-            f"  Kill it first or check: netstat -ano | findstr {PORT}\n"
         )
         sys.exit(1)
 
@@ -908,15 +954,20 @@ def main():
         )
         sys.exit(1)
 
+    # Bind to PORT (0 = OS picks a free port).
+    # After bind, read the actual port from the socket.
+    server = BridgeServer((HOST, PORT), BridgeHandler)
+    actual_port = server.server_address[1]
+
     _debug(f"dt found at: {dt_cmd}")
     _debug(f"default assistant: {DEFAULT_ASSISTANT}")
-    _debug(f"listening on port: {PORT}")
+    _debug(f"listening on port: {actual_port}")
     _debug(f"auto-close pause windows: {AUTO_CLOSE_PAUSE_WINDOWS}")
 
     _write_pid_file()
+    _write_port_file(actual_port)   # lets native_host discover the port
 
-    server = BridgeServer((HOST, PORT), BridgeHandler)
-    print(f"[bridge] Chat Mode Bridge Server running on http://{HOST}:{PORT} (PID: {os.getpid()})")
+    print(f"[bridge] Chat Mode Bridge Server running on http://{HOST}:{actual_port} (PID: {os.getpid()})")
     print(f"[bridge] Press Ctrl+C to stop")
 
     try:
@@ -927,6 +978,7 @@ def main():
         server.shutdown()
     finally:
         _remove_pid_file()
+        _remove_port_file()
 
 
 if __name__ == "__main__":

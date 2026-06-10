@@ -319,9 +319,9 @@ function connectPort() {
           setInputEnabled(!!msg.session_waiting_input);
           hideConnectionSplash();
         } else {
-          // New session starting — toolkit still loading
+          // New session starting — toolkit still loading (can take 30-90s)
           setStatus("connected", "Loading toolkits...");
-          addSystemMsg("Session starting... waiting for toolkit to load.");
+          updateConnectionSplash("Loading AI toolkit...", "dt gnai chat starting — please wait (up to 90s)");
           // Input stays disabled until SSE 'ready' event
         }
         if (msg.conversation_id) {
@@ -343,10 +343,18 @@ function connectPort() {
       // Startup progress
       case "startup_status":
         setStatus("connected", msg.message || "Starting...");
+        updateConnectionSplash(msg.message || "Starting...", "");
         break;
       case "bridge_unavailable":
         setStatus("disconnected", "No Bridge");
+        updateConnectionSplash("Bridge unavailable", "Run: cd bridge && python bridge_server.py");
         addSystemMsg("❌ Bridge server not available. Please run:\n  cd bridge && python bridge_server.py\n\nOr set up auto-launch: .\\install_native_host.ps1");
+        setInputEnabled(false);
+        break;
+      case "session_start_error":
+        setStatus("disconnected", "Session Error");
+        updateConnectionSplash("Session failed to start", msg.error || "Unknown error");
+        addSystemMsg(`❌ Session error: ${msg.error}\n\nMake sure 'dt' is in your PATH.`);
         setInputEnabled(false);
         break;
 
@@ -564,6 +572,7 @@ function onEnd() {
   isStreaming = false;
   removeToolIndicator();
   finalizeAiMsg();
+  hideConnectionSplash();
   setInputEnabled(true);
 }
 

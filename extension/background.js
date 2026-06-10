@@ -3,9 +3,16 @@
  * Manages bridge connection, auto-launch, and relays events between sidepanel and bridge server.
  */
 
-// NOTE: Port must match BRIDGE_PORT in bridge/run_bridge.ps1 (default: 8776)
-const BRIDGE_URL = "http://127.0.0.1:8776";
+// NOTE: Port is discovered dynamically from the bridge server at runtime.
+// The bridge writes its actual port to bridge.port; native_host reads it and
+// returns it in the NM response. We cache it in chrome.storage.session so it
+// survives service worker restarts.
+let bridgePort = null;   // set after first successful NM launch/check
 const NM_HOST_NAME = "com.chat_mode_assistant.bridge";
+
+function getBridgeUrl() {
+  return bridgePort ? `http://127.0.0.1:${bridgePort}` : null;
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -16,7 +23,9 @@ function sleep(ms) {
 // ── Bridge API helpers ─────────────────────────────────────────────────────
 
 async function bridgeFetch(path, options = {}) {
-  const url = `${BRIDGE_URL}${path}`;
+  const base = getBridgeUrl();
+  if (!base) throw new Error("Bridge port not yet known");
+  const url = `${base}${path}`;
   const resp = await fetch(url, {
     ...options,
     headers: { "Content-Type": "application/json", ...options.headers },
@@ -58,9 +67,9 @@ async function healthCheck() {
 
 // ── Auto-Launch via Native Messaging ───────────────────────────────────────
 
-function launchViaNativeMessaging() {
+function sendNativeMessage(msg) {
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendNativeMessage(NM_HOST_NAME, { action: "launch" }, (response) => {
+    chrome.runtime.sendNativeMessage(NM_HOST_NAME, msg, (response) => {
       if (chrome.runtime.lastError) {
         reject(new Error(chrome.runtime.lastError.message));
       } else {
@@ -70,55 +79,79 @@ function launchViaNativeMessaging() {
   });
 }
 
+/** Persist the discovered port so it survives service worker restarts. */
+function saveBridgePort(port) {
+  bridgePort = port;
+  chrome.storage.session.set({ bridgePort: port }).catch(() => {});
+}
+
 /**
  * Ensure the bridge server is running.
- * 1. Check /health
- * 2. If not running → try Native Messaging launch
- * 3. Poll /health until ready
+ * 1. Try to recover port from session storage + health-check
+ * 2. NM "launch" action → responds immediately ("already_running"|"launching"|"error")
+ * 3. If "launching": poll NM "check" every second until bridge is ready
  * Returns true if bridge is ready.
  */
 async function ensureBridgeRunning(sendStatus) {
-  // Step 1: Quick health check
+  // Step 1: Try to recover persisted port from a previous launch
   sendStatus("Checking bridge...");
-  let health = await healthCheck();
-  if (health.status === "ok") {
-    sendStatus("Bridge connected");
-    return true;
+  if (!bridgePort) {
+    try {
+      const stored = await chrome.storage.session.get("bridgePort");
+      if (stored.bridgePort) bridgePort = stored.bridgePort;
+    } catch { /* session storage unavailable */ }
   }
-
-  // Step 2: Try native messaging launch
-  sendStatus("Starting bridge server...");
-  let nmAvailable = true;
-  try {
-    const result = await launchViaNativeMessaging();
-    if (result.status === "error") {
-      sendStatus(`Launch error: ${result.message}`);
-      return false;
-    }
-    // result.status is "launched" or "already_running"
-    sendStatus("Bridge process started, waiting for ready...");
-  } catch (err) {
-    nmAvailable = false;
-    sendStatus("Auto-launch not set up. Checking if bridge starts...");
-  }
-
-  // Step 3: Poll until bridge is ready
-  const maxWait = nmAvailable ? 45 : 8;
-  for (let i = 0; i < maxWait; i++) {
-    await sleep(1000);
-    sendStatus(`Waiting for bridge... (${i + 1}s)`);
-    health = await healthCheck();
+  if (bridgePort) {
+    const health = await healthCheck();
     if (health.status === "ok") {
       sendStatus("Bridge connected");
       return true;
     }
+    // Stored port is stale — clear it
+    bridgePort = null;
+    chrome.storage.session.remove("bridgePort").catch(() => {});
   }
 
-  if (!nmAvailable) {
-    sendStatus("Bridge not running. Run: cd bridge && python bridge_server.py");
-  } else {
-    sendStatus("Bridge failed to start. Check console for errors.");
+  // Step 2: NM "launch" — native_host responds immediately (no blocking wait)
+  sendStatus("Starting bridge server...");
+  let nmAvailable = false;
+  try {
+    const result = await sendNativeMessage({ action: "launch" });
+    if (result.status === "error") {
+      sendStatus(`Bridge launch error: ${result.message}`);
+      return false;
+    }
+    if (result.status === "already_running" && result.port) {
+      saveBridgePort(result.port);
+      sendStatus("Bridge connected");
+      return true;
+    }
+    // status === "launching" — bridge process was spawned, now poll for port
+    nmAvailable = true;
+    sendStatus("Bridge starting...");
+  } catch (err) {
+    // NM not set up (dev mode) or host crashed — show actual error
+    sendStatus(`Native Messaging unavailable: ${err.message}`);
+    return false;
   }
+
+  // Step 3: Poll NM "check" every second until bridge is running (max 45s)
+  for (let i = 0; i < 45; i++) {
+    await sleep(1000);
+    sendStatus(`Waiting for bridge... (${i + 1}s)`);
+    try {
+      const check = await sendNativeMessage({ action: "check" });
+      if (check.status === "running" && check.port) {
+        saveBridgePort(check.port);
+        sendStatus("Bridge connected");
+        return true;
+      }
+    } catch {
+      // NM error during poll — keep waiting
+    }
+  }
+
+  sendStatus("Bridge failed to start within 45s.");
   return false;
 }
 
@@ -133,7 +166,7 @@ function startKeepAlive() {
   if (keepAliveInterval) return;
   keepAliveInterval = setInterval(() => {
     // Any async operation keeps the Service Worker alive
-    fetch(`${BRIDGE_URL}/health`).catch(() => {});
+    fetch(`${getBridgeUrl() || ''}/health`).catch(() => {});
   }, 20000); // every 20s
 }
 
@@ -169,9 +202,10 @@ function startStreaming() {
     sseReconnectTimer = null;
   }
 
-  const es = new EventSource(`${BRIDGE_URL}/session/stream`);
+  const streamUrl = getBridgeUrl();
+  if (!streamUrl) return null;
+  const es = new EventSource(`${streamUrl}/session/stream`);
   currentEventSource = es;
-
   const eventTypes = [
     "answer", "tool_start", "tool_request", "usage", "ready", "info", "end", "goodbye", "error"
   ];
@@ -260,6 +294,11 @@ chrome.runtime.onConnect.addListener((port) => {
             // Start chat session
             port.postMessage({ type: "startup_status", message: "Starting chat session..." });
             const startResult = await startSession(msg.assistant, msg.conversation_id);
+            // Surface errors from /session/start (e.g. dt not found in PATH)
+            if (startResult.error) {
+              port.postMessage({ action: "session_start_error", error: startResult.error });
+              break;
+            }
             port.postMessage({ action: "session_started", ...startResult });
             startStreaming();
             startKeepAlive();
