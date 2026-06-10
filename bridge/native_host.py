@@ -67,8 +67,9 @@ def is_bridge_running():
     if not port:
         return False, None
     try:
-        req = urllib.request.Request(f"{_bridge_url(port)}/health")
-        with urllib.request.urlopen(req, timeout=2) as resp:
+        # Use a no-proxy opener so corporate http_proxy doesn't intercept localhost
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(f"{_bridge_url(port)}/health", timeout=2) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             if data.get("status") == "ok":
                 return True, port
