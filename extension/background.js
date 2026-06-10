@@ -67,9 +67,9 @@ async function healthCheck() {
 
 // ── Auto-Launch via Native Messaging ───────────────────────────────────────
 
-function launchViaNativeMessaging() {
+function sendNativeMessage(msg) {
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendNativeMessage(NM_HOST_NAME, { action: "launch" }, (response) => {
+    chrome.runtime.sendNativeMessage(NM_HOST_NAME, msg, (response) => {
       if (chrome.runtime.lastError) {
         reject(new Error(chrome.runtime.lastError.message));
       } else {
@@ -88,8 +88,8 @@ function saveBridgePort(port) {
 /**
  * Ensure the bridge server is running.
  * 1. Try to recover port from session storage + health-check
- * 2. If not running → try Native Messaging launch (returns actual port)
- * 3. Poll /health until ready
+ * 2. NM "launch" action → responds immediately ("already_running"|"launching"|"error")
+ * 3. If "launching": poll NM "check" every second until bridge is ready
  * Returns true if bridge is ready.
  */
 async function ensureBridgeRunning(sendStatus) {
@@ -98,9 +98,7 @@ async function ensureBridgeRunning(sendStatus) {
   if (!bridgePort) {
     try {
       const stored = await chrome.storage.session.get("bridgePort");
-      if (stored.bridgePort) {
-        bridgePort = stored.bridgePort;
-      }
+      if (stored.bridgePort) bridgePort = stored.bridgePort;
     } catch { /* session storage unavailable */ }
   }
   if (bridgePort) {
@@ -114,43 +112,46 @@ async function ensureBridgeRunning(sendStatus) {
     chrome.storage.session.remove("bridgePort").catch(() => {});
   }
 
-  // Step 2: Try native messaging launch (native_host returns actual port)
+  // Step 2: NM "launch" — native_host responds immediately (no blocking wait)
   sendStatus("Starting bridge server...");
-  let nmAvailable = true;
+  let nmAvailable = false;
   try {
-    const result = await launchViaNativeMessaging();
+    const result = await sendNativeMessage({ action: "launch" });
     if (result.status === "error") {
-      sendStatus(`Launch error: ${result.message}`);
+      sendStatus(`Bridge launch error: ${result.message}`);
       return false;
     }
-    // native_host always returns {status, port}
-    if (result.port) {
+    if (result.status === "already_running" && result.port) {
       saveBridgePort(result.port);
-    }
-    // result.status is "launched" or "already_running"
-    sendStatus("Bridge process started, waiting for ready...");
-  } catch (err) {
-    nmAvailable = false;
-    sendStatus("Auto-launch not set up. Checking if bridge starts...");
-  }
-
-  // Step 3: Poll until bridge is ready
-  const maxWait = nmAvailable ? 45 : 8;
-  for (let i = 0; i < maxWait; i++) {
-    await sleep(1000);
-    sendStatus(`Waiting for bridge... (${i + 1}s)`);
-    const health = await healthCheck();
-    if (health.status === "ok") {
       sendStatus("Bridge connected");
       return true;
     }
+    // status === "launching" — bridge process was spawned, now poll for port
+    nmAvailable = true;
+    sendStatus("Bridge starting...");
+  } catch (err) {
+    // NM not set up (dev mode) or host crashed — show actual error
+    sendStatus(`Native Messaging unavailable: ${err.message}`);
+    return false;
   }
 
-  if (!nmAvailable) {
-    sendStatus("Bridge not running. Run: cd bridge && python bridge_server.py");
-  } else {
-    sendStatus("Bridge failed to start. Check console for errors.");
+  // Step 3: Poll NM "check" every second until bridge is running (max 45s)
+  for (let i = 0; i < 45; i++) {
+    await sleep(1000);
+    sendStatus(`Waiting for bridge... (${i + 1}s)`);
+    try {
+      const check = await sendNativeMessage({ action: "check" });
+      if (check.status === "running" && check.port) {
+        saveBridgePort(check.port);
+        sendStatus("Bridge connected");
+        return true;
+      }
+    } catch {
+      // NM error during poll — keep waiting
+    }
   }
+
+  sendStatus("Bridge failed to start within 45s.");
   return false;
 }
 

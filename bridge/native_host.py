@@ -14,7 +14,6 @@ import os
 import struct
 import subprocess
 import sys
-import time
 import urllib.request
 
 BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", "0"))   # 0 = auto, read from bridge.port file
@@ -95,24 +94,6 @@ def launch_bridge():
     subprocess.Popen(cmd, cwd=SCRIPT_DIR, env=env, creationflags=flags)
 
 
-def _wait_for_port_file(timeout=15):
-    """Poll until bridge.port file appears and bridge is healthy. Returns port or None."""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        port = _read_port_file()
-        if port:
-            try:
-                req = urllib.request.Request(f"{_bridge_url(port)}/health")
-                with urllib.request.urlopen(req, timeout=2) as resp:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    if data.get("status") == "ok":
-                        return port
-            except Exception:
-                pass
-        time.sleep(0.5)
-    return None
-
-
 def main():
     msg = read_message()
     if not msg:
@@ -121,27 +102,27 @@ def main():
     action = msg.get("action", "")
 
     if action == "launch":
+        # Check if already running — respond immediately with port.
         running, port = is_bridge_running()
         if running:
             send_message({"status": "already_running", "port": port})
             return
+        # Not running: spawn bridge and return IMMEDIATELY (no waiting).
+        # background.js will poll with "check" until bridge.port appears.
         try:
-            # Remove stale port file before launching so we can detect fresh start
+            # Remove stale port file so background.js can detect fresh start
             try:
                 if os.path.exists(PORT_FILE):
                     os.remove(PORT_FILE)
             except OSError:
                 pass
             launch_bridge()
-            port = _wait_for_port_file(timeout=15)
-            if port:
-                send_message({"status": "launched", "port": port})
-            else:
-                send_message({"status": "error", "message": "Bridge started but port not available in time"})
+            send_message({"status": "launching"})
         except Exception as e:
             send_message({"status": "error", "message": str(e)})
 
     elif action == "check":
+        # Return current bridge status + port (fast, no waiting).
         running, port = is_bridge_running()
         send_message({
             "status": "running" if running else "not_running",
