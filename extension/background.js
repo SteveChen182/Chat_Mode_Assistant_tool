@@ -3,9 +3,16 @@
  * Manages bridge connection, auto-launch, and relays events between sidepanel and bridge server.
  */
 
-// NOTE: Port must match BRIDGE_PORT in bridge/run_bridge.ps1 (default: 8776)
-const BRIDGE_URL = "http://127.0.0.1:8776";
+// NOTE: Port is discovered dynamically from the bridge server at runtime.
+// The bridge writes its actual port to bridge.port; native_host reads it and
+// returns it in the NM response. We cache it in chrome.storage.session so it
+// survives service worker restarts.
+let bridgePort = null;   // set after first successful NM launch/check
 const NM_HOST_NAME = "com.chat_mode_assistant.bridge";
+
+function getBridgeUrl() {
+  return bridgePort ? `http://127.0.0.1:${bridgePort}` : null;
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -16,7 +23,9 @@ function sleep(ms) {
 // ── Bridge API helpers ─────────────────────────────────────────────────────
 
 async function bridgeFetch(path, options = {}) {
-  const url = `${BRIDGE_URL}${path}`;
+  const base = getBridgeUrl();
+  if (!base) throw new Error("Bridge port not yet known");
+  const url = `${base}${path}`;
   const resp = await fetch(url, {
     ...options,
     headers: { "Content-Type": "application/json", ...options.headers },
@@ -70,23 +79,42 @@ function launchViaNativeMessaging() {
   });
 }
 
+/** Persist the discovered port so it survives service worker restarts. */
+function saveBridgePort(port) {
+  bridgePort = port;
+  chrome.storage.session.set({ bridgePort: port }).catch(() => {});
+}
+
 /**
  * Ensure the bridge server is running.
- * 1. Check /health
- * 2. If not running → try Native Messaging launch
+ * 1. Try to recover port from session storage + health-check
+ * 2. If not running → try Native Messaging launch (returns actual port)
  * 3. Poll /health until ready
  * Returns true if bridge is ready.
  */
 async function ensureBridgeRunning(sendStatus) {
-  // Step 1: Quick health check
+  // Step 1: Try to recover persisted port from a previous launch
   sendStatus("Checking bridge...");
-  let health = await healthCheck();
-  if (health.status === "ok") {
-    sendStatus("Bridge connected");
-    return true;
+  if (!bridgePort) {
+    try {
+      const stored = await chrome.storage.session.get("bridgePort");
+      if (stored.bridgePort) {
+        bridgePort = stored.bridgePort;
+      }
+    } catch { /* session storage unavailable */ }
+  }
+  if (bridgePort) {
+    const health = await healthCheck();
+    if (health.status === "ok") {
+      sendStatus("Bridge connected");
+      return true;
+    }
+    // Stored port is stale — clear it
+    bridgePort = null;
+    chrome.storage.session.remove("bridgePort").catch(() => {});
   }
 
-  // Step 2: Try native messaging launch
+  // Step 2: Try native messaging launch (native_host returns actual port)
   sendStatus("Starting bridge server...");
   let nmAvailable = true;
   try {
@@ -94,6 +122,10 @@ async function ensureBridgeRunning(sendStatus) {
     if (result.status === "error") {
       sendStatus(`Launch error: ${result.message}`);
       return false;
+    }
+    // native_host always returns {status, port}
+    if (result.port) {
+      saveBridgePort(result.port);
     }
     // result.status is "launched" or "already_running"
     sendStatus("Bridge process started, waiting for ready...");
@@ -107,7 +139,7 @@ async function ensureBridgeRunning(sendStatus) {
   for (let i = 0; i < maxWait; i++) {
     await sleep(1000);
     sendStatus(`Waiting for bridge... (${i + 1}s)`);
-    health = await healthCheck();
+    const health = await healthCheck();
     if (health.status === "ok") {
       sendStatus("Bridge connected");
       return true;
@@ -133,7 +165,7 @@ function startKeepAlive() {
   if (keepAliveInterval) return;
   keepAliveInterval = setInterval(() => {
     // Any async operation keeps the Service Worker alive
-    fetch(`${BRIDGE_URL}/health`).catch(() => {});
+    fetch(`${getBridgeUrl() || ''}/health`).catch(() => {});
   }, 20000); // every 20s
 }
 
@@ -169,9 +201,10 @@ function startStreaming() {
     sseReconnectTimer = null;
   }
 
-  const es = new EventSource(`${BRIDGE_URL}/session/stream`);
+  const streamUrl = getBridgeUrl();
+  if (!streamUrl) return null;
+  const es = new EventSource(`${streamUrl}/session/stream`);
   currentEventSource = es;
-
   const eventTypes = [
     "answer", "tool_start", "tool_request", "usage", "ready", "info", "end", "goodbye", "error"
   ];

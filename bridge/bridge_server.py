@@ -50,7 +50,9 @@ except ImportError:
 
 # ── Configuration ───────────────────────────────────────────────────────────
 HOST = os.environ.get("BRIDGE_HOST", "127.0.0.1")
-PORT = int(os.environ.get("BRIDGE_PORT", "8776"))       # NOTE: 8776 to avoid conflict with old bridge (8775)
+# Port 0 = OS picks a free port automatically (recommended).
+# Set BRIDGE_PORT env-var to force a specific port (e.g. for dev/testing).
+PORT = int(os.environ.get("BRIDGE_PORT", "0"))
 REQUIRE_API_KEY = os.environ.get("BRIDGE_API_KEY", "").strip()
 DEFAULT_ASSISTANT = os.environ.get("BRIDGE_ASSISTANT", "sighting_assistant")
 DT_PATH_OVERRIDE = os.environ.get("BRIDGE_DT_PATH", "").strip()
@@ -896,7 +898,8 @@ def _is_port_in_use(host, port):
             return False
 
 
-_PID_FILE = os.path.join(_SCRIPT_DIR, "bridge.pid")
+_PID_FILE  = os.path.join(_SCRIPT_DIR, "bridge.pid")
+_PORT_FILE = os.path.join(_SCRIPT_DIR, "bridge.port")
 
 
 def _write_pid_file():
@@ -917,20 +920,29 @@ def _remove_pid_file():
         pass
 
 
+def _write_port_file(port: int):
+    """Write the actual listening port so native_host can discover it."""
+    try:
+        with open(_PORT_FILE, "w") as f:
+            f.write(str(port))
+    except OSError:
+        pass
+
+
+def _remove_port_file():
+    """Remove port file on shutdown."""
+    try:
+        if os.path.exists(_PORT_FILE):
+            os.remove(_PORT_FILE)
+    except OSError:
+        pass
+
+
 def main():
     if not HAS_WINPTY:
         sys.stderr.write(
             "[bridge] ERROR: pywinpty is required.\n"
             "  Install: pip install pywinpty\n"
-        )
-        sys.exit(1)
-
-    # ── Singleton check: ensure only one bridge runs at a time ──
-    if _is_port_in_use(HOST, PORT):
-        sys.stderr.write(
-            f"[bridge] ERROR: Port {PORT} is already in use.\n"
-            f"  Another bridge_server is likely running.\n"
-            f"  Kill it first or check: netstat -ano | findstr {PORT}\n"
         )
         sys.exit(1)
 
@@ -942,15 +954,20 @@ def main():
         )
         sys.exit(1)
 
+    # Bind to PORT (0 = OS picks a free port).
+    # After bind, read the actual port from the socket.
+    server = BridgeServer((HOST, PORT), BridgeHandler)
+    actual_port = server.server_address[1]
+
     _debug(f"dt found at: {dt_cmd}")
     _debug(f"default assistant: {DEFAULT_ASSISTANT}")
-    _debug(f"listening on port: {PORT}")
+    _debug(f"listening on port: {actual_port}")
     _debug(f"auto-close pause windows: {AUTO_CLOSE_PAUSE_WINDOWS}")
 
     _write_pid_file()
+    _write_port_file(actual_port)   # lets native_host discover the port
 
-    server = BridgeServer((HOST, PORT), BridgeHandler)
-    print(f"[bridge] Chat Mode Bridge Server running on http://{HOST}:{PORT} (PID: {os.getpid()})")
+    print(f"[bridge] Chat Mode Bridge Server running on http://{HOST}:{actual_port} (PID: {os.getpid()})")
     print(f"[bridge] Press Ctrl+C to stop")
 
     try:
@@ -961,6 +978,7 @@ def main():
         server.shutdown()
     finally:
         _remove_pid_file()
+        _remove_port_file()
 
 
 if __name__ == "__main__":
