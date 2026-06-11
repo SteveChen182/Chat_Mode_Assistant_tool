@@ -537,18 +537,16 @@ class ChatSession:
         """Process a single cleaned line from the PTY output."""
 
         # Detect '> ' prompt → ready for input
-        # Distinguish the real bare prompt from the PTY echo of user input:
-        #   Echo:        "> user message text"  (has content after "> ")
-        #   Real prompt: ">" or "> "           (nothing after the prefix)
-        # When _ignore_prompt is True we still handle the bare prompt so that
-        # recovery works when dt returns to the prompt WITHOUT emitting
-        # {"usage":...} (e.g. after an API timeout or unexpected error path).
+        # Only emit ready event on state transition (not on ConPTY redraws).
+        # ConPTY periodically redraws the screen, showing bare '>' even while
+        # dt is still processing. We suppress these with _ignore_prompt=True
+        # (set in send()) until a {"usage":...} event resets it.
+        # If dt errors out, {"level":"error"} also resets _ignore_prompt.
+        # If dt exits without usage, the 'end' event fires and onEnd() clears
+        # the indicator, so we don't need to bypass _ignore_prompt here.
         if line.startswith("> ") or line == ">":
-            is_bare_prompt = (line == ">" or line == "> ")
-            if self._ignore_prompt and not is_bare_prompt:
-                return  # echo of user input (has content), skip
-            # Bare prompt: always treat as ready and reset _ignore_prompt
-            self._ignore_prompt = False
+            if self._ignore_prompt:
+                return  # ConPTY redraw or echo while dt is still processing
             self._ready.set()
             if not self._waiting_input.is_set():
                 _debug(f"[pty] prompt detected → ready")
@@ -853,9 +851,19 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return
 
         # Reconnect recovery: if session is already waiting for input, a previous
-        # SSE connection may have consumed the usage/ready events. Send a synthetic
-        # ready immediately so the UI can clear any stale tool indicator.
+        # SSE connection may have consumed the usage/ready events.
+        # Flush any stale events from the queue (old tool_start, answer chunks)
+        # so they don't re-show the indicator, then send a synthetic ready.
         if session.is_waiting_input:
+            flushed = 0
+            while not session.event_queue.empty():
+                try:
+                    session.event_queue.get_nowait()
+                    flushed += 1
+                except queue.Empty:
+                    break
+            if flushed:
+                _debug(f"[stream] flushed {flushed} stale events on reconnect")
             try:
                 synthetic = json.dumps({
                     "type": "ready",

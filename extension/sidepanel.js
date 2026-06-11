@@ -515,14 +515,16 @@ function onToolStart(name, args) {
   const detail = args.id ? ` (ID: ${args.id})` : "";
   addToolIndicator(`${friendlyName}${detail}`);
 
-  // Watchdog: if tool still running after 90s, send a health check.
-  // This recovers from SSE drop where usage/ready events were lost.
-  _toolWatchdog = setTimeout(() => {
-    if (document.getElementById("tool-progress") && port) {
-      addSystemMsg("⏳ Tool is taking longer than expected. Checking status...");
-      port.postMessage({ action: "health" });
-    }
-  }, 90000);
+  // Watchdog: fire every 60s while tool indicator is still showing.
+  // On SSE drop, usage/ready events may be lost; health_result clears the
+  // indicator when bridge confirms session_waiting_input=true.
+  _toolWatchdog = setTimeout(function _wd() {
+    _toolWatchdog = null;
+    if (!document.getElementById("tool-progress") || !port) return;
+    addSystemMsg("⏳ Tool is taking longer than expected. Checking status...");
+    port.postMessage({ action: "health" });
+    _toolWatchdog = setTimeout(_wd, 60000); // re-arm until indicator clears
+  }, 60000);
 }
 
 function onToolRequest(name, operation) {
