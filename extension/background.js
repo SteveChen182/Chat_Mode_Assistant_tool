@@ -235,6 +235,8 @@ function startStreaming() {
           if (health.status === "ok" && health.session_active) {
             console.log("[bg] SSE reconnecting...");
             startStreaming();
+            // Sync UI state in case events (usage/ready) were lost during drop
+            _postToActivePort({ type: "health_result", ...health });
           } else {
             _postToActivePort({ type: "stream_error" });
           }

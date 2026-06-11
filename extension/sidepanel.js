@@ -499,14 +499,30 @@ function onAnswerChunk(text) {
   }, getRenderDebounce());
 }
 
+let _toolWatchdog = null;
+
+function _clearToolWatchdog() {
+  if (_toolWatchdog) { clearTimeout(_toolWatchdog); _toolWatchdog = null; }
+}
+
 function onToolStart(name, args) {
   // Remove previous tool indicator if exists
   removeToolIndicator();
   removeTypingIndicator();
+  _clearToolWatchdog();
 
   const friendlyName = formatToolName(name);
   const detail = args.id ? ` (ID: ${args.id})` : "";
   addToolIndicator(`${friendlyName}${detail}`);
+
+  // Watchdog: if tool still running after 90s, send a health check.
+  // This recovers from SSE drop where usage/ready events were lost.
+  _toolWatchdog = setTimeout(() => {
+    if (document.getElementById("tool-progress") && port) {
+      addSystemMsg("⏳ Tool is taking longer than expected. Checking status...");
+      port.postMessage({ action: "health" });
+    }
+  }, 90000);
 }
 
 function onToolRequest(name, operation) {
@@ -515,6 +531,7 @@ function onToolRequest(name, operation) {
 
 function onUsage(usage) {
   // Response complete for this turn
+  _clearToolWatchdog();
   isStreaming = false;
   removeToolIndicator();
   finalizeAiMsg();
@@ -527,6 +544,7 @@ function onUsage(usage) {
 
 function onReady(accumulatedAnswer) {
   // AI finished responding, waiting for user input
+  _clearToolWatchdog();
   isStreaming = false;
   removeToolIndicator();
   finalizeAiMsg();
@@ -572,6 +590,7 @@ function onInfo(text) {
 }
 
 function onEnd() {
+  _clearToolWatchdog();
   isStreaming = false;
   removeToolIndicator();
   finalizeAiMsg();

@@ -852,6 +852,21 @@ class BridgeHandler(BaseHTTPRequestHandler):
         except Exception:
             return
 
+        # Reconnect recovery: if session is already waiting for input, a previous
+        # SSE connection may have consumed the usage/ready events. Send a synthetic
+        # ready immediately so the UI can clear any stale tool indicator.
+        if session.is_waiting_input:
+            try:
+                synthetic = json.dumps({
+                    "type": "ready",
+                    "accumulated_answer": session.accumulated_answer,
+                })
+                self.wfile.write(f"event: ready\ndata: {synthetic}\n\n".encode("utf-8"))
+                self.wfile.flush()
+                _debug("[stream] sent synthetic ready on reconnect (session already waiting)")
+            except Exception:
+                return
+
         try:
             while session.is_alive or not session.event_queue.empty():
                 try:
