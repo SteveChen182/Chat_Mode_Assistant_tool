@@ -73,7 +73,7 @@
     .header-btn:disabled:hover { background: rgba(255,255,255,0.2); }
 
     /* ── Chat Area ─── */
-    #main-view { display: flex; flex: 1; flex-direction: column; overflow: hidden; }
+    #main-view { display: flex; flex: 1; flex-direction: column; overflow: hidden; position: relative; }
     #regression-view { flex: 1; }
     #chat-area {
       flex: 1;
@@ -195,17 +195,29 @@
     }
     #regression-send-btn:hover { background: #4a6a94; }
     #regression-send-btn:disabled { background: #9ca3af; cursor: not-allowed; }
-    #btn-bottom {
-      background: #e5e7eb;
-      color: #374151;
-      border: none;
-      border-radius: 8px;
-      padding: 8px 10px;
-      font-size: 14px;
+    #btn-scroll-down {
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: rgba(95, 128, 171, 0.92);
+      border: 2px solid rgba(255,255,255,0.35);
+      color: #fff;
       cursor: pointer;
-      line-height: 1;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.22);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.22s ease, background 0.15s;
     }
-    #btn-bottom:hover { background: #d1d5db; }
+    #btn-scroll-down.show { opacity: 1; pointer-events: auto; }
+    #btn-scroll-down:hover { background: rgba(70, 103, 146, 0.97); }
     .font-size-ctrl {
       display: flex;
       flex-direction: column;
@@ -228,6 +240,38 @@
 
     /* ── History ─── */
     .history-wrap { position: relative; }
+    .settings-wrap { position: relative; }
+    .settings-menu {
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 4px;
+      width: 240px;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      z-index: 200;
+      padding: 4px 0 8px;
+    }
+    .settings-menu.show { display: block; }
+    .settings-menu-title { font-size: 12px; font-weight: 700; color: #6b7280; padding: 10px 14px 8px; border-bottom: 1px solid #e5e7eb; margin-bottom: 6px; }
+    .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; gap: 10px; }
+    .settings-label { font-size: 12px; color: #374151; white-space: nowrap; }
+    .settings-lang-options { display: flex; gap: 4px; }
+    .lang-opt {
+      padding: 3px 10px;
+      font-size: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      background: none;
+      color: #6b7280;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .lang-opt:hover { border-color: #5F80AB; color: #5F80AB; }
+    .lang-opt.active { background: #5F80AB; color: #fff; border-color: #5F80AB; font-weight: 600; }
     .history-menu {
       display: none;
       position: absolute;
@@ -669,6 +713,24 @@
         <button id="btn-history" class="header-btn" title="Session History">&#8634;</button>
         <div id="historyMenu" class="history-menu"></div>
       </div>
+      <div class="settings-wrap">
+        <button id="btn-settings" class="header-btn" title="Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+        <div id="settingsMenu" class="settings-menu">
+          <div class="settings-menu-title">Settings</div>
+          <div class="settings-row">
+            <span class="settings-label">Language / 語言</span>
+            <div class="settings-lang-options">
+              <button class="lang-opt active" data-lang="en">English</button>
+              <button class="lang-opt" data-lang="zh">繁體中文</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -733,6 +795,14 @@
       </div>
     </div>
 
+    <!-- Floating scroll-to-bottom button -->
+    <button id="btn-scroll-down" title="Jump to latest">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="4" x2="12" y2="18"/>
+        <polyline points="6 12 12 18 18 12"/>
+      </svg>
+    </button>
+
     <!-- Quick action buttons (shown when AI asks a question) -->
     <div id="quick-actions"></div>
 
@@ -740,7 +810,6 @@
     <div class="input-area">
       <textarea id="input" rows="1" placeholder="Type a message or HSD ID..."></textarea>
       <button id="send-btn">Send</button>
-      <button id="btn-bottom" title="Jump to latest">⬇</button>
       <div class="font-size-ctrl" title="Adjust font size">
         <button id="btn-font-up">+</button>
         <button id="btn-font-down">−</button>

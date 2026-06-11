@@ -16,7 +16,7 @@ import subprocess
 import sys
 import urllib.request
 
-BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", "0"))   # 0 = auto, read from bridge.port file
+BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", "8776"))   # Default 8776; bridge falls back to random if occupied
 
 # When bundled as native_host.exe via PyInstaller, __file__ points to the
 # temp extraction dir. Use sys.executable directory to find bridge_server.exe.
@@ -81,8 +81,8 @@ def is_bridge_running():
 def launch_bridge():
     """Spawn bridge server as a detached background process."""
     env = os.environ.copy()
-    # BRIDGE_PORT=0 → bridge picks a free port and writes it to bridge.port
-    env["BRIDGE_PORT"] = "0"
+    # Default to port 8776; if occupied, bridge will fail and caller retries
+    env["BRIDGE_PORT"] = str(BRIDGE_PORT)
     env["BRIDGE_DEBUG"] = "1"
 
     flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NEW_CONSOLE

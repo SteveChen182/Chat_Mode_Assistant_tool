@@ -159,15 +159,22 @@ async function ensureBridgeRunning(sendStatus) {
 // Chrome suspends Service Workers after ~30s of inactivity. During long tool
 // execution (RAG search, Sherlog), no events flow back, causing suspension.
 // This keep-alive prevents that by periodic self-ping while a session is active.
+// It also monitors SSE health and reconnects if the stream dropped silently.
 
 let keepAliveInterval = null;
 
 function startKeepAlive() {
   if (keepAliveInterval) return;
-  keepAliveInterval = setInterval(() => {
-    // Any async operation keeps the Service Worker alive
-    fetch(`${getBridgeUrl() || ''}/health`).catch(() => {});
-  }, 20000); // every 20s
+  keepAliveInterval = setInterval(async () => {
+    try {
+      const health = await healthCheck();
+      // If session is active but SSE is disconnected, force reconnect
+      if (health.status === "ok" && health.session_active && !currentEventSource) {
+        console.log("[bg] Keep-alive detected dead SSE — reconnecting");
+        startStreaming();
+      }
+    } catch { /* ignore */ }
+  }, 15000); // every 15s
 }
 
 function stopKeepAlive() {
@@ -181,8 +188,10 @@ function stopKeepAlive() {
 
 let currentEventSource = null;
 let sseReconnectTimer = null;
+let sseReconnectAttempts = 0;
 let activePort = null; // Global reference to current sidepanel/popup port
-const SSE_RECONNECT_DELAY = 2000; // ms
+const SSE_RECONNECT_BASE_DELAY = 2000; // ms
+const SSE_MAX_RECONNECT_ATTEMPTS = 15; // give up after ~2 min of retries
 
 function _postToActivePort(msg) {
   try {
@@ -206,6 +215,12 @@ function startStreaming() {
   if (!streamUrl) return null;
   const es = new EventSource(`${streamUrl}/session/stream`);
   currentEventSource = es;
+
+  // Reset reconnect counter on successful open
+  es.onopen = () => {
+    sseReconnectAttempts = 0;
+  };
+
   const eventTypes = [
     "answer", "tool_start", "tool_request", "usage", "ready", "info", "end", "goodbye", "error"
   ];
@@ -222,26 +237,42 @@ function startStreaming() {
   }
 
   es.onerror = () => {
-    // Don't immediately give up — try to reconnect
+    // Close broken connection
     es.close();
     currentEventSource = null;
 
-    // Check if session is still alive before reconnecting
+    // Exponential backoff reconnect while session is alive
+    if (sseReconnectAttempts >= SSE_MAX_RECONNECT_ATTEMPTS) {
+      console.log("[bg] SSE max reconnect attempts reached");
+      _postToActivePort({ type: "stream_error" });
+      return;
+    }
+
+    const delay = Math.min(SSE_RECONNECT_BASE_DELAY * Math.pow(1.5, sseReconnectAttempts), 10000);
+    sseReconnectAttempts++;
+
     if (!sseReconnectTimer) {
       sseReconnectTimer = setTimeout(async () => {
         sseReconnectTimer = null;
         try {
           const health = await healthCheck();
           if (health.status === "ok" && health.session_active) {
-            console.log("[bg] SSE reconnecting...");
+            console.log(`[bg] SSE reconnecting (attempt ${sseReconnectAttempts})...`);
             startStreaming();
-          } else {
+          } else if (health.status === "ok" && !health.session_active) {
+            // Session ended while SSE was disconnected — notify UI
             _postToActivePort({ type: "stream_error" });
+          } else {
+            // Bridge unreachable — retry
+            sseReconnectTimer = setTimeout(() => {
+              sseReconnectTimer = null;
+              startStreaming();
+            }, delay);
           }
         } catch {
           _postToActivePort({ type: "stream_error" });
         }
-      }, SSE_RECONNECT_DELAY);
+      }, delay);
     }
   };
 

@@ -50,13 +50,14 @@ const btnNew = document.getElementById("btn-new");
 const btnStop = document.getElementById("btn-stop");
 const btnImport = document.getElementById("btn-import");
 const btnSave = document.getElementById("btn-save");
-const btnBottom = document.getElementById("btn-bottom");
+const btnBottom = document.getElementById("btn-scroll-down");
 const btnFontUp = document.getElementById("btn-font-up");
 const btnFontDown = document.getElementById("btn-font-down");
 const headerTitle = document.getElementById("header-title");
 const headerSubtitle = document.getElementById("header-subtitle");
 const statusBadge = document.getElementById("status-badge");
 const btnHistory = document.getElementById("btn-history");
+const btnSettings = document.getElementById("btn-settings");
 const btnPopout = document.getElementById("btn-popout");
 const onboardingEl = document.getElementById("onboarding");
 const onboardingImportBtn = document.getElementById("onboarding-import-btn");
@@ -72,6 +73,20 @@ const modalTitle = document.getElementById("modal-title");
 const modalMessage = document.getElementById("modal-message");
 const modalConfirmBtn = document.getElementById("modal-confirm");
 const modalCancelBtn = document.getElementById("modal-cancel");
+
+// ── Scroll Button Position ────────────────────────────────────────────────────────────────
+const _inputArea = document.querySelector(".input-area");
+
+function updateScrollBtnBottom() {
+  const inputH = _inputArea ? _inputArea.offsetHeight : 60;
+  const panelH = postAnalysisPanel.classList.contains("show")
+    ? postAnalysisPanel.offsetHeight
+    : 0;
+  btnBottom.style.bottom = (inputH + panelH + 12) + "px";
+}
+
+// Watch post-analysis panel height changes (handles expand/collapse animation)
+new ResizeObserver(() => updateScrollBtnBottom()).observe(postAnalysisPanel);
 
 // ── Custom Modal ─────────────────────────────────────────────────────────────────────────
 let _modalResolve = null;
@@ -212,11 +227,13 @@ function showPostAnalysisPanel() {
   }
   postAnalysisPanel.classList.remove("collapsed");
   postAnalysisPanel.classList.add("show");
+  updateScrollBtnBottom();
   scrollToBottom();
 }
 
 function hidePostAnalysisPanel() {
   postAnalysisPanel.classList.remove("show");
+  updateScrollBtnBottom();
 }
 
 // Toggle collapse on header click
@@ -514,11 +531,14 @@ function onUsage(usage) {
   // Response complete for this turn
   isStreaming = false;
   removeToolIndicator();
+
+  // Capture AI text BEFORE finalizeAiMsg() clears it
+  const aiContent = currentAiText;
   finalizeAiMsg();
 
   // Track AI response in session messages when we have accumulated text
-  if (currentAiText) {
-    sessionMessages.push({ role: "assistant", content: currentAiText });
+  if (aiContent) {
+    sessionMessages.push({ role: "assistant", content: aiContent });
   }
 }
 
@@ -762,7 +782,11 @@ function sendUserMessage(text, displayText) {
   // }
 
   // Currently: send text (with HSD prefix if applicable)
-  const messageToSend = text;
+  // Modification 3: Language instruction — append zh instruction when UI is set to zh
+  let messageToSend = text;
+  if (uiLang === "zh") {
+    messageToSend += " (請使用繁體中文回答)";
+  }
 
   port.postMessage({ action: "send", message: messageToSend });
   showTypingIndicator();
@@ -834,6 +858,7 @@ chatArea.addEventListener("scroll", () => {
   // If user is within 80px of bottom, consider them "at bottom"
   const atBottom = chatArea.scrollHeight - chatArea.scrollTop - chatArea.clientHeight < 80;
   userScrolledUp = !atBottom;
+  btnBottom.classList.toggle("show", userScrolledUp);
 });
 
 function scrollToBottom() {
@@ -963,7 +988,6 @@ async function importHsdFromWebpage() {
       .trim();
     updateHeaderSubtitle(hsdTitle);
 
-    addSystemMsg(`Imported HSD ID: ${hsdId}`);
     showToast(`HSD ${hsdId} imported`, "success");
     hsdImported = true;
 
@@ -1075,6 +1099,7 @@ sendBtn.addEventListener("click", () => {
 });
 
 btnBottom.addEventListener("click", () => {
+  btnBottom.classList.remove("show");
   forceScrollToBottom();
 });
 
@@ -1355,6 +1380,48 @@ function formatTimestamp(ts) {
 btnHistory.addEventListener("click", openHistoryMenu);
 
 btnImport.addEventListener("click", importHsdFromWebpage);
+
+// ── Settings (Language) ───────────────────────────────────────────────────
+
+let uiLang = localStorage.getItem("uiLang") || "en"; // "en" | "zh"
+
+function applyLang(lang) {
+  uiLang = lang;
+  localStorage.setItem("uiLang", lang);
+  // Update Send button label
+  sendBtn.textContent = lang === "zh" ? "送出" : "Send";
+  // Update active state on option buttons
+  document.querySelectorAll(".lang-opt").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.lang === lang);
+  });
+}
+
+// Init language on load
+applyLang(uiLang);
+
+btnSettings.addEventListener("click", (e) => {
+  e.stopPropagation();
+  const menu = document.getElementById("settingsMenu");
+  const isOpen = menu.classList.contains("show");
+  // Close history menu if open
+  closeHistoryMenu();
+  menu.classList.toggle("show", !isOpen);
+});
+
+document.querySelectorAll(".lang-opt").forEach(btn => {
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    applyLang(btn.dataset.lang);
+  });
+});
+
+// Close settings menu on click outside
+document.addEventListener("click", (e) => {
+  const menu = document.getElementById("settingsMenu");
+  if (menu && menu.classList.contains("show") && !menu.contains(e.target) && e.target !== btnSettings) {
+    menu.classList.remove("show");
+  }
+});
 
 // ── Pop-out / Pop-in Toggle ──────────────────────────────────────────────────
 const _isPopup = new URLSearchParams(window.location.search).has("popup");

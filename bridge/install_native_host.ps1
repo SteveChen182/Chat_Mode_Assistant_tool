@@ -27,7 +27,8 @@ if (-not (Get-Command dt -ErrorAction SilentlyContinue)) {
     Write-Error "dt CLI not found in PATH. Please install Intel Developer Toolkit first."
     exit 1
 }
-$dtVer = (dt version 2>&1) | Select-String "Version:" | ForEach-Object { $_.ToString().Trim() }
+$dtVer = (dt version 2>$null) | Select-String "Version:" | ForEach-Object { $_.ToString().Trim() }
+if (-not $dtVer) { $dtVer = "OK" }
 Write-Host "[OK] dt found: $dtVer" -ForegroundColor Green
 
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {

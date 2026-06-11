@@ -52,7 +52,7 @@ except ImportError:
 HOST = os.environ.get("BRIDGE_HOST", "127.0.0.1")
 # Port 0 = OS picks a free port automatically (recommended).
 # Set BRIDGE_PORT env-var to force a specific port (e.g. for dev/testing).
-PORT = int(os.environ.get("BRIDGE_PORT", "0"))
+PORT = int(os.environ.get("BRIDGE_PORT", "8776"))
 REQUIRE_API_KEY = os.environ.get("BRIDGE_API_KEY", "").strip()
 DEFAULT_ASSISTANT = os.environ.get("BRIDGE_ASSISTANT", "sighting_assistant")
 DT_PATH_OVERRIDE = os.environ.get("BRIDGE_DT_PATH", "").strip()
@@ -846,6 +846,17 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return
 
         try:
+            # If session is already waiting for input when client (re)connects,
+            # immediately send a ready event so UI can sync state.
+            if session._waiting_input.is_set():
+                ready_event = {
+                    "type": "ready",
+                    "accumulated_answer": session.accumulated_answer,
+                }
+                payload = json.dumps(ready_event, ensure_ascii=False)
+                self.wfile.write(f"event: ready\ndata: {payload}\n\n".encode("utf-8"))
+                self.wfile.flush()
+
             while session.is_alive or not session.event_queue.empty():
                 try:
                     event = session.event_queue.get(timeout=2)
@@ -956,7 +967,15 @@ def main():
 
     # Bind to PORT (0 = OS picks a free port).
     # After bind, read the actual port from the socket.
-    server = BridgeServer((HOST, PORT), BridgeHandler)
+    # ── Port selection: prefer fixed port, fallback to random if occupied ──
+    bind_port = PORT
+    if PORT != 0 and _is_port_in_use(HOST, PORT):
+        sys.stderr.write(
+            f"[bridge] WARNING: Port {PORT} is already in use. Falling back to a random port.\n"
+        )
+        bind_port = 0
+
+    server = BridgeServer((HOST, bind_port), BridgeHandler)
     actual_port = server.server_address[1]
 
     _debug(f"dt found at: {dt_cmd}")
@@ -967,8 +986,8 @@ def main():
     _write_pid_file()
     _write_port_file(actual_port)   # lets native_host discover the port
 
-    print(f"[bridge] Chat Mode Bridge Server running on http://{HOST}:{actual_port} (PID: {os.getpid()})")
-    print(f"[bridge] Press Ctrl+C to stop")
+    _debug(f"Chat Mode Bridge Server running on http://{HOST}:{actual_port} (PID: {os.getpid()})")
+    _debug(f"Press Ctrl+C to stop")
 
     try:
         server.serve_forever()
