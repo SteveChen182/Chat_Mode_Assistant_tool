@@ -537,11 +537,18 @@ class ChatSession:
         """Process a single cleaned line from the PTY output."""
 
         # Detect '> ' prompt → ready for input
-        # Only emit ready event on state transition (not on ConPTY redraws)
-        # Also skip prompt echoes right after send (before usage event)
+        # Distinguish the real bare prompt from the PTY echo of user input:
+        #   Echo:        "> user message text"  (has content after "> ")
+        #   Real prompt: ">" or "> "           (nothing after the prefix)
+        # When _ignore_prompt is True we still handle the bare prompt so that
+        # recovery works when dt returns to the prompt WITHOUT emitting
+        # {"usage":...} (e.g. after an API timeout or unexpected error path).
         if line.startswith("> ") or line == ">":
-            if self._ignore_prompt:
-                return  # echo'd prompt right after send, ignore
+            is_bare_prompt = (line == ">" or line == "> ")
+            if self._ignore_prompt and not is_bare_prompt:
+                return  # echo of user input (has content), skip
+            # Bare prompt: always treat as ready and reset _ignore_prompt
+            self._ignore_prompt = False
             self._ready.set()
             if not self._waiting_input.is_set():
                 _debug(f"[pty] prompt detected → ready")

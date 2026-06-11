@@ -407,7 +407,10 @@ function connectPort() {
           setStatus("connected", msg.session_waiting_input ? "Connected" : "Processing...");
           setInputEnabled(!!msg.session_waiting_input);
           if (msg.conversation_id) updateConversationId(msg.conversation_id);
-          if (msg.session_waiting_input) hideConnectionSplash();
+          if (msg.session_waiting_input) {
+            hideConnectionSplash();
+            removeToolIndicator(); // clear stale indicator after SSE reconnect
+          }
         } else {
           setStatus("connected", "No Session");
         }
