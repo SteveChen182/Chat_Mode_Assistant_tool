@@ -23,6 +23,13 @@ function sleep(ms) {
 // ── Bridge API helpers ─────────────────────────────────────────────────────
 
 async function bridgeFetch(path, options = {}) {
+  // Recover port from session storage if lost (e.g. after Service Worker restart)
+  if (!bridgePort) {
+    try {
+      const stored = await chrome.storage.session.get("bridgePort");
+      if (stored.bridgePort) bridgePort = stored.bridgePort;
+    } catch { /* ignore */ }
+  }
   const base = getBridgeUrl();
   if (!base) throw new Error("Bridge port not yet known");
   const url = `${base}${path}`;
@@ -343,6 +350,10 @@ chrome.runtime.onConnect.addListener((port) => {
           const sendResult = await sendMessage(msg.message);
           if (sendResult.error === "session_busy") {
             port.postMessage({ type: "send_rejected", reason: "session_busy", message: sendResult.message || "AI is still processing." });
+          }
+          // Ensure SSE is connected after successful send
+          if (!currentEventSource && bridgePort) {
+            startStreaming();
           }
           break;
         }
