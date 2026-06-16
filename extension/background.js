@@ -358,7 +358,7 @@ chrome.runtime.onConnect.addListener((port) => {
           break;
         }
 
-        case "stop_session":
+        case "stop_session": {
           stopKeepAlive();
           if (currentEventSource) {
             currentEventSource.close();
@@ -367,6 +367,60 @@ chrome.runtime.onConnect.addListener((port) => {
           const stopResult = await stopSession();
           port.postMessage({ action: "session_stopped", ...stopResult });
           break;
+        }
+
+        case "restart_session": {
+          if (isStarting) {
+            port.postMessage({ type: "startup_status", message: "Already starting..." });
+            break;
+          }
+          isStarting = true;
+          try {
+            // Stop current session cleanly
+            stopKeepAlive();
+            if (currentEventSource) {
+              currentEventSource.close();
+              currentEventSource = null;
+            }
+            try { await stopSession(); } catch { /* ignore if no session */ }
+
+            // Ensure bridge is still running
+            const bridgeReady = await ensureBridgeRunning((status) => {
+              port.postMessage({ type: "startup_status", message: status });
+            });
+            if (!bridgeReady) {
+              port.postMessage({ action: "bridge_unavailable" });
+              break;
+            }
+
+            // Start new session with the specified assistant
+            port.postMessage({ type: "startup_status", message: `Starting ${msg.assistant || "assistant"}...` });
+            const restartResult = await startSession(msg.assistant, msg.conversation_id);
+            if (restartResult.error) {
+              port.postMessage({ action: "session_start_error", error: restartResult.error });
+              break;
+            }
+            port.postMessage({ action: "session_started", ...restartResult });
+            startStreaming();
+            startKeepAlive();
+          } finally {
+            isStarting = false;
+          }
+          break;
+        }
+
+        case "file_dialog": {
+          // Ask bridge to open a native Windows file-picker; wait up to 5 min
+          try {
+            const title = encodeURIComponent(msg.title || "Open File");
+            const resp = await bridgeFetch(`/dialog/file?title=${title}`);
+            const data = await resp.json();
+            port.postMessage({ action: "file_dialog_result", field: msg.field, ...data });
+          } catch (err) {
+            port.postMessage({ action: "file_dialog_result", field: msg.field, path: "", selected: false, error: err.message });
+          }
+          break;
+        }
 
         default:
           port.postMessage({ action: "error", error: `unknown action: ${msg.action}` });

@@ -335,6 +335,11 @@ function connectPort() {
 
   port.onMessage.addListener((msg) => {
     switch (msg.type || msg.action) {
+      // File dialog result from browse buttons
+      case "file_dialog_result":
+        onFileDialogResult(msg.field, msg.path || "");
+        break;
+
       // Session lifecycle
       case "session_started":
         _pendingSessionRestart = false;
@@ -1775,10 +1780,20 @@ const regressionSendBtn = document.getElementById("regression-send-btn");
 const regressionHsdInfo = document.getElementById("regression-hsd-info");
 const btnRegression = document.getElementById("btn-regression");
 const btnBackToChat = document.getElementById("btn-back-to-chat");
+const btnLogAnalysis = document.getElementById("btn-log-analysis");
+const logAnalysisBar = document.getElementById("log-analysis-bar");
+const logAnalysisExit = document.getElementById("log-analysis-exit");
+const logPathInput = document.getElementById("log-path-input");
+const manPathInput = document.getElementById("man-path-input");
+const btnLogAnalyze = document.getElementById("btn-log-analyze");
+const btnBrowseLog = document.getElementById("btn-browse-log");
+const btnBrowseMan = document.getElementById("btn-browse-man");
 
 let isRegressionMode = false;
+let isLogAnalysisMode = false;
 const HEADER_COLOR_CHAT = "#5F80AB";
 const HEADER_COLOR_REGRESSION = "#b8860b";  // dark goldenrod (土黃色)
+const HEADER_COLOR_LOG = "#1d4ed8";          // deep blue (Log Analysis)
 
 function updateRegressionBtnState() {
   // R button requires both HSD ID and title to be available
@@ -1852,6 +1867,136 @@ function sendRegressionMessage() {
 // Event listeners
 btnRegression.addEventListener("click", switchToRegressionMode);
 btnBackToChat.addEventListener("click", switchToChatMode);
+
+// ── Log Analysis Mode ────────────────────────────────────────────────────────────────────────
+
+async function switchToLogAnalysisMode() {
+  const confirmed = await showModal(
+    "Switch to Log Analysis Mode",
+    "This will restart the bridge session with the 'displaydebugger' assistant. Current session will be saved. Continue?",
+    "Switch",
+    "Cancel"
+  );
+  if (!confirmed) return;
+
+  isLogAnalysisMode = true;
+
+  // Save and reset current session state
+  saveCurrentSession();
+  chatArea.innerHTML = "";
+  quickActions.classList.remove("show");
+  quickActions.innerHTML = "";
+  activeHsdId = null;
+  activeHsdTitle = "";
+  activeConversationId = "";
+  sessionMessages = [];
+  _postAnalysisShown = false;
+  hidePostAnalysisPanel();
+  heroCta.classList.remove("show");
+  hideOnboarding();
+
+  // Update header appearance
+  document.querySelector(".header").style.background = HEADER_COLOR_LOG;
+  headerTitle.textContent = "Log Analysis Mode";
+  logAnalysisBar.classList.add("show");
+
+  // Show splash and restart bridge with displaydebugger
+  showConnectionSplash("Switching to Log Analysis Mode...", "Restarting with displaydebugger assistant");
+  setInputEnabled(false);
+
+  if (port) {
+    port.postMessage({ action: "restart_session", assistant: "displaydebugger" });
+  }
+}
+
+async function exitLogAnalysisMode() {
+  isLogAnalysisMode = false;
+
+  // Restore header
+  document.querySelector(".header").style.background = HEADER_COLOR_CHAT;
+  logAnalysisBar.classList.remove("show");
+
+  // Reset state
+  saveCurrentSession();
+  chatArea.innerHTML = "";
+  quickActions.classList.remove("show");
+  quickActions.innerHTML = "";
+  activeHsdId = null;
+  activeHsdTitle = "";
+  activeConversationId = "";
+  sessionMessages = [];
+  _postAnalysisShown = false;
+  hidePostAnalysisPanel();
+  heroCta.classList.remove("show");
+  showOnboarding();
+
+  updateHeaderTitle();
+
+  // Show splash and restart bridge with sighting_assistant
+  showConnectionSplash("Returning to Chat Mode...", "Restarting with sighting_assistant");
+  setInputEnabled(false);
+
+  if (port) {
+    port.postMessage({ action: "restart_session", assistant: "sighting_assistant" });
+  }
+}
+
+btnLogAnalysis.addEventListener("click", switchToLogAnalysisMode);
+logAnalysisExit.addEventListener("click", exitLogAnalysisMode);
+
+// ── Log Analysis Toolbar ──────────────────────────────────────────────────
+
+// Enable Analyze button only when a log path is provided
+logPathInput.addEventListener("input", () => {
+  btnLogAnalyze.disabled = !logPathInput.value.trim();
+});
+
+// ── Browse button helpers ─────────────────────────────────────────────────
+
+function openFileBrowseDialog(field, title) {
+  if (!port) { showToast("Bridge not connected", "error"); return; }
+  // Disable the browse button while dialog is open
+  const btn = field === "log" ? btnBrowseLog : btnBrowseMan;
+  btn.disabled = true;
+  btn.textContent = "⏳";
+  port.postMessage({ action: "file_dialog", field, title });
+}
+
+function onFileDialogResult(field, path) {
+  // Re-enable browse button
+  const btn = field === "log" ? btnBrowseLog : btnBrowseMan;
+  btn.disabled = false;
+  btn.innerHTML = "&#128193;";
+
+  if (!path) return; // user cancelled
+
+  if (field === "log") {
+    logPathInput.value = path;
+    btnLogAnalyze.disabled = false;
+  } else {
+    manPathInput.value = path;
+  }
+}
+
+btnBrowseLog.addEventListener("click", () => openFileBrowseDialog("log", "Select Log File"));
+btnBrowseMan.addEventListener("click", () => openFileBrowseDialog("man", "Select Man File"));
+
+btnLogAnalyze.addEventListener("click", () => {
+  const logPath = logPathInput.value.trim();
+  if (!logPath) return;
+  const manPath = manPathInput.value.trim();
+
+  let command, display;
+  if (manPath) {
+    command = `analyze "${logPath}" with man file "${manPath}"`;
+    display = `🔍 Analyze log: ${logPath}  |  Man file: ${manPath}`;
+  } else {
+    command = `analyze "${logPath}"`;
+    display = `🔍 Analyze log: ${logPath}`;
+  }
+
+  sendUserMessage(command, display);
+});
 
 regressionSendBtn.addEventListener("click", sendRegressionMessage);
 regressionInput.addEventListener("keydown", (e) => {
