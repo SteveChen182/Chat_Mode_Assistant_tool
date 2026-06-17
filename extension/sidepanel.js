@@ -1300,6 +1300,7 @@ function saveCurrentSession() {
     hsdTitle: activeHsdTitle || "",
     conversationId: activeConversationId || "",
     messages: [...sessionMessages],
+    postAnalysisShown: _postAnalysisShown,
     timestamp: Date.now(),
   };
 }
@@ -1319,6 +1320,20 @@ async function loadSessions() {
     sessions = Array.isArray(stored.chatSessions) ? stored.chatSessions : [];
   } catch (e) {
     sessions = [];
+  }
+}
+
+// Restore post-analysis panel for a session: show collapsed if previously shown, else hide
+function _restorePostAnalysisPanel(shown) {
+  if (shown) {
+    _postAnalysisShown = false; // reset guard so showPostAnalysisPanel() rebuilds it
+    showPostAnalysisPanel();   // builds buttons + shows panel
+    postAnalysisPanel.classList.add("collapsed"); // immediately collapse
+    const titleEl = postAnalysisPanel.querySelector(".post-analysis-title");
+    if (titleEl) titleEl.textContent = _POST_TITLE_SHORT;
+  } else {
+    hidePostAnalysisPanel();
+    _postAnalysisShown = false;
   }
 }
 
@@ -1361,8 +1376,7 @@ async function switchToSession(index) {
   updateHeaderSubtitle(activeHsdTitle);
   updateConversationId(activeConversationId);
   rebuildChatArea();
-  hidePostAnalysisPanel();
-  _postAnalysisShown = false;
+  _restorePostAnalysisPanel(target.postAnalysisShown || false);
   quickActions.classList.remove("show");
   quickActions.innerHTML = "";
   heroCta.classList.remove("show");
@@ -1472,8 +1486,7 @@ async function closeTab(index) {
     updateHeaderSubtitle(activeHsdTitle);
     updateConversationId(activeConversationId);
     rebuildChatArea();
-    hidePostAnalysisPanel();
-    _postAnalysisShown = false;
+    _restorePostAnalysisPanel(next.postAnalysisShown || false);
     quickActions.classList.remove("show");
     quickActions.innerHTML = "";
     heroCta.classList.remove("show");
