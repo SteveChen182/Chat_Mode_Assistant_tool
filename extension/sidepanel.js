@@ -56,7 +56,7 @@ const btnFontDown = document.getElementById("btn-font-down");
 const headerTitle = document.getElementById("header-title");
 const headerSubtitle = document.getElementById("header-subtitle");
 const statusBadge = document.getElementById("status-badge");
-const btnHistory = document.getElementById("btn-history");
+const btnHistory = null; // removed — replaced by tab bar
 const btnSettings = document.getElementById("btn-settings");
 const btnPopout = document.getElementById("btn-popout");
 const onboardingEl = document.getElementById("onboarding");
@@ -97,7 +97,12 @@ function showModal(title, message, confirmText = "Confirm", cancelText = "Cancel
     modalTitle.textContent = title;
     modalMessage.textContent = message;
     modalConfirmBtn.textContent = confirmText;
-    modalCancelBtn.textContent = cancelText;
+    if (cancelText) {
+      modalCancelBtn.textContent = cancelText;
+      modalCancelBtn.style.display = "";
+    } else {
+      modalCancelBtn.style.display = "none";
+    }
     modalOverlay.classList.add("show");
   });
 }
@@ -320,6 +325,7 @@ let activeHsdId = null;        // detected from user's first message
 let hsdImported = false;       // true after Import HSD, before first analysis sent
 let sessionMessages = [];      // [{role, content}] for current session
 let sessions = [];             // [{hsdId, hsdTitle, conversationId, messages[], timestamp}]
+let activeSessionIndex = 0;    // index into sessions[] for the currently active tab
 
 // ── Port connection ────────────────────────────────────────────────────────
 
@@ -330,6 +336,8 @@ function connectPort() {
     switch (msg.type || msg.action) {
       // Session lifecycle
       case "session_started":
+        _pendingSessionRestart = false;
+        bridgeSessionCid = msg.conversation_id || "";
         if (msg.status === "already_active") {
           // Session was already running (e.g. sidepanel reloaded) — just reconnect
           setStatus("connected", msg.session_waiting_input ? "Connected" : "Processing...");
@@ -346,6 +354,16 @@ function connectPort() {
         }
         break;
       case "session_stopped":
+        if (_suppressNextSessionStopped) {
+          // Tab switch interrupted streaming — suppress UI side effects, input already enabled
+          _suppressNextSessionStopped = false;
+          break;
+        }
+        if (_pendingSessionRestart) {
+          // Lazy restart: bridge stopping to immediately restart — don't show "Session ended"
+          setInputEnabled(false);
+          break;
+        }
         setStatus("disconnected", "Offline");
         removeToolIndicator();
         removeTypingIndicator();
@@ -387,6 +405,19 @@ function connectPort() {
         if (msg.conversation_id && !activeConversationId) {
           updateConversationId(msg.conversation_id);
         }
+        break;
+      case "cid_mismatch":
+        // Requested CID no longer exists on GNAI server — new conversation started
+        console.warn(`[cid] mismatch: requested=${msg.requested} actual=${msg.actual}`);
+        updateConversationId(msg.actual || "");
+        // Also update sessions[activeSessionIndex] so it won't trigger lazy restart loop
+        bridgeSessionCid = msg.actual || "";
+        if (sessions.length > 0) {
+          sessions[activeSessionIndex].conversationId = msg.actual || "";
+          persistSessions();
+        }
+        showToast("⚠️ 舊對話紀錄已過期，已開始新的對話（context 重置）");
+        addSystemMsg(`⚠️ 此 session 的對話紀錄已過期（conversation_id 已失效），GNAI 已開始新的空白對話。之前的分析 context 已遺失。`);
         break;
       case "usage":
         onUsage(msg.usage);
@@ -551,6 +582,18 @@ function onReady(accumulatedAnswer) {
   // Update status to Connected (handles initial toolkit-loaded ready too)
   setStatus("connected", "Connected");
   hideConnectionSplash();
+
+  // Auto-send pending message (from lazy session switch)
+  if (_pendingSendMessage) {
+    const msg = _pendingSendMessage;
+    _pendingSendMessage = null;
+    isStreaming = true;
+    setTimeout(() => {
+      port.postMessage({ action: "send", message: msg });
+      showTypingIndicator();
+    }, 100);
+    return;  // Input stays disabled; will enable when AI responds
+  }
 
   // If this is the first ready after session start, show welcome
   if (!accumulatedAnswer) {
@@ -725,6 +768,22 @@ function generateQuickActions(text) {
 // ── Send Message ───────────────────────────────────────────────────────────
 
 /**
+ * Restart bridge for a different conversation ID (lazy session switch).
+ * Called automatically when sendUserMessage detects CID mismatch.
+ */
+function _restartBridgeForSession() {
+  if (!port) return;
+  _pendingSessionRestart = true;
+  port.postMessage({ action: "stop_session" });
+  setTimeout(() => {
+    const startMsg = { action: "start_session" };
+    if (activeConversationId) startMsg.conversation_id = activeConversationId;
+    port.postMessage(startMsg);
+    showConnectionSplash("切換 Session...", "載入對話紀錄，請稍候（最多 90 秒）");
+  }, 300);
+}
+
+/**
  * Send a message to GNAI via the bridge.
  * @param {string} text - The actual prompt sent to GNAI
  * @param {string} [displayText] - What to show in chat area (defaults to text)
@@ -788,6 +847,15 @@ function sendUserMessage(text, displayText) {
     messageToSend += " (請使用繁體中文回答)";
   }
 
+  // Lazy bridge restart: if bridge is on a different session, queue message and restart
+  if (bridgeSessionCid !== activeConversationId) {
+    _pendingSendMessage = messageToSend;
+    _restartBridgeForSession();
+    hideOnboarding();
+    return;
+  }
+
+  isStreaming = true;
   port.postMessage({ action: "send", message: messageToSend });
   showTypingIndicator();
   hideOnboarding();
@@ -847,7 +915,6 @@ function setInputEnabled(enabled) {
   inputEl.disabled = !enabled;
   sendBtn.disabled = !enabled;
   btnImport.disabled = !enabled;
-  btnHistory.disabled = !enabled;
   if (enabled) inputEl.focus();
 }
 
@@ -893,6 +960,10 @@ function updateHeaderTitle() {
 
 let activeHsdTitle = "";
 let activeConversationId = "";  // GNAI conversation ID
+let bridgeSessionCid = "";      // CID the bridge process was actually started with
+let _pendingSendMessage = null; // message queued to send after lazy bridge restart
+let _suppressNextSessionStopped = false; // suppress session_stopped side effects on tab switch
+let _pendingSessionRestart = false;      // true when stop_session was called to immediately restart
 
 function updateHeaderSubtitle(title) {
   activeHsdTitle = title || "";
@@ -965,10 +1036,12 @@ async function importHsdFromWebpage() {
     // If already have an active HSD, confirm
     if (activeHsdId && activeHsdId !== hsdId) {
       const confirmed = await showModal(
-        "Switch HSD",
-        `Switch from HSD ${activeHsdId} to HSD ${hsdId}? This will send the new ID to the current session.`,
-        "Switch",
-        "Cancel"
+        uiLang === "zh" ? "切換 HSD" : "Switch HSD",
+        uiLang === "zh"
+          ? `從 HSD ${activeHsdId} 切換到 HSD ${hsdId}？新的 ID 將傳送到目前的 session。`
+          : `Switch from HSD ${activeHsdId} to HSD ${hsdId}? This will send the new ID to the current session.`,
+        uiLang === "zh" ? "切換" : "Switch",
+        uiLang === "zh" ? "取消" : "Cancel"
       );
       if (!confirmed) return;
     }
@@ -1136,6 +1209,19 @@ inputEl.addEventListener("keydown", (e) => {
 });
 
 btnNew.addEventListener("click", async () => {
+  // Block if at max capacity
+  if (sessions.length >= MAX_SESSIONS) {
+    await showModal(
+      uiLang === "zh" ? `已達 Tab 上限 (${MAX_SESSIONS})` : `Tab Limit Reached (${MAX_SESSIONS})`,
+      uiLang === "zh"
+        ? `目前已有 ${MAX_SESSIONS} 個 session，請先關閉不需要的 tab 再新增。`
+        : `You have ${MAX_SESSIONS} sessions open. Please close an existing tab before adding a new one.`,
+      uiLang === "zh" ? "確定" : "OK",
+      null
+    );
+    return;
+  }
+
   // Skip confirmation if session is empty
   if (sessionMessages.length === 0 && !activeHsdId) {
     startNewSession();
@@ -1143,10 +1229,12 @@ btnNew.addEventListener("click", async () => {
   }
 
   const confirmed = await showModal(
-    "Start New Session",
-    "Leave current session and start a new one? Current session will be saved to history.",
-    "New Session",
-    "Cancel"
+    uiLang === "zh" ? "開新 Session" : "Start New Session",
+    uiLang === "zh"
+      ? "離開目前 session 並開新的？目前的 session 將儲存到歷史記錄。"
+      : "Leave current session and start a new one? Current session will be saved to history.",
+    uiLang === "zh" ? "新增" : "New Session",
+    uiLang === "zh" ? "取消" : "Cancel"
   );
   if (!confirmed) return;
 
@@ -1182,9 +1270,11 @@ function startNewSession() {
     timestamp: Date.now(),
   });
   sessions = sessions.slice(0, MAX_SESSIONS);
+  activeSessionIndex = 0;
   persistSessions();
 
   if (port) {
+    bridgeSessionCid = "";  // new session has no CID yet
     port.postMessage({ action: "start_session" });
   }
 }
@@ -1203,8 +1293,9 @@ function saveCurrentSession() {
   if (!activeHsdId && sessionMessages.length === 0) return;
   if (sessions.length === 0) {
     sessions.push({});
+    activeSessionIndex = 0;
   }
-  sessions[0] = {
+  sessions[activeSessionIndex] = {
     hsdId: activeHsdId || "",
     hsdTitle: activeHsdTitle || "",
     conversationId: activeConversationId || "",
@@ -1216,6 +1307,7 @@ function saveCurrentSession() {
 async function persistSessions() {
   try {
     await chrome.storage.local.set({ chatSessions: sessions.slice(0, MAX_SESSIONS) });
+    renderTabBar();
   } catch (e) {
     console.error("[sessions] persist error:", e);
   }
@@ -1230,15 +1322,33 @@ async function loadSessions() {
   }
 }
 
-function switchToSession(index) {
-  if (index < 1 || index >= sessions.length) return;
+async function switchToSession(index) {
+  if (index < 0 || index >= sessions.length || index === activeSessionIndex) return;
+
+  // If analysis is running, confirm before interrupting
+  if (isStreaming) {
+    const confirmed = await showModal(
+      uiLang === "zh" ? "切換 Session" : "Switch Session",
+      uiLang === "zh"
+        ? "目前正在進行分析，切換 session 將會中斷現有分析。確定要切換嗎？"
+        : "Analysis is in progress. Switching session will interrupt it. Continue?",
+      uiLang === "zh" ? "切換" : "Switch",
+      uiLang === "zh" ? "取消" : "Cancel"
+    );
+    if (!confirmed) return;
+    _suppressNextSessionStopped = true;
+    if (port) port.postMessage({ action: "stop_session" });
+    isStreaming = false;
+    removeToolIndicator();
+    removeTypingIndicator();
+  }
 
   // Save current active session
   saveCurrentSession();
 
-  // Move target to front
-  const target = sessions.splice(index, 1)[0];
-  sessions.unshift(target);
+  // Switch to the target index (no reordering — tab stays in place)
+  activeSessionIndex = index;
+  const target = sessions[activeSessionIndex];
 
   // Load into active state
   activeHsdId = target.hsdId || null;
@@ -1251,8 +1361,135 @@ function switchToSession(index) {
   updateHeaderSubtitle(activeHsdTitle);
   updateConversationId(activeConversationId);
   rebuildChatArea();
+  hidePostAnalysisPanel();
+  _postAnalysisShown = false;
+  quickActions.classList.remove("show");
+  quickActions.innerHTML = "";
+  heroCta.classList.remove("show");
+  if (sessionMessages.length === 0 && !activeHsdId) showOnboarding();
+  else hideOnboarding();
+
+  // Lazy restart: bridge will switch to this session's CID on next send
+  setInputEnabled(true);
+  setStatus("connected", "Connected");
 
   persistSessions();
+  renderTabBar();
+}
+
+// ── Tab Bar ─────────────────────────────────────────────────────────────────
+
+// (tab bar drag-to-scroll disabled)
+
+function renderTabBar() {
+  const bar = document.getElementById("tab-bar");
+  if (!bar) return;
+  bar.innerHTML = "";
+
+  sessions.forEach((session, i) => {
+    const tab = document.createElement("div");
+    tab.className = "tab-item" + (i === activeSessionIndex ? " active" : "");
+    tab.title = session.hsdTitle || (session.hsdId ? `HSD ${session.hsdId}` : "New Session");
+
+    const label = document.createElement("span");
+    label.className = "tab-label";
+    label.textContent = session.hsdId ? `HSD ${session.hsdId}` : "New Session";
+    tab.appendChild(label);
+
+    const closeBtn = document.createElement("span");
+    closeBtn.className = "tab-close";
+    closeBtn.innerHTML = "&times;";
+    closeBtn.title = "Close tab";
+    closeBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await closeTab(i);
+    });
+    tab.appendChild(closeBtn);
+
+    tab.addEventListener("click", () => switchToSession(i));
+
+    bar.appendChild(tab);
+  });
+
+  // + button
+  const addBtn = document.createElement("button");
+  addBtn.className = "tab-add";
+  addBtn.textContent = "+";
+  addBtn.title = "New session";
+  addBtn.addEventListener("click", () => btnNew.click());
+  bar.appendChild(addBtn);
+}
+
+async function closeTab(index) {
+  const session = sessions[index];
+  const label = session.hsdId ? `HSD ${session.hsdId}` : "this session";
+  const isActive = (index === activeSessionIndex);
+
+  // If closing the active tab while streaming, warn
+  if (isActive && isStreaming) {
+    const confirmed = await showModal(
+      uiLang === "zh" ? "關閉 Tab" : "Close Tab",
+      uiLang === "zh"
+        ? `目前正在進行分析，關閉此 tab 將中斷分析。確定要關閉 ${label} 嗎？`
+        : `Analysis is in progress. Closing this tab will interrupt it. Close ${label}?`,
+      uiLang === "zh" ? "關閉" : "Close",
+      uiLang === "zh" ? "取消" : "Cancel"
+    );
+    if (!confirmed) return;
+    _suppressNextSessionStopped = true;
+    if (port) port.postMessage({ action: "stop_session" });
+    isStreaming = false;
+    removeToolIndicator();
+    removeTypingIndicator();
+  } else {
+    const confirmed = await showModal(
+      uiLang === "zh" ? "關閉 Tab" : "Close Tab",
+      uiLang === "zh"
+        ? `關閉 ${label}？此 session 將從歷史記錄中移除。`
+        : `Close ${label}? This session will be removed from history.`,
+      uiLang === "zh" ? "關閉" : "Close",
+      uiLang === "zh" ? "取消" : "Cancel"
+    );
+    if (!confirmed) return;
+  }
+
+  if (isActive) {
+    // Closing active tab
+    if (sessions.length === 1) {
+      // Only one tab left — just reset
+      startNewSession();
+      return;
+    }
+    sessions.splice(index, 1);
+    // Go to the tab to the left, or stay at index 0 if we were at the first tab
+    activeSessionIndex = index > 0 ? index - 1 : 0;
+    const next = sessions[activeSessionIndex];
+    activeHsdId = next.hsdId || null;
+    activeHsdTitle = next.hsdTitle || "";
+    activeConversationId = next.conversationId || "";
+    sessionMessages = [...(next.messages || [])];
+    updateHeaderTitle();
+    updateHeaderSubtitle(activeHsdTitle);
+    updateConversationId(activeConversationId);
+    rebuildChatArea();
+    hidePostAnalysisPanel();
+    _postAnalysisShown = false;
+    quickActions.classList.remove("show");
+    quickActions.innerHTML = "";
+    heroCta.classList.remove("show");
+    if (sessionMessages.length === 0 && !activeHsdId) showOnboarding();
+    else hideOnboarding();
+    // Lazy restart: bridge will switch to this session's CID on next send
+    setInputEnabled(true);
+    setStatus("connected", "Connected");
+  } else {
+    sessions.splice(index, 1);
+    // If the removed tab was before the active one, shift activeSessionIndex down
+    if (index < activeSessionIndex) activeSessionIndex--;
+  }
+
+  persistSessions();
+  renderTabBar();
 }
 
 function rebuildChatArea() {
@@ -1268,13 +1505,12 @@ function rebuildChatArea() {
   forceScrollToBottom();
 }
 
-function closeHistoryMenu() {
-  const menu = document.getElementById("historyMenu");
-  if (menu) menu.classList.remove("show");
-}
+function closeHistoryMenu() { /* replaced by tab bar */ }
 
 function openHistoryMenu() {
-  const menu = document.getElementById("historyMenu");
+  const menu = null; // replaced by tab bar; kept for compat
+  if (!menu) { return; }
+  const _unused = document.getElementById("historyMenu");
   if (!menu) return;
 
   // Toggle
@@ -1345,10 +1581,12 @@ function openHistoryMenu() {
       delBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
         const confirmed = await showModal(
-          "Delete Session",
-          `Delete history for HSD ${entry.hsdId || "this session"}?`,
-          "Delete",
-          "Cancel"
+          uiLang === "zh" ? "刪除 Session" : "Delete Session",
+          uiLang === "zh"
+            ? `刪除 HSD ${entry.hsdId || "此 session"} 的歷史記錄？`
+            : `Delete history for HSD ${entry.hsdId || "this session"}?`,
+          uiLang === "zh" ? "刪除" : "Delete",
+          uiLang === "zh" ? "取消" : "Cancel"
         );
         if (!confirmed) return;
         sessions.splice(i + 1, 1);
@@ -1376,8 +1614,6 @@ function formatTimestamp(ts) {
 }
 
 // ── Session Event Listeners ───────────────────────────────────────────────
-
-btnHistory.addEventListener("click", openHistoryMenu);
 
 btnImport.addEventListener("click", importHsdFromWebpage);
 
@@ -1460,6 +1696,8 @@ if (onboardingGoBtn && onboardingHsdInput) {
 }
 
 async function _saveStateForTransfer() {
+  // Save current state into sessions[activeSessionIndex] before transferring
+  saveCurrentSession();
   // Save full UI state so the new window can restore it exactly
   const transferData = {
     chatHtml: chatArea.innerHTML,
@@ -1468,6 +1706,8 @@ async function _saveStateForTransfer() {
     activeHsdTitle: activeHsdTitle,
     activeConversationId: activeConversationId,
     postAnalysisShown: _postAnalysisShown,
+    sessions: sessions,             // full tab list
+    activeSessionIndex: activeSessionIndex,
     timestamp: Date.now(),
   };
   await chrome.storage.local.set({ _popoutTransfer: transferData });
@@ -1482,18 +1722,11 @@ btnPopout.addEventListener("click", async () => {
   }
 });
 
-// Close history menu on click outside
-document.addEventListener("click", (e) => {
-  const menu = document.getElementById("historyMenu");
-  if (menu && menu.classList.contains("show") && !menu.contains(e.target) && e.target !== btnHistory) {
-    closeHistoryMenu();
-  }
-});
-
-// Close history menu on Escape
+// Close settings menu on Escape
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    closeHistoryMenu();
+    const settingsMenu = document.getElementById("settingsMenu");
+    if (settingsMenu) settingsMenu.classList.remove("show");
   }
 });
 
@@ -1627,12 +1860,18 @@ async function _restoreTransferState() {
     activeConversationId = data.activeConversationId || "";
     sessionMessages = data.sessionMessages || [];
     _postAnalysisShown = data.postAnalysisShown || false;
+    if (Array.isArray(data.sessions) && data.sessions.length > 0) {
+      sessions = data.sessions;
+      activeSessionIndex = (typeof data.activeSessionIndex === "number" && data.activeSessionIndex < data.sessions.length)
+        ? data.activeSessionIndex : 0;
+    }
 
     // Restore chat HTML directly (preserves rendered markdown, tool indicators, etc.)
     chatArea.innerHTML = data.chatHtml || "";
     updateHeaderTitle();
     updateHeaderSubtitle(activeHsdTitle);
     updateConversationId(activeConversationId);
+    renderTabBar();
     hideOnboarding();
 
     // Re-show post-analysis panel if it was shown
@@ -1665,8 +1904,10 @@ _restoreTransferState().then((restored) => {
 
   // Load saved sessions and restore active session UI
   loadSessions().then(() => {
-    if (sessions.length > 0 && sessions[0].messages && sessions[0].messages.length > 0) {
-      const active = sessions[0];
+    activeSessionIndex = 0;
+    renderTabBar();
+    if (sessions.length > 0 && sessions[activeSessionIndex].messages && sessions[activeSessionIndex].messages.length > 0) {
+      const active = sessions[activeSessionIndex];
       activeHsdId = active.hsdId || null;
       activeHsdTitle = active.hsdTitle || "";
       activeConversationId = active.conversationId || "";

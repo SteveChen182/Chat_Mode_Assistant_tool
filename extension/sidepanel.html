@@ -332,6 +332,86 @@
     }
     .history-clear-btn:hover { background: #fef2f2; }
 
+    /* ── Tab Bar ── */
+    #tab-bar {
+      display: flex;
+      align-items: stretch;
+      background: #e8ecf0;
+      border-bottom: 1px solid #d1d5db;
+      overflow-x: auto;
+      overflow-y: hidden;
+      min-height: 32px;
+      flex-shrink: 0;
+      scrollbar-width: thin;
+    }
+    #tab-bar::-webkit-scrollbar { height: 3px; }
+    #tab-bar::-webkit-scrollbar-thumb { background: #c0c8d4; border-radius: 2px; }
+    .tab-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 0 8px 0 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #6b7280;
+      background: transparent;
+      border: none;
+      border-right: 1px solid #d1d5db;
+      cursor: pointer;
+      white-space: nowrap;
+      min-width: 80px;
+      max-width: 130px;
+      transition: background 0.12s, color 0.12s;
+      user-select: none;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .tab-item:hover { background: #d4dbe4; color: #374151; }
+    .tab-item.active {
+      background: #fff;
+      color: #1f2937;
+      font-weight: 600;
+      box-shadow: inset 0 -2px 0 var(--primary);
+    }
+    .tab-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+      pointer-events: none;
+    }
+    .tab-close {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      font-size: 13px;
+      line-height: 1;
+      color: #9ca3af;
+      pointer-events: all;
+      transition: background 0.12s, color 0.12s;
+    }
+    .tab-close:hover { background: #fecaca; color: #dc2626; }
+    .tab-add {
+      flex-shrink: 0;
+      width: 30px;
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: #6b7280;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      border-radius: 0;
+      transition: background 0.12s, color 0.12s;
+    }
+    .tab-add:hover { background: #d4dbe4; color: #374151; }
+
     /* ── History Viewer Overlay ─── */
     .history-viewer-bar {
       display: none;
@@ -709,10 +789,7 @@
       <button id="btn-new" class="header-btn" title="New Session">New</button>
       <button id="btn-stop" class="header-btn" title="Stop Session">Stop</button>
       <button id="btn-regression" class="header-btn" title="Regression Tool" style="background:#d4a017;color:#fff;font-weight:700;" disabled>R</button>
-      <div class="history-wrap">
-        <button id="btn-history" class="header-btn" title="Session History">&#8634;</button>
-        <div id="historyMenu" class="history-menu"></div>
-      </div>
+
       <div class="settings-wrap">
         <button id="btn-settings" class="header-btn" title="Settings">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -733,6 +810,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Tab Bar -->
+  <div id="tab-bar"></div>
 
   <!-- HSD subtitle (shown when HSD title or CID is available) -->
   <div id="header-subtitle" class="header-subtitle">
