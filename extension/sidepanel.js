@@ -428,7 +428,19 @@ function connectPort() {
         removeToolIndicator();
         isStreaming = false;
         finalizeAiMsg();
-        addSystemMsg(`⚠️ Error: ${msg.text || "Unknown error"}`);
+        {
+          // msg.text = GNAI/bridge SSE error; msg.error = Service Worker exception
+          const errText = msg.text || msg.error || "";
+          const errSource = msg.text ? "GNAI" : msg.error ? "Bridge" : "Unknown";
+          const ts = new Date().toLocaleTimeString();
+          if (errText) {
+            addSystemMsg(`⚠️ Error [${errSource}] (${ts}): ${errText}`);
+          } else {
+            // Empty error from GNAI — add diagnostic hint
+            const raw = JSON.stringify(msg);
+            addSystemMsg(`⚠️ Error [${errSource}] (${ts}): GNAI returned an empty error event.\nRaw: ${raw}\n\nThis may indicate a tool execution failure or network issue. Try re-sending your message.`);
+          }
+        }
         break;
       case "ready":
         onReady(msg.accumulated_answer || "");
@@ -450,6 +462,20 @@ function connectPort() {
         // SSE will auto-reconnect in background.js; if it gives up, we'll get bridge_unavailable
         break;
 
+      // GNAI config auto-repair events
+      case "config_repaired":
+        _configAutoFixed = true;
+        showToast(uiLang === "zh" ? "⚙️ GNAI 設定檔已自動修復，重新連線中..." : "⚙️ GNAI config repaired, reconnecting...");
+        updateConnectionSplash(
+          uiLang === "zh" ? "⚙️ 自動修復 GNAI 設定檔" : "⚙️ Auto-repaired GNAI config",
+          uiLang === "zh" ? "重新啟動 session..." : "Restarting session..."
+        );
+        break;
+      case "config_repair_failed":
+        addSystemMsg(`❌ ${msg.text || "GNAI config error. Please run: .\\bridge\\fix_gnai_config.ps1"}`);
+        setStatus("disconnected", "Config Error");
+        break;
+
       // Health check result (also used after port reconnect)
       case "health_result":
         if (msg.session_active) {
@@ -462,9 +488,9 @@ function connectPort() {
         }
         break;
 
-      // Errors
-      case "error":
-        addSystemMsg(`❌ Error: ${msg.error}`);
+      // Errors (from Service Worker — SW-level exceptions)
+      case "sw_error":
+        addSystemMsg(`❌ Bridge Error: ${msg.error || "Unknown"}`);
         break;
     }
   });
@@ -637,6 +663,16 @@ function onEnd() {
   removeToolIndicator();
   finalizeAiMsg();
   hideConnectionSplash();
+
+  // If config was auto-repaired, restart session automatically
+  if (_configAutoFixed) {
+    _configAutoFixed = false;
+    setTimeout(() => {
+      if (port) port.postMessage({ action: "start_session" });
+    }, 500);
+    return;
+  }
+
   setInputEnabled(true);
 }
 
@@ -963,6 +999,7 @@ let activeHsdTitle = "";
 let activeConversationId = "";  // GNAI conversation ID
 let bridgeSessionCid = "";      // CID the bridge process was actually started with
 let _pendingSendMessage = null; // message queued to send after lazy bridge restart
+let _configAutoFixed = false;   // set when bridge auto-repaired config.yaml; triggers auto-restart on end
 let _suppressNextSessionStopped = false; // suppress session_stopped side effects on tab switch
 let _pendingSessionRestart = false;      // true when stop_session was called to immediately restart
 

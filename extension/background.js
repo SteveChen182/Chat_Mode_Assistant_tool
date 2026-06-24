@@ -229,7 +229,8 @@ function startStreaming() {
   };
 
   const eventTypes = [
-    "answer", "tool_start", "tool_request", "usage", "ready", "info", "end", "goodbye", "error"
+    "answer", "tool_start", "tool_request", "usage", "ready", "info", "end", "goodbye",
+    "error", "cid_mismatch", "config_repaired", "config_repair_failed"
   ];
 
   for (const type of eventTypes) {
@@ -369,10 +370,10 @@ chrome.runtime.onConnect.addListener((port) => {
           break;
 
         default:
-          port.postMessage({ action: "error", error: `unknown action: ${msg.action}` });
+          port.postMessage({ action: "sw_error", error: `unknown action: ${msg.action}` });
       }
     } catch (err) {
-      port.postMessage({ action: "error", error: err.message });
+      port.postMessage({ action: "sw_error", error: err.message || String(err) });
     }
   });
 

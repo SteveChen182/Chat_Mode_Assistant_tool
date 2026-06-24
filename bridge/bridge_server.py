@@ -425,6 +425,7 @@ class ChatSession:
         self.session_id = None                   # GNAI conversation_id from first request event
         self.accumulated_answer = ""             # full answer text for current turn
         self._ignore_prompt = False              # ignore '> ' prompt until usage event (avoids echo)
+        self._config_error_handled = False       # prevent duplicate auto-fix attempts
 
     def start(self):
         if not HAS_WINPTY:
@@ -602,6 +603,14 @@ class ChatSession:
 
         # Skip non-JSON lines
         if not line.startswith("{"):
+            # Detect GNAI config YAML corruption error
+            if not self._config_error_handled and (
+                "unable to load configuration" in line.lower() or
+                "unknown escape character" in line.lower() or
+                "mapping value is not allowed" in line.lower()
+            ):
+                self._config_error_handled = True
+                self._handle_config_error(line)
             _debug(f"[pty] (skipped non-JSON)")
             return
 
@@ -693,6 +702,40 @@ class ChatSession:
             return {"type": "info", "text": data["msg"]}
 
         return None
+
+    def _handle_config_error(self, error_line):
+        """Auto-repair ~/.gnai/config.yaml when dt reports a YAML parse error."""
+        _debug(f"[config error] detected: {error_line[:200]}")
+        fix_script = os.path.join(_SCRIPT_DIR, "fix_gnai_config.ps1")
+        if os.name != "nt" or not os.path.exists(fix_script):
+            self.event_queue.put({
+                "type": "config_repair_failed",
+                "text": f"GNAI config error: {error_line}\n\nPlease run: .\\bridge\\fix_gnai_config.ps1",
+            })
+            return
+        try:
+            result = subprocess.run(
+                ["powershell", "-ExecutionPolicy", "Bypass", "-File", fix_script],
+                capture_output=True, text=True, timeout=15,
+            )
+            if result.returncode == 0:
+                _debug("[config error] auto-fix succeeded")
+                self.event_queue.put({
+                    "type": "config_repaired",
+                    "message": "GNAI 設定檔已自動修復，重新啟動 session...",
+                })
+            else:
+                _debug(f"[config error] auto-fix failed: {result.stderr[:300]}")
+                self.event_queue.put({
+                    "type": "config_repair_failed",
+                    "text": f"GNAI config error: {error_line}\n\nAuto-fix failed. Please run: .\\bridge\\fix_gnai_config.ps1",
+                })
+        except Exception as e:
+            _debug(f"[config error] auto-fix exception: {e}")
+            self.event_queue.put({
+                "type": "config_repair_failed",
+                "text": f"GNAI config error detected. Please run: .\\bridge\\fix_gnai_config.ps1",
+            })
 
     def _scan_pause_windows(self):
         """Periodically scan and close paused child cmd/GDHM windows."""
