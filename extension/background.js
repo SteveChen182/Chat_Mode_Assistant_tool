@@ -411,13 +411,16 @@ chrome.runtime.onConnect.addListener((port) => {
 
         case "file_dialog": {
           // Ask bridge to open a native Windows file-picker; wait up to 5 min
+          // Use _postToActivePort instead of the closed-over `port` so the result
+          // reaches the sidepanel even if it disconnected and reconnected while
+          // the file picker was open (stale `port` would silently drop the message).
           try {
             const title = encodeURIComponent(msg.title || "Open File");
             const resp = await bridgeFetch(`/dialog/file?title=${title}`);
             const data = await resp.json();
-            port.postMessage({ action: "file_dialog_result", field: msg.field, ...data });
+            _postToActivePort({ action: "file_dialog_result", field: msg.field, ...data });
           } catch (err) {
-            port.postMessage({ action: "file_dialog_result", field: msg.field, path: "", selected: false, error: err.message });
+            _postToActivePort({ action: "file_dialog_result", field: msg.field, path: "", selected: false, error: err.message });
           }
           break;
         }

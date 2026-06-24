@@ -1014,14 +1014,21 @@ class BridgeHandler(BaseHTTPRequestHandler):
         qs = urllib.parse.urlparse(self.path).query
         params = urllib.parse.parse_qs(qs)
         title = params.get("title", ["Open File"])[0]
-        # Build a PowerShell one-liner that opens the native OpenFileDialog
+        # Build a PowerShell one-liner that opens the native OpenFileDialog.
+        # A hidden TopMost owner form is used so the dialog always appears on top.
         ps = (
             '[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null; '
+            '$owner = New-Object System.Windows.Forms.Form; '
+            '$owner.TopMost = $true; '
+            '$owner.WindowState = [System.Windows.Forms.FormWindowState]::Minimized; '
+            '$owner.ShowInTaskbar = $false; '
+            '$owner.Show(); '
             '$d = New-Object System.Windows.Forms.OpenFileDialog; '
             f'$d.Title = \"{title}\"; '
             '$d.Multiselect = $false; '
-            'if ($d.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) '
-            '{ Write-Output $d.FileName } else { Write-Output "" }'
+            'if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) '
+            '{ Write-Output $d.FileName } else { Write-Output "" }; '
+            '$owner.Dispose()'
         )
         try:
             result = subprocess.run(
