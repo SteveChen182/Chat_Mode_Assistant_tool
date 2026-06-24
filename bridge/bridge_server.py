@@ -722,6 +722,14 @@ class ChatSession:
             if conv_id and not self.session_id:
                 self.session_id = conv_id
                 _debug(f"conversation_id captured: {conv_id}")
+                # Detect CID mismatch: requested CID differs from what GNAI returned
+                if self.conversation_id and conv_id != self.conversation_id:
+                    _debug(f"[cid_mismatch] requested={self.conversation_id} actual={conv_id}")
+                    self.event_queue.put({
+                        "type": "cid_mismatch",
+                        "requested": self.conversation_id,
+                        "actual": conv_id,
+                    })
             return {
                 "type": "tool_request",
                 "name": req.get("name", ""),
