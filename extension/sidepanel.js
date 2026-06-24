@@ -344,6 +344,8 @@ function connectPort() {
       case "session_started":
         _pendingSessionRestart = false;
         bridgeSessionCid = msg.conversation_id || "";
+        // Restore default placeholder (may have been changed by stop reconnect state)
+        inputEl.placeholder = "Type a message or HSD ID...";
         if (msg.status === "already_active") {
           // Session was already running (e.g. sidepanel reloaded) — just reconnect
           setStatus("connected", msg.session_waiting_input ? "Connected" : "Processing...");
@@ -378,7 +380,14 @@ function connectPort() {
         currentAiText = "";
         addSystemMsg("Session ended.");
         showToast("Session ended");
-        setInputEnabled(false);
+        // If there's a known CID, keep input enabled so user can reconnect by sending a message
+        bridgeSessionCid = "";  // reset so next send triggers _restartBridgeForSession
+        if (activeConversationId) {
+          setInputEnabled(true);
+          inputEl.placeholder = "Send a message to reconnect to this session...";
+        } else {
+          setInputEnabled(false);
+        }
         break;
 
       // Startup progress
