@@ -422,6 +422,8 @@ function connectPort() {
           sessions[activeSessionIndex].conversationId = msg.actual || "";
           persistSessions();
         }
+        // Flag: next user message should prepend HSD context to restore GNAI context
+        if (activeHsdId) _pendingCidContextRestore = true;
         showToast("⚠️ 舊對話紀錄已過期，已開始新的對話（context 重置）");
         addSystemMsg(`⚠️ 此 session 的對話紀錄已過期（conversation_id 已失效），GNAI 已開始新的空白對話。之前的分析 context 已遺失。`);
         break;
@@ -877,6 +879,14 @@ function sendUserMessage(text, displayText) {
     // text += ` (Output format: Do NOT use inline code style. Use markdown table format for structured data.)`;
   }
 
+  // Modification 1c: CID context restore — after cid_mismatch, prepend HSD ID so GNAI regains context
+  if (_pendingCidContextRestore && activeHsdId) {
+    _pendingCidContextRestore = false;
+    if (!text.includes(activeHsdId)) {
+      text = `[HSD ${activeHsdId}] ${text}`;
+    }
+  }
+
   // Modification 2: Menu selection prefix — wraps "1", "2", "all", "skip" with instruction
   // if (isMenuSelection && activeHsdId) {
   //   text = `I select: ${text}. Proceed with analyzing only the selected item(s) from the menu above. Do NOT repeat Phase 1 or re-read the article.`
@@ -1004,6 +1014,7 @@ let activeHsdTitle = "";
 let activeConversationId = "";  // GNAI conversation ID
 let bridgeSessionCid = "";      // CID the bridge process was actually started with
 let _pendingSendMessage = null; // message queued to send after lazy bridge restart
+let _pendingCidContextRestore = false; // true after cid_mismatch — next send should prepend HSD context
 let _configAutoFixed = false;   // set when bridge auto-repaired config.yaml; triggers auto-restart on end
 let _suppressNextSessionStopped = false; // suppress session_stopped side effects on tab switch
 let _pendingSessionRestart = false;      // true when stop_session was called to immediately restart
