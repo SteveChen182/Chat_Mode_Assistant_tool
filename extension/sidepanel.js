@@ -1828,6 +1828,7 @@ const btnBrowseMan = document.getElementById("btn-browse-man");
 
 let isRegressionMode = false;
 let isLogAnalysisMode = false;
+let _preLogSessionIndex = -1;  // session index before entering Log Analysis Mode
 const HEADER_COLOR_CHAT = "#5F80AB";
 const HEADER_COLOR_REGRESSION = "#b8860b";  // dark goldenrod (土黃色)
 const HEADER_COLOR_LOG = "#1d4ed8";          // deep blue (Log Analysis)
@@ -1918,8 +1919,10 @@ async function switchToLogAnalysisMode() {
 
   isLogAnalysisMode = true;
 
-  // Save and reset current session state
+  // Save and remember current session index before entering Log mode
   saveCurrentSession();
+  _preLogSessionIndex = activeSessionIndex;
+
   chatArea.innerHTML = "";
   quickActions.classList.remove("show");
   quickActions.innerHTML = "";
@@ -1953,28 +1956,56 @@ async function exitLogAnalysisMode() {
   document.querySelector(".header").style.background = HEADER_COLOR_CHAT;
   logAnalysisBar.classList.remove("show");
 
-  // Reset state
+  // Save log session state, then restore the pre-log session
   saveCurrentSession();
-  chatArea.innerHTML = "";
-  quickActions.classList.remove("show");
-  quickActions.innerHTML = "";
-  activeHsdId = null;
-  activeHsdTitle = "";
-  activeConversationId = "";
-  sessionMessages = [];
-  _postAnalysisShown = false;
-  hidePostAnalysisPanel();
-  heroCta.classList.remove("show");
-  showOnboarding();
 
-  updateHeaderTitle();
+  // Restore previous session if available
+  const prevIndex = (_preLogSessionIndex >= 0 && _preLogSessionIndex < sessions.length)
+    ? _preLogSessionIndex : -1;
+  _preLogSessionIndex = -1;
 
-  // Show splash and restart bridge with sighting_assistant
+  if (prevIndex >= 0 && sessions[prevIndex]) {
+    activeSessionIndex = prevIndex;
+    const prev = sessions[prevIndex];
+    activeHsdId = prev.hsdId || null;
+    activeHsdTitle = prev.hsdTitle || "";
+    activeConversationId = prev.conversationId || "";
+    sessionMessages = [...(prev.messages || [])];
+    _postAnalysisShown = prev.postAnalysisShown || false;
+    updateHeaderTitle();
+    updateHeaderSubtitle(activeHsdTitle);
+    updateConversationId(activeConversationId);
+    rebuildChatArea();
+    _restorePostAnalysisPanel(_postAnalysisShown);
+    quickActions.classList.remove("show");
+    quickActions.innerHTML = "";
+    heroCta.classList.remove("show");
+    if (sessionMessages.length === 0 && !activeHsdId) showOnboarding();
+    else hideOnboarding();
+  } else {
+    // No previous session — reset to blank
+    chatArea.innerHTML = "";
+    quickActions.classList.remove("show");
+    quickActions.innerHTML = "";
+    activeHsdId = null;
+    activeHsdTitle = "";
+    activeConversationId = "";
+    sessionMessages = [];
+    _postAnalysisShown = false;
+    hidePostAnalysisPanel();
+    heroCta.classList.remove("show");
+    showOnboarding();
+    updateHeaderTitle();
+  }
+
+  // Show splash and restart bridge with sighting_assistant + previous CID if available
   showConnectionSplash("Returning to Chat Mode...", "Restarting with sighting_assistant");
   setInputEnabled(false);
 
   if (port) {
-    port.postMessage({ action: "restart_session", assistant: "sighting_assistant" });
+    const restartMsg = { action: "restart_session", assistant: "sighting_assistant" };
+    if (activeConversationId) restartMsg.conversation_id = activeConversationId;
+    port.postMessage(restartMsg);
   }
 }
 
