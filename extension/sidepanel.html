@@ -339,6 +339,91 @@
     }
     .font-size-ctrl button:hover { background: #d1d5db; }
 
+    /* ── Log Analysis Mode Bar ─── */
+    .log-analysis-bar {
+      display: none;
+      flex-direction: column;
+      background: #dbeafe;
+      border-bottom: 2px solid #93c5fd;
+      font-size: 12px;
+      color: #1e3a5f;
+    }
+    .log-analysis-bar.show { display: flex; }
+    .log-analysis-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 14px 4px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .log-analysis-input-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 14px 8px;
+      flex-wrap: wrap;
+    }
+    .log-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 120px;
+    }
+    .log-input-label {
+      font-size: 10px;
+      color: #3b5fa0;
+      font-weight: 600;
+      padding-left: 2px;
+    }
+    .log-input-field {
+      border: 1px solid #93c5fd;
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 11px;
+      background: #fff;
+      color: #1e3a5f;
+      outline: none;
+      font-family: monospace;
+      width: 100%;
+    }
+    .log-input-field:focus { border-color: #1d4ed8; box-shadow: 0 0 0 2px rgba(29,78,216,0.15); }
+    .log-input-field::placeholder { color: #93c5fd; font-style: italic; }
+    .log-input-wrap {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .log-input-wrap .log-input-field { flex: 1; }
+    .btn-browse {
+      flex-shrink: 0;
+      background: #e0e7ff;
+      border: 1px solid #93c5fd;
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 13px;
+      cursor: pointer;
+      line-height: 1;
+      color: #1d4ed8;
+      transition: background 0.15s;
+    }
+    .btn-browse:hover { background: #c7d2fe; }
+    .btn-browse:disabled { opacity: 0.45; cursor: not-allowed; }
+    .log-analysis-bar .btn-exit {
+      background: rgba(29,78,216,0.15); color: #1d4ed8; border: 1px solid #93c5fd;
+      border-radius: 6px; padding: 3px 10px; font-size: 11px; cursor: pointer;
+      white-space: nowrap;
+    }
+    .log-analysis-bar .btn-exit:hover { background: #1d4ed8; color: #fff; }
+    .log-analysis-bar .btn-analyze {
+      background: #1d4ed8; color: #fff; border: none; border-radius: 6px;
+      padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+      white-space: nowrap; align-self: flex-end;
+    }
+    .log-analysis-bar .btn-analyze:hover { background: #1e40af; }
+    .log-analysis-bar .btn-analyze:disabled { background: #93c5fd; cursor: not-allowed; }
+
     /* ── History ─── */
     .history-wrap { position: relative; }
     .settings-wrap { position: relative; }
@@ -890,7 +975,11 @@
       <button id="btn-new" class="header-btn" title="New Session">New</button>
       <button id="btn-stop" class="header-btn" title="Stop Session">Stop</button>
       <button id="btn-regression" class="header-btn" title="Regression Tool" style="background:#d4a017;color:#fff;font-weight:700;" disabled>R</button>
-
+      <button id="btn-log-analysis" class="header-btn" title="Log Analysis Mode (displaydebugger)">📋 Log</button>
+      <div class="history-wrap">
+        <button id="btn-history" class="header-btn" title="Session History">&#8634;</button>
+        <div id="historyMenu" class="history-menu"></div>
+      </div>
       <div class="settings-wrap">
         <button id="btn-settings" class="header-btn" title="Settings">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -919,6 +1008,31 @@
   <div id="header-subtitle" class="header-subtitle">
     <span id="subtitle-title"></span>
     <span id="subtitle-cid" style="opacity:0.7; font-family:monospace;"></span>
+  </div>
+
+  <!-- Log Analysis mode bar -->
+  <div id="log-analysis-bar" class="log-analysis-bar">
+    <div class="log-analysis-title-row">
+      <span>📋 Log Analysis Mode &mdash; displaydebugger</span>
+      <button id="log-analysis-exit" class="btn-exit">&#8592; Exit Log Mode</button>
+    </div>
+    <div class="log-analysis-input-row">
+      <div class="log-input-group">
+        <span class="log-input-label">Log File Path <span style="color:#ef4444">*</span></span>
+        <div class="log-input-wrap">
+          <input id="log-path-input" class="log-input-field" type="text" placeholder="e.g. C:\logs\system.log" />
+          <button id="btn-browse-log" class="btn-browse" title="Browse for log file">&#128193;</button>
+        </div>
+      </div>
+      <div class="log-input-group">
+        <span class="log-input-label">Man File Path <span style="color:#9ca3af">(optional)</span></span>
+        <div class="log-input-wrap">
+          <input id="man-path-input" class="log-input-field" type="text" placeholder="e.g. C:\man\error_codes.txt" />
+          <button id="btn-browse-man" class="btn-browse" title="Browse for man file">&#128193;</button>
+        </div>
+      </div>
+      <button id="btn-log-analyze" class="btn-analyze" disabled>🔍 Analyze</button>
+    </div>
   </div>
 
   <!-- History viewer bar (shown when viewing read-only history) -->

@@ -426,6 +426,8 @@ class ChatSession:
         self.accumulated_answer = ""             # full answer text for current turn
         self._ignore_prompt = False              # ignore '> ' prompt until usage event (avoids echo)
         self._config_error_handled = False       # prevent duplicate auto-fix attempts
+        self._idle_timer = None                  # timer to synthesize 'ready' if '> ' prompt is missed
+        self._idle_timer_lock = threading.Lock()
 
     def start(self):
         if not HAS_WINPTY:
@@ -469,6 +471,7 @@ class ChatSession:
                 raise RuntimeError("Chat process not running")
             # Sanitize: replace newlines with spaces to prevent multi-command injection
             clean_text = text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ").strip()
+            self._cancel_idle_timer()
             self._waiting_input.clear()
             self._ignore_prompt = True           # ignore echo'd prompts until usage
             self.accumulated_answer = ""
@@ -479,6 +482,7 @@ class ChatSession:
     def stop(self):
         """Terminate the chat session."""
         self._stop_event.set()
+        self._cancel_idle_timer()
         with self._lock:
             if self._pty and self._pty.isalive():
                 try:
@@ -503,6 +507,42 @@ class ChatSession:
     @property
     def pid(self):
         return self._pty.pid if self._pty else None
+
+    # ── Idle Timer ──────────────────────────────────────────────────────────
+
+    def _reset_idle_timer(self):
+        """Reset the 2-second idle timer after each answer chunk.
+
+        If the '> ' prompt is not detected within 2 s of the last answer
+        chunk (e.g. displaydebugger does not emit a usage event and the
+        prompt is somehow missed), synthesise a 'ready' event so the UI
+        is not permanently stuck in the 'not waiting for input' state.
+        """
+        with self._idle_timer_lock:
+            if self._idle_timer is not None:
+                self._idle_timer.cancel()
+            self._idle_timer = threading.Timer(2.0, self._on_idle_timeout)
+            self._idle_timer.daemon = True
+            self._idle_timer.start()
+
+    def _cancel_idle_timer(self):
+        with self._idle_timer_lock:
+            if self._idle_timer is not None:
+                self._idle_timer.cancel()
+                self._idle_timer = None
+
+    def _on_idle_timeout(self):
+        """Fired 2 s after the last answer chunk when '> ' was not detected."""
+        if self._waiting_input.is_set() or self._stop_event.is_set():
+            return  # already handled normally
+        _debug("[idle] 2 s elapsed with no prompt — synthesising ready event")
+        self._waiting_input.set()
+        self.event_queue.put({
+            "type": "ready",
+            "accumulated_answer": self.accumulated_answer,
+        })
+
+    # ── PTY Reader ───────────────────────────────────────────────────────────
 
     def _read_pty(self):
         """Background thread: read from ConPTY, split into lines, parse & enqueue.
@@ -649,6 +689,16 @@ class ChatSession:
         if "answer" in data:
             text = data["answer"]
             self.accumulated_answer += text
+            # AI has started responding → echo protection no longer needed.
+            # This is important for assistants (e.g. displaydebugger) that do
+            # not emit a "usage" event, which is the normal path to reset
+            # _ignore_prompt. Without this, the subsequent '> ' prompt is
+            # silently ignored and the session is stuck waiting forever.
+            if self._ignore_prompt:
+                self._ignore_prompt = False
+            # Reset the idle timer: if '> ' prompt is not seen within 2 s of
+            # the last answer chunk, _on_idle_timeout will synthesise 'ready'.
+            self._reset_idle_timer()
             return {"type": "answer", "text": text}
 
         # Tool steps: {"steps": [...], ...}
@@ -835,6 +885,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._handle_stream()
         elif self.path.startswith("/driver-history"):
             self._handle_driver_history_get()
+        elif self.path.startswith("/dialog/file"):
+            self._handle_file_dialog()
         else:
             self._json_response(404, {"error": "not_found"})
 
@@ -998,6 +1050,41 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def _handle_stop(self):
         _stop_session()
         self._json_response(200, {"status": "stopped"})
+
+    def _handle_file_dialog(self):
+        """Open a native Windows file-picker dialog via PowerShell and return the chosen path."""
+        import urllib.parse
+        qs = urllib.parse.urlparse(self.path).query
+        params = urllib.parse.parse_qs(qs)
+        title = params.get("title", ["Open File"])[0]
+        # Build a PowerShell one-liner that opens the native OpenFileDialog.
+        # A hidden TopMost owner form is used so the dialog always appears on top.
+        ps = (
+            '[System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null; '
+            '$owner = New-Object System.Windows.Forms.Form; '
+            '$owner.TopMost = $true; '
+            '$owner.WindowState = [System.Windows.Forms.FormWindowState]::Minimized; '
+            '$owner.ShowInTaskbar = $false; '
+            '$owner.Show(); '
+            '$d = New-Object System.Windows.Forms.OpenFileDialog; '
+            f'$d.Title = \"{title}\"; '
+            '$d.Multiselect = $false; '
+            'if ($d.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) '
+            '{ Write-Output $d.FileName } else { Write-Output "" }; '
+            '$owner.Dispose()'
+        )
+        try:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                capture_output=True, text=True, timeout=300,
+            )
+            path = result.stdout.strip()
+            _debug(f"[dialog] file selected: {path!r}")
+            self._json_response(200, {"path": path, "selected": bool(path)})
+        except subprocess.TimeoutExpired:
+            self._json_response(200, {"path": "", "selected": False, "reason": "timeout"})
+        except Exception as e:
+            self._json_response(500, {"error": str(e)})
 
     def _handle_stream(self):
         """SSE endpoint: streams events from the chat process."""
