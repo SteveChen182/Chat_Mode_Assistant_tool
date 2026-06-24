@@ -1698,7 +1698,7 @@ btnImport.addEventListener("click", importHsdFromWebpage);
 let uiLang = localStorage.getItem("uiLang") || "en"; // "en" | "zh"
 
 // ── Feature Flags ────────────────────────────────────────────────────────────
-let featureLogEnabled        = localStorage.getItem("feature_log")        !== "false";
+let featureLogEnabled        = localStorage.getItem("feature_log")        === "true";  // default: OFF (unchecked on first install)
 let featureRegressionEnabled = localStorage.getItem("feature_regression") !== "false";
 
 function applyFeatureFlags() {
