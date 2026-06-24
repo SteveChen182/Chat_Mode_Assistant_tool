@@ -1688,6 +1688,63 @@ btnImport.addEventListener("click", importHsdFromWebpage);
 
 let uiLang = localStorage.getItem("uiLang") || "en"; // "en" | "zh"
 
+// ── Feature Flags ────────────────────────────────────────────────────────────
+let featureLogEnabled        = localStorage.getItem("feature_log")        !== "false";
+let featureRegressionEnabled = localStorage.getItem("feature_regression") !== "false";
+
+function applyFeatureFlags() {
+  const btnLog        = document.getElementById("btn-log-analysis");
+  const btnRegression = document.getElementById("btn-regression");
+  const checkLog        = document.getElementById("feature-log-check");
+  const checkRegression = document.getElementById("feature-regression-check");
+
+  if (btnLog)        btnLog.style.display        = featureLogEnabled        ? "" : "none";
+  if (btnRegression) btnRegression.style.display = featureRegressionEnabled ? "" : "none";
+  if (checkLog)        checkLog.checked        = featureLogEnabled;
+  if (checkRegression) checkRegression.checked = featureRegressionEnabled;
+}
+
+async function toggleFeature(featureKey, label, currentEnabled) {
+  const action = currentEnabled ? "停用" : "啟用";
+  const confirmed = await showModal(
+    `${action} ${label}`,
+    `確定要${action} "${label}" 功能嗎？${currentEnabled ? "按鈕將從主介面移除。" : "按鈕將重新出現在主介面。"}`,
+    action,
+    "取消"
+  );
+  if (!confirmed) {
+    // Revert checkbox state
+    applyFeatureFlags();
+    return;
+  }
+  const newEnabled = !currentEnabled;
+  localStorage.setItem(featureKey, newEnabled ? "true" : "false");
+  return newEnabled;
+}
+
+// Init feature flags
+applyFeatureFlags();
+
+document.getElementById("feature-log-check")?.addEventListener("change", async () => {
+  const result = await toggleFeature("feature_log", "Log Analysis (beta)", featureLogEnabled);
+  if (result !== undefined) {
+    featureLogEnabled = result;
+    // If currently in Log mode and disabling, exit first
+    if (!featureLogEnabled && isLogAnalysisMode) await exitLogAnalysisMode();
+    applyFeatureFlags();
+  }
+});
+
+document.getElementById("feature-regression-check")?.addEventListener("change", async () => {
+  const result = await toggleFeature("feature_regression", "Regression Checker", featureRegressionEnabled);
+  if (result !== undefined) {
+    featureRegressionEnabled = result;
+    // If currently in Regression mode and disabling, switch back to chat
+    if (!featureRegressionEnabled && isRegressionMode) switchToChatMode();
+    applyFeatureFlags();
+  }
+});
+
 function applyLang(lang) {
   uiLang = lang;
   localStorage.setItem("uiLang", lang);
