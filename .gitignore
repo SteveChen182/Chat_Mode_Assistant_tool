@@ -39,3 +39,8 @@ bridge/native_host.cmd
 bridge/com.chat_mode_assistant.bridge.json
 bridge/.output/
 bridge/.dumps/
+
+# Installer build artifacts (PyInstaller / Inno Setup output)
+installer/build/
+installer/dist/
+installer/*.spec
