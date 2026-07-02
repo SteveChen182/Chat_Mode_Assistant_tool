@@ -72,6 +72,14 @@
     .header-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .header-btn:disabled:hover { background: rgba(255,255,255,0.2); }
 
+    /* ── Log Analysis Mode header toggle ─── */
+    .header-btn.log-only { display: none; }
+    .header .log-mode-active .chat-only { display: none; }
+    .header .log-mode-active .log-only  { display: inline-flex; align-items: center; }
+    .header .log-mode-active #settings-features { display: none; }
+    body.log-mode #tab-bar,
+    body.log-mode #header-subtitle { display: none !important; }
+
     /* ── Chat Area ─── */
     #main-view { display: flex; flex: 1; flex-direction: column; overflow: hidden; position: relative; }
     #regression-view { flex: 1; }
@@ -389,6 +397,7 @@
       width: 100%;
     }
     .log-input-field:focus { border-color: #1d4ed8; box-shadow: 0 0 0 2px rgba(29,78,216,0.15); }
+    .log-input-field.drag-over { border-color: #1d4ed8; background: #eff6ff; box-shadow: 0 0 0 2px rgba(29,78,216,0.2); }
     .log-input-field::placeholder { color: #93c5fd; font-style: italic; }
     .log-input-wrap {
       display: flex;
@@ -975,15 +984,16 @@
       <span id="status-badge" class="header-status disconnected">Offline</span>
     </div>
     <span id="header-title" class="header-title"></span>
-    <div class="header-controls">
-      <button id="btn-popout" class="header-btn" title="Pop out to window / Back to sidepanel">⧉</button>
+    <div id="header-controls" class="header-controls">
+      <button id="btn-popout" class="header-btn chat-only" title="Pop out to window / Back to sidepanel">⧉</button>
       <button id="btn-save" class="header-btn" title="Save chat as HTML">&#128190;</button>
-      <button id="btn-import" class="header-btn" title="Import HSD from current tab">Import HSD</button>
-      <button id="btn-new" class="header-btn" title="New Session">New</button>
-      <button id="btn-stop" class="header-btn" title="Stop Session">Stop</button>
-      <button id="btn-regression" class="header-btn" title="Regression Tool" style="background:#d4a017;color:#fff;font-weight:700;" disabled>R</button>
-      <button id="btn-log-analysis" class="header-btn" title="Log Analysis Mode (displaydebugger)">📋 Log</button>
-      <div class="history-wrap">
+      <button id="btn-import" class="header-btn chat-only" title="Import HSD from current tab">Import HSD</button>
+      <button id="btn-new" class="header-btn chat-only" title="New Session">New</button>
+      <button id="btn-stop" class="header-btn chat-only" title="Stop Session">Stop</button>
+      <button id="btn-regression" class="header-btn chat-only" title="Regression Tool" style="background:#d4a017;color:#fff;font-weight:700;" disabled>R</button>
+      <button id="btn-log-analysis" class="header-btn chat-only" title="Log Analysis Mode (displaydebugger)">📋 Log</button>
+      <button id="btn-log-reset" class="header-btn log-only" title="Reset — clear paths and chat">&#x21BA; Reset</button>
+      <div class="history-wrap chat-only">
         <button id="btn-history" class="header-btn" title="Session History">&#8634;</button>
         <div id="historyMenu" class="history-menu"></div>
       </div>
@@ -1003,17 +1013,19 @@
               <button class="lang-opt" data-lang="zh">繁體中文</button>
             </div>
           </div>
-          <hr class="settings-divider">
-          <div class="settings-section-title">Features</div>
-          <label class="settings-check-row" id="feature-log-row">
-            <input type="checkbox" id="feature-log-check" checked>
-            <span class="settings-check-label">Log Analysis</span>
-            <span class="settings-check-badge">beta</span>
-          </label>
-          <label class="settings-check-row" id="feature-regression-row">
-            <input type="checkbox" id="feature-regression-check" checked>
-            <span class="settings-check-label">Regression Checker</span>
-          </label>
+          <div id="settings-features">
+            <hr class="settings-divider">
+            <div class="settings-section-title">Features</div>
+            <label class="settings-check-row" id="feature-log-row">
+              <input type="checkbox" id="feature-log-check" checked>
+              <span class="settings-check-label">Log Analysis</span>
+              <span class="settings-check-badge">beta</span>
+            </label>
+            <label class="settings-check-row" id="feature-regression-row">
+              <input type="checkbox" id="feature-regression-check" checked>
+              <span class="settings-check-label">Regression Checker</span>
+            </label>
+          </div>
         </div>
       </div>
     </div>
