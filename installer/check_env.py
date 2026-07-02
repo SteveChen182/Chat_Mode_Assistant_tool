@@ -43,35 +43,73 @@ def check_dt_in_path():
     return False, "dt not found in PATH — install Intel Developer Toolkit CLI"
 
 
-def check_gnai_auth():
-    """Check if dt gnai auth has been completed by looking for the config file."""
-    config_candidates = [
-        os.path.join(os.path.expanduser("~"), ".gnai", "config.yaml"),
-        os.path.join(os.path.expanduser("~"), ".gnai", "config.yml"),
-        os.path.join(os.environ.get("APPDATA", ""), "gnai", "config.yaml"),
-        os.path.join(os.environ.get("USERPROFILE", ""), ".dt", "gnai_config.yaml"),
-    ]
-    for p in config_candidates:
-        if os.path.isfile(p):
-            return True, f"Config found: {p}"
-
-    # If no config file found, try running dt gnai and check output
+def check_gnai_connection():
+    """Test GNAI connectivity by launching dt gnai chat --json and checking for any response."""
     dt = shutil.which("dt")
     if not dt:
-        return False, "dt not found — cannot check GNAI auth"
-    try:
-        r = subprocess.run(
-            ["dt", "gnai", "auth", "--status"],
-            capture_output=True, text=True, timeout=15,
-        )
-        raw = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", r.stdout + r.stderr).strip()
-        if r.returncode == 0:
-            return True, raw[:100] or "Auth OK"
-        # Some dt versions don't have --status, fall through
-    except Exception:
-        pass
+        return False, "dt not found — cannot test GNAI"
 
-    return False, "GNAI config not found — please run:  dt gnai auth"
+    _ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\x1b.", re.I)
+    output_lines = []
+    stop_event = threading.Event()
+
+    try:
+        proc = subprocess.Popen(
+            [dt, "gnai", "chat", "--json"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=(
+                subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+            ) if sys.platform == "win32" else 0,
+        )
+    except Exception as e:
+        return False, f"Could not launch dt: {e}"
+
+    with _active_procs_lock:
+        _active_procs.append(proc)
+
+    def _collect():
+        for stream in (proc.stdout, proc.stderr):
+            try:
+                for line in iter(stream.readline, ""):
+                    if stop_event.is_set():
+                        break
+                    clean = _ANSI.sub("", line).strip()
+                    if clean:
+                        output_lines.append(clean)
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_collect, daemon=True)
+    t.start()
+    t.join(timeout=10)
+    stop_event.set()
+    _kill_proc_tree(proc)
+
+    with _active_procs_lock:
+        try:
+            _active_procs.remove(proc)
+        except ValueError:
+            pass
+
+    if output_lines:
+        # Any response means dt gnai chat is working
+        first = output_lines[0][:100]
+        # Check for auth/permission errors in the output
+        _ERR = re.compile(
+            r"unauthorized|forbidden|not.authorized|access.denied|permission.denied|login|sign.in",
+            re.I,
+        )
+        for line in output_lines:
+            if _ERR.search(line):
+                return False, f"GNAI not authenticated: {line[:100]}"
+        return True, f"dt gnai chat responded: {first}"
+
+    return False, "dt gnai chat did not respond — ensure GNAI is set up correctly"
 
 
 def check_chrome():
@@ -150,10 +188,15 @@ def _probe_gnai_assistant(assistant_name: str, timeout: float = 10.0):
             text=True,
             encoding="utf-8",
             errors="replace",
-            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+            creationflags=(
+                subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
+            ) if sys.platform == "win32" else 0,
         )
     except Exception as e:
         return _ASSISTANT_WARN, f"Could not launch dt: {e}"
+
+    with _active_procs_lock:
+        _active_procs.append(proc)
 
     # Collect output in background thread; terminate process after timeout
     output_lines = []
@@ -176,14 +219,13 @@ def _probe_gnai_assistant(assistant_name: str, timeout: float = 10.0):
     t.join(timeout=timeout)
     stop_event.set()
 
-    # Terminate the process
-    try:
-        proc.terminate()
-        proc.wait(timeout=3)
-    except Exception:
+    # Terminate the process (use taskkill on Windows to kill full process tree)
+    _kill_proc_tree(proc)
+
+    with _active_procs_lock:
         try:
-            proc.kill()
-        except Exception:
+            _active_procs.remove(proc)
+        except ValueError:
             pass
 
     combined = "\n".join(output_lines)
@@ -203,7 +245,7 @@ def _probe_gnai_assistant(assistant_name: str, timeout: float = 10.0):
         return _ASSISTANT_OK, f"Accessible (output: {combined.splitlines()[0][:80]})"
 
     # No output at all — dt may buffer without a PTY; can't determine access
-    return _ASSISTANT_WARN, "Could not verify — ensure dt gnai auth is complete and you have access"
+    return _ASSISTANT_WARN, "Could not verify — ensure GNAI is set up correctly and you have access"
 
 
 # ── GNAI Toolkit installation check ───────────────────────────────────────
@@ -211,6 +253,10 @@ def _probe_gnai_assistant(assistant_name: str, timeout: float = 10.0):
 _toolkit_cache      = None   # dict of {name: {"status": "valid"|"missing", "path": str}}
 _toolkit_cache_lock = threading.Lock()
 _toolkit_cache_err  = None   # str if the command failed entirely
+
+# ── Active subprocess tracking (for cleanup on exit) ──────────────────────
+_active_procs      = []
+_active_procs_lock = threading.Lock()
 
 
 def _get_installed_toolkits():
@@ -287,6 +333,28 @@ def _get_installed_toolkits():
         return toolkits, None
 
 
+def _kill_proc_tree(proc):
+    """Terminate a process and all its children (Windows: taskkill /F /T)."""
+    if sys.platform == "win32":
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                capture_output=True, timeout=5,
+            )
+            return
+        except Exception:
+            pass
+    # Fallback
+    try:
+        proc.terminate()
+        proc.wait(timeout=3)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
 def _make_toolkit_check(toolkit_name: str, assistant_name: str):
     """
     Combined check: toolkit installed AND assistant accessible.
@@ -331,7 +399,7 @@ def _make_toolkit_check(toolkit_name: str, assistant_name: str):
 
 CHECKS = [
     ("Intel dt CLI (PATH)",      check_dt_in_path,  None),
-    ("GNAI Auth (dt gnai auth)",  check_gnai_auth,   None),
+    ("GNAI 連線測試",               check_gnai_connection, None),
     ("sighting",       _make_toolkit_check("sighting",        "sighting_assistant"),
      "dt gnai toolkits register intel-sandbox/SightingAssistantTool"),
     ("displaydebugger", _make_toolkit_check("displaydebugger", "displaydebugger"),
@@ -371,6 +439,7 @@ class App(tk.Tk):
         self._fonts()
         self._build()
         self._center()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.after(200, self._run_checks)
 
     def _fonts(self):
@@ -576,6 +645,14 @@ class App(tk.Tk):
 
     def _recheck(self):
         self._run_checks()
+
+    def _on_close(self):
+        """Kill all active gnai subprocesses before closing the window."""
+        with _active_procs_lock:
+            procs = list(_active_procs)
+        for proc in procs:
+            _kill_proc_tree(proc)
+        self.destroy()
 
     def _on_resize(self, event):
         if event.widget is self:
