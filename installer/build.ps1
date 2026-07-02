@@ -149,9 +149,26 @@ python -m PyInstaller `
 if ($LASTEXITCODE -ne 0) { Fail "PyInstaller failed for native_host.py" }
 OK "native_host.exe built"
 
-# 6. Verify all exes exist
+# 6. Bundle check_env.exe
+Step "Bundling check_env.exe (environment checker)..."
+$checkEnvScript = Join-Path $InstallerDir "check_env.py"
+
+python -m PyInstaller `
+    --onefile `
+    --name check_env `
+    --distpath $DistDir `
+    --workpath $BuildDir `
+    --specpath $InstallerDir `
+    --noconsole `
+    --noconfirm `
+    $checkEnvScript
+
+if ($LASTEXITCODE -ne 0) { Fail "PyInstaller failed for check_env.py" }
+OK "check_env.exe built"
+
+# 7. Verify all exes exist
 Step "Verifying build artifacts..."
-@("bridge_server.exe", "native_host.exe") | ForEach-Object {
+@("bridge_server.exe", "native_host.exe", "check_env.exe") | ForEach-Object {
     $p = Join-Path $DistDir $_
     if (-not (Test-Path $p)) { Fail "Missing: $p" }
     $size = "{0:N0}" -f (Get-Item $p).Length
@@ -191,18 +208,31 @@ $issFile = Join-Path $InstallerDir "setup.iss"
 
 if ($LASTEXITCODE -ne 0) { Fail "Inno Setup compilation failed." }
 
-# 11. Done
-$outputExe = Join-Path $OutputDir "Chat_Mode_Assistant_Setup.exe"
+# 11. Copy check_env.exe to output dir
+Step "Copying check_env.exe to $OutputDir..."
+$checkEnvSrc = Join-Path $DistDir "check_env.exe"
+$checkEnvDst = Join-Path $OutputDir "check_env.exe"
+if (-not (Test-Path $checkEnvSrc)) { Fail "check_env.exe not found in dist/" }
+Copy-Item $checkEnvSrc $checkEnvDst -Force
+OK "check_env.exe copied"
+
+# 12. Done
+$outputExe    = Join-Path $OutputDir "Chat_Mode_Assistant_Setup.exe"
+$outputCheck  = Join-Path $OutputDir "check_env.exe"
 if (-not (Test-Path $outputExe)) { Fail "Expected output not found: $outputExe" }
-$finalSize = "{0:N0}" -f (Get-Item $outputExe).Length
+$finalSize      = "{0:N0}" -f (Get-Item $outputExe).Length
+$checkEnvSize   = "{0:N0}" -f (Get-Item $outputCheck).Length
 
 Write-Host ""
 Write-Host "===============================================" -ForegroundColor Green
 Write-Host "  BUILD COMPLETE"                               -ForegroundColor Green
 Write-Host "===============================================" -ForegroundColor Green
-Write-Host "  Installer : $outputExe"                      -ForegroundColor Cyan
-Write-Host "  Size      : $finalSize bytes"                 -ForegroundColor Cyan
+Write-Host "  Installer    : $outputExe"    -ForegroundColor Cyan
+Write-Host "  Size         : $finalSize bytes" -ForegroundColor Cyan
+Write-Host "  Env Checker  : $outputCheck"  -ForegroundColor Cyan
+Write-Host "  Size         : $checkEnvSize bytes" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "  Run the installer and follow the wizard."        -ForegroundColor White
-Write-Host "  Follow the prompts to load the Chrome extension." -ForegroundColor White
+Write-Host "  Share BOTH files with end-users:"              -ForegroundColor White
+Write-Host "    1. check_env.exe  — run first to verify prerequisites" -ForegroundColor White
+Write-Host "    2. Chat_Mode_Assistant_Setup.exe  — main installer"     -ForegroundColor White
 Write-Host ""
