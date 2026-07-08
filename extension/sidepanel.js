@@ -34,7 +34,7 @@ const QUICK_ACTIONS_TABLE = [
   { label: "No",          prompt: "no",                                                     display: "No",                 group: "yesno", show: "yesno" },
 
   // ── 第一次分析完成後顯示 ──
-  { label: "📋 Summary",        prompt: "Provide a brief summary bersion of this sighting analysis with table style.Skip all attachment check, include latest action item if issue still open",              display: "Summary",         group: "post", show: "post-analysis" },
+  { label: "📋 Suggestion",        prompt: "Provide a brief summary version of this sighting next suggestion with table style.Skip all attachment check, include latest action item if issue still open",              display: "Suggestion of next step",         group: "post", show: "post-analysis" },
   { label: "🔍 Potential Root Cause",     prompt: "What is the most likely root cause? (skip all attachment check)",                            display: "Potential Root Cause",      group: "post", show: "post-analysis" },
   { label: "📝 Lastest Action Items",   prompt: "List latest three comment's action items and who is action owner.",                             display: "Latest Action Items",    group: "post", show: "post-analysis" },
   { label: "🔄 More Similiar issues",      prompt: "List 10 similar issues' ID, title and score by table style.",        display: "List 10 similiar issues",       group: "post", show: "post-analysis" },
@@ -1230,7 +1230,8 @@ function showImportQuickActions(hsdId) {
   const handler = () => {
     heroCta.classList.remove("show");
     hsdImported = false;
-    sendUserMessage(`Analyze HSD ${hsdId}`);
+    // Send full instruction to GNAI; display text stays clean in the UI
+    sendUserMessage(`Analyze HSD ${hsdId}, use rich emoji style in the response`, `Analyze HSD ${hsdId}`);
     heroCtaBtn.removeEventListener("click", handler);
   };
   heroCtaBtn.addEventListener("click", handler);
