@@ -414,6 +414,7 @@ class ChatSession:
     def __init__(self, assistant=None, conversation_id=None):
         self.assistant = assistant or DEFAULT_ASSISTANT
         self.conversation_id = conversation_id  # user-specified conversation ID
+        _debug(f"[session] __init__ assistant={self.assistant} requested_cid={self.conversation_id}")
         self._pty = None                         # PtyProcess instance
         self.event_queue = queue.Queue()
         self._reader_thread = None
@@ -426,6 +427,7 @@ class ChatSession:
         self.accumulated_answer = ""             # full answer text for current turn
         self._ignore_prompt = False              # ignore '> ' prompt until usage event (avoids echo)
         self._config_error_handled = False       # prevent duplicate auto-fix attempts
+        self._cid_expired_notified = False       # prevent duplicate cid_expired events
         self._idle_timer = None                  # timer to synthesize 'ready' if '> ' prompt is missed
         self._idle_timer_lock = threading.Lock()
 
@@ -440,6 +442,9 @@ class ChatSession:
         cmd = f'{dt_cmd} gnai chat --json --assistant {self.assistant}'
         if self.conversation_id:
             cmd += f' --conversation-id {self.conversation_id}'
+            _debug(f"[session] CID mode: resuming conversation {self.conversation_id}")
+        else:
+            _debug(f"[session] CID mode: new conversation (no CID)")
         _debug(f"starting via ConPTY: {cmd}")
 
         # Use a very wide terminal (500 cols) so dt's JSON output lines are never
@@ -749,6 +754,14 @@ class ChatSession:
             self._ignore_prompt = False
             error_msg = data.get("msg", "Unknown error")
             _debug(f"[event] gnai error detected, resetting ignore_prompt: {error_msg[:200]}")
+            # Detect config YAML corruption from JSON error messages too
+            if not self._config_error_handled and (
+                "unable to load configuration" in error_msg.lower() or
+                "unknown escape character" in error_msg.lower() or
+                "mapping value is not allowed" in error_msg.lower()
+            ):
+                self._config_error_handled = True
+                self._handle_config_error(error_msg)
             return {"type": "error", "text": error_msg}
 
         # Goodbye
@@ -757,6 +770,23 @@ class ChatSession:
 
         # Info messages (welcome, loading, etc)
         if "msg" in data and data["msg"]:
+            _debug(f"[info] msg=\"{data['msg'][:100]}\" has_cid={bool(self.conversation_id)} cid_notified={self._cid_expired_notified}")
+            # Detect CID expired: if we requested a conversation_id but GNAI
+            # shows "Welcome" greeting, it means the CID was invalid/expired
+            # and GNAI silently started a fresh conversation.
+            has_welcome = "Welcome" in data["msg"]
+            has_wave = "👋" in data["msg"]
+            if self.conversation_id and not self._cid_expired_notified:
+                _debug(f"[cid_check] Welcome={has_welcome} 👋={has_wave} → expired={has_welcome and has_wave}")
+            if (self.conversation_id and not self._cid_expired_notified
+                    and has_welcome and has_wave):
+                self._cid_expired_notified = True
+                _debug(f"[cid_expired] ★ DETECTED ★ requested CID={self.conversation_id} but got Welcome → pushing cid_expired event")
+                self.event_queue.put({
+                    "type": "cid_expired",
+                    "requested_cid": self.conversation_id,
+                    "message": "Conversation expired. Starting fresh session.",
+                })
             return {"type": "info", "text": data["msg"]}
 
         return None
@@ -909,6 +939,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._handle_send()
         elif self.path == "/session/stop":
             self._handle_stop()
+        elif self.path == "/bridge/shutdown":
+            self._handle_shutdown()
         elif self.path == "/driver-history":
             self._handle_driver_history_post()
         elif self.path == "/driver-history/delete":
@@ -935,6 +967,14 @@ class BridgeHandler(BaseHTTPRequestHandler):
             "session_id": session.session_id if session else None,
             "conversation_id": session.conversation_id if session else None,
         })
+
+    def _handle_shutdown(self):
+        """Gracefully shut down the bridge server process."""
+        _stop_session()
+        self._json_response(200, {"status": "shutting_down"})
+        # Schedule server shutdown in a separate thread to allow response to be sent
+        import threading
+        threading.Thread(target=self.server.shutdown, daemon=True).start()
 
     # ── Driver History endpoints ─────────────────────────────────────────────
 
@@ -1021,7 +1061,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
             })
             return
         try:
+            _debug(f"[start] creating session: assistant={assistant} cid={conversation_id}")
             session = _start_session(assistant, conversation_id)
+            _debug(f"[start] session created: session.conversation_id={session.conversation_id} session.session_id={session.session_id}")
             self._json_response(200, {
                 "status": "starting",
                 "assistant": session.assistant,
@@ -1029,6 +1071,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 "message": "Session spawned. Connect to /session/stream for events.",
             })
         except Exception as e:
+            _debug(f"[start] ERROR: {e}")
             self._json_response(500, {"error": str(e)})
 
     def _handle_send(self):
@@ -1050,13 +1093,17 @@ class BridgeHandler(BaseHTTPRequestHandler):
             return
 
         try:
+            _debug(f"[send] message=\"{message[:80]}\" session.cid={session.conversation_id} session.session_id={session.session_id}")
             session.send(message)
             self._json_response(200, {"status": "sent"})
         except Exception as e:
+            _debug(f"[send] ERROR: {e}")
             self._json_response(500, {"error": str(e)})
 
     def _handle_stop(self):
+        _debug(f"[stop] stopping session")
         _stop_session()
+        _debug(f"[stop] session stopped")
         self._json_response(200, {"status": "stopped"})
 
     def _handle_file_dialog(self):
@@ -1098,8 +1145,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
         """SSE endpoint: streams events from the chat process."""
         session = _get_session()
         if not session or not session.is_alive:
+            _debug(f"[stream] no active session to stream")
             self._json_response(400, {"error": "no_active_session"})
             return
+        _debug(f"[stream] starting SSE: session.cid={session.conversation_id} session.session_id={session.session_id} waiting_input={session.is_waiting_input}")
 
         try:
             self.send_response(200)
@@ -1136,6 +1185,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
                     continue
 
                 event_type = event.get("type", "unknown")
+                # Log non-answer events (answers are too verbose)
+                if event_type != "answer":
+                    _debug(f"[stream→ext] event={event_type} data={json.dumps(event, ensure_ascii=False)[:200]}")
                 payload = json.dumps(event, ensure_ascii=False)
 
                 try:

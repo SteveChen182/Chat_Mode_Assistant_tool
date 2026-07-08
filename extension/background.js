@@ -123,7 +123,13 @@ async function ensureBridgeRunning(sendStatus) {
   sendStatus("Starting bridge server...");
   let nmAvailable = false;
   try {
-    const result = await sendNativeMessage({ action: "launch" });
+    // Read debug mode setting and pass to native host
+    let debugMode = false;
+    try {
+      const stored = await chrome.storage.local.get({ debugMode: false });
+      debugMode = !!stored.debugMode;
+    } catch {}
+    const result = await sendNativeMessage({ action: "launch", debug_mode: debugMode });
     if (result.status === "error") {
       sendStatus(`Bridge launch error: ${result.message}`);
       return false;
@@ -230,7 +236,7 @@ function startStreaming() {
 
   const eventTypes = [
     "answer", "tool_start", "tool_request", "usage", "ready", "info", "end", "goodbye",
-    "error", "cid_mismatch", "config_repaired", "config_repair_failed"
+    "error", "cid_mismatch", "cid_expired", "config_repaired", "config_repair_failed"
   ];
 
   for (const type of eventTypes) {
@@ -367,6 +373,35 @@ chrome.runtime.onConnect.addListener((port) => {
           }
           const stopResult = await stopSession();
           port.postMessage({ action: "session_stopped", ...stopResult });
+          break;
+        }
+
+        case "restart_bridge": {
+          // Kill current bridge and re-launch with updated settings (e.g. debug mode)
+          stopKeepAlive();
+          if (currentEventSource) {
+            currentEventSource.close();
+            currentEventSource = null;
+          }
+          // Shut down bridge process completely (so it can relaunch with new flags)
+          try { await bridgeFetch("/bridge/shutdown", { method: "POST" }); } catch {}
+          bridgePort = null;
+          chrome.storage.session.remove("bridgePort").catch(() => {});
+          // Wait a moment for process to exit, then re-launch
+          await sleep(1000);
+          const ready = await ensureBridgeRunning((status) => {
+            port.postMessage({ type: "startup_status", message: status });
+          });
+          if (ready) {
+            const startMsg = { action: "start_session" };
+            port.postMessage({ action: "session_started", status: "restarted" });
+            const startResult = await startSession();
+            if (!startResult.error) {
+              port.postMessage({ action: "session_started", ...startResult });
+              startStreaming();
+              startKeepAlive();
+            }
+          }
           break;
         }
 

@@ -461,6 +461,11 @@
     .settings-check-row input[type=checkbox] { width: 14px; height: 14px; accent-color: #5F80AB; cursor: pointer; flex-shrink: 0; }
     .settings-check-label { font-size: 12px; color: #374151; flex: 1; }
     .settings-check-badge { font-size: 10px; background: #dbeafe; color: #1d4ed8; border-radius: 4px; padding: 1px 5px; font-weight: 600; }
+    .settings-apply-btn { margin: 6px 0 2px; padding: 4px 12px; font-size: 11px; background: var(--primary); color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .settings-apply-btn:hover { opacity: 0.85; }
+    .tool-progress-bar { display: flex; align-items: center; gap: 8px; padding: 5px 14px; background: #f0f4ff; border-top: 1px solid #e0e7ef; font-size: 12px; color: #4a5568; }
+    .tool-progress-bar .spinner { width: 12px; height: 12px; border: 2px solid #c0c8d8; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .settings-lang-options { display: flex; gap: 4px; }
     .lang-opt {
       padding: 3px 10px;
@@ -1026,6 +1031,19 @@
               <span class="settings-check-label">Regression Checker</span>
             </label>
           </div>
+          <hr class="settings-divider">
+          <div class="settings-section-title">互動 / Interaction</div>
+          <label class="settings-check-row" id="auto-interact-row">
+            <input type="checkbox" id="auto-interact-check">
+            <span class="settings-check-label">自動互動模式 (Menu → What's Next)</span>
+          </label>
+          <hr class="settings-divider">
+          <div class="settings-section-title">Developer</div>
+          <label class="settings-check-row" id="debug-mode-row">
+            <input type="checkbox" id="debug-mode-check">
+            <span class="settings-check-label">Debug Mode (Show Bridge Console)</span>
+          </label>
+          <button id="debug-mode-apply" class="settings-apply-btn" style="display:none;">Apply</button>
         </div>
       </div>
     </div>
@@ -1109,17 +1127,6 @@
     <!-- Chat messages -->
     <div id="chat-area"></div>
 
-    <!-- Post-analysis fancy panel -->
-    <div id="post-analysis-panel" class="post-analysis-panel">
-      <div class="post-analysis-header" id="post-analysis-header">
-        <div class="post-analysis-title">✅ Analysis Complete — What's next?</div>
-        <div class="post-analysis-toggle">▼</div>
-      </div>
-      <div class="post-analysis-body">
-        <div id="post-analysis-grid" class="post-analysis-grid"></div>
-      </div>
-    </div>
-
     <!-- Floating scroll-to-bottom button -->
     <button id="btn-scroll-down" title="Jump to latest">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -1130,6 +1137,20 @@
 
     <!-- Quick action buttons (shown when AI asks a question) -->
     <div id="quick-actions"></div>
+
+    <!-- Tool progress indicator (Running: Assistant Agent) -->
+    <div id="tool-progress" class="tool-progress-bar" style="display:none;"></div>
+
+    <!-- Post-analysis fancy panel (What's next) — at the bottom above input -->
+    <div id="post-analysis-panel" class="post-analysis-panel">
+      <div class="post-analysis-header" id="post-analysis-header">
+        <div class="post-analysis-title">✅ Analysis Complete — What's next?</div>
+        <div class="post-analysis-toggle">▼</div>
+      </div>
+      <div class="post-analysis-body">
+        <div id="post-analysis-grid" class="post-analysis-grid"></div>
+      </div>
+    </div>
 
     <!-- Input -->
     <div class="input-area">

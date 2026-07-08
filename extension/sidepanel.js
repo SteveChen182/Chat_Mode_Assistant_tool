@@ -35,7 +35,7 @@ const QUICK_ACTIONS_TABLE = [
 
   // ── 第一次分析完成後顯示 ──
   { label: "📋 Summary",        prompt: "Provide a brief summary bersion of this sighting analysis with table style.Skip all attachment check, include latest action item if issue still open",              display: "Summary",         group: "post", show: "post-analysis" },
-  { label: "🔍 Potential Root Cause",     prompt: "What is the most likely root cause? (skip all attachment check)",                            display: "Root Cause",      group: "post", show: "post-analysis" },
+  { label: "🔍 Potential Root Cause",     prompt: "What is the most likely root cause? (skip all attachment check)",                            display: "Potential Root Cause",      group: "post", show: "post-analysis" },
   { label: "📝 Lastest Action Items",   prompt: "List latest three comment's action items and who is action owner.",                             display: "Latest Action Items",    group: "post", show: "post-analysis" },
   { label: "🔄 More Similiar issues",      prompt: "List 10 similar issues' ID, title and score by table style.",        display: "List 10 similiar issues",       group: "post", show: "post-analysis" },
  
@@ -344,6 +344,7 @@ function connectPort() {
       case "session_started":
         _pendingSessionRestart = false;
         bridgeSessionCid = msg.conversation_id || "";
+        console.log(`[session_started] status=${msg.status} cid="${bridgeSessionCid}" activeCid="${activeConversationId}" match=${bridgeSessionCid === activeConversationId}`);
         // Restore default placeholder (may have been changed by stop reconnect state)
         inputEl.placeholder = "Type a message or HSD ID...";
         if (msg.status === "already_active") {
@@ -435,6 +436,32 @@ function connectPort() {
         if (activeHsdId) _pendingCidContextRestore = true;
         showToast("⚠️ 舊對話紀錄已過期，已開始新的對話（context 重置）");
         addSystemMsg(`⚠️ 此 session 的對話紀錄已過期（conversation_id 已失效），GNAI 已開始新的空白對話。之前的分析 context 已遺失。`);
+        break;
+      case "cid_expired":
+        // GNAI showed Welcome despite having a CID → conversation expired
+        // BUT: if session has no prior AI messages, this is a brand-new CID (first use), not expiry
+        const hasPriorConversation = sessionMessages.some(m => m.role === "assistant");
+        console.warn(`[cid] expired: requested=${msg.requested_cid} hasPriorConversation=${hasPriorConversation}`);
+        if (!hasPriorConversation) {
+          // New session, first-time CID — this is normal, not an expiry
+          console.log("[cid] ignoring cid_expired for brand-new session (no prior messages)");
+          break;
+        }
+        // Clear the old CID — it's useless now; cid_mismatch will set the new one later
+        if (sessions.length > 0) {
+          sessions[activeSessionIndex].conversationId = "";
+          persistSessions();
+        }
+        updateConversationId("");
+        // Flag so onReady auto-send will prepend HSD context
+        if (activeHsdId) _pendingCidContextRestore = true;
+        showToast(uiLang === "zh"
+          ? "⚠️ 舊 Session 已過期，已自動重置為新 Session"
+          : "⚠️ Previous session expired. A new session has been started.");
+        addSystemMsg(uiLang === "zh"
+          ? `⚠️ 舊的對話 Session 已過期（Conversation ID 已失效），GNAI 已自動開始新的 Session。\n之前的對話 context 已遺失，系統將自動補充 HSD context 重新提問。`
+          : `⚠️ Previous session has expired. A new session has been started automatically.\nPrior conversation context is lost. The system will re-attach HSD context and resend your question.`
+        );
         break;
       case "usage":
         onUsage(msg.usage);
@@ -533,6 +560,7 @@ function connectPort() {
 
 function onAnswerChunk(text) {
   removeTypingIndicator();
+
   if (!currentAiMsg) {
     currentAiMsg = addAiMsg("");
     currentAiText = "";
@@ -628,8 +656,17 @@ function onReady(accumulatedAnswer) {
 
   // Auto-send pending message (from lazy session switch)
   if (_pendingSendMessage) {
-    const msg = _pendingSendMessage;
+    let msg = _pendingSendMessage;
     _pendingSendMessage = null;
+    // If CID expired during restart, prepend HSD context so GNAI knows what we're talking about
+    if (_pendingCidContextRestore && activeHsdId) {
+      _pendingCidContextRestore = false;
+      if (!msg.includes(activeHsdId)) {
+        msg = `[HSD ${activeHsdId}] ${msg}`;
+      }
+      console.log(`[onReady] CID expired → prepended HSD context: "${msg.slice(0, 80)}..."`);
+    }
+    console.log(`[onReady] auto-sending pending message: "${msg.slice(0, 50)}..."`);
     isStreaming = true;
     setTimeout(() => {
       port.postMessage({ action: "send", message: msg });
@@ -639,7 +676,8 @@ function onReady(accumulatedAnswer) {
   }
 
   // If this is the first ready after session start, show welcome
-  if (!accumulatedAnswer && !isLogAnalysisMode) {
+  // But only if there are existing messages (not a brand-new empty session with onboarding)
+  if (!accumulatedAnswer && !isLogAnalysisMode && sessionMessages.length > 0) {
     hideOnboarding();
     addSystemMsg("Session ready. Type an HSD ID to begin analysis.");
   }
@@ -648,6 +686,27 @@ function onReady(accumulatedAnswer) {
   // if (accumulatedAnswer) {
   //   generateQuickActions(accumulatedAnswer);
   // }
+
+  // Parse MENU block from AI response → show as buttons in What's Next panel
+  if (autoInteractEnabled && accumulatedAnswer) {
+    const menuItems = parseMenuBlock(accumulatedAnswer);
+    if (menuItems) {
+      showMenuInPanel(menuItems);
+      if (sessionMessages.length > 0) { saveCurrentSession(); persistSessions(); }
+      setInputEnabled(true);
+      return; // Skip regular post-analysis panel
+    }
+  }
+
+  // If no new MENU found but we were showing a menu panel → restore original post-analysis buttons
+  if (_showingMenuPanel && activeHsdId) {
+    _showingMenuPanel = false;
+    _postAnalysisShown = false;
+    showPostAnalysisPanel();
+    postAnalysisPanel.classList.add("collapsed");
+    const titleEl = postAnalysisPanel.querySelector(".post-analysis-title");
+    if (titleEl) titleEl.textContent = _POST_TITLE_SHORT;
+  }
 
   // Show post-analysis fancy panel after first HSD analysis completes
   if (accumulatedAnswer && activeHsdId && !_postAnalysisShown) {
@@ -845,6 +904,11 @@ function _restartBridgeForSession() {
  */
 function sendUserMessage(text, displayText) {
   if (!text.trim() || !port) return;
+  // Guard: block input while AI is streaming to prevent accidental interruption
+  if (isStreaming) {
+    console.log("[sendUserMessage] blocked — AI is still streaming");
+    return;
+  }
 
   // Reset scroll lock — user sending a message means they want to follow output
   userScrolledUp = false;
@@ -903,13 +967,16 @@ function sendUserMessage(text, displayText) {
 
   // Currently: send text (with HSD prefix if applicable)
   // Modification 3: Language instruction — append zh instruction when UI is set to zh
+  // Skip for menu selections (1, 2, 3, all, skip, etc.) to avoid confusing GNAI's menu parser
   let messageToSend = text;
-  if (uiLang === "zh") {
+  const isMenuSelection = /^\s*(\d{1,2}|all|skip)\s*$/i.test(text.trim());
+  if (uiLang === "zh" && !isMenuSelection) {
     messageToSend += " (請使用繁體中文回答)";
   }
 
   // Lazy bridge restart: if bridge is on a different session, queue message and restart
   if (bridgeSessionCid !== activeConversationId) {
+    console.log(`[lazy-restart] CID mismatch: bridge="${bridgeSessionCid}" active="${activeConversationId}" → queueing message and restarting`);
     _pendingSendMessage = messageToSend;
     _restartBridgeForSession();
     hideOnboarding();
@@ -954,17 +1021,26 @@ function addSystemMsg(text) {
 }
 
 function addToolIndicator(text) {
-  const el = document.createElement("div");
-  el.className = "tool-indicator";
-  el.id = "tool-progress";
+  const el = document.getElementById("tool-progress");
+  if (!el) return;
   el.innerHTML = `<div class="spinner"></div><span>Running: ${escapeHtml(text)}</span>`;
-  chatArea.appendChild(el);
-  scrollToBottom();
+  el.style.display = "flex";
+}
+
+function _updateProgressStatus(text) {
+  // Show progress text (from answer chunks) in the tool-progress status bar
+  const el = document.getElementById("tool-progress");
+  if (!el) return;
+  el.innerHTML = `<div class="spinner"></div><span>${escapeHtml(text)}</span>`;
+  el.style.display = "flex";
 }
 
 function removeToolIndicator() {
   const el = document.getElementById("tool-progress");
-  if (el) el.remove();
+  if (el) {
+    el.style.display = "none";
+    el.innerHTML = "";
+  }
 }
 
 function setStatus(cls, text) {
@@ -976,6 +1052,14 @@ function setInputEnabled(enabled) {
   inputEl.disabled = !enabled;
   sendBtn.disabled = !enabled;
   btnImport.disabled = !enabled;
+  // Protect against accidental interruption: disable most toolbar buttons while AI is running
+  // Only Stop and Popout remain functional during streaming
+  if (btnNew) btnNew.disabled = !enabled;
+  if (btnSave) btnSave.disabled = !enabled;
+  if (btnSettings) btnSettings.disabled = !enabled;
+  // Tab bar clicks should also be gated
+  const tabItems = document.querySelectorAll(".tab-item");
+  tabItems.forEach(tab => { tab.style.pointerEvents = enabled ? "" : "none"; });
   if (enabled) inputEl.focus();
 }
 
@@ -1146,7 +1230,7 @@ function showImportQuickActions(hsdId) {
   const handler = () => {
     heroCta.classList.remove("show");
     hsdImported = false;
-    sendUserMessage(`${hsdId} skip any attachment check and skip gdhm sherlog and etl log check`, `Analyze HSD ${hsdId}`);
+    sendUserMessage(`Analyze HSD ${hsdId}`);
     heroCtaBtn.removeEventListener("click", handler);
   };
   heroCtaBtn.addEventListener("click", handler);
@@ -1323,6 +1407,7 @@ function startNewSession() {
   heroCta.classList.remove("show");
   hidePostAnalysisPanel();
   _postAnalysisShown = false;
+  _showingMenuPanel = false;
 
   // Push new empty session at front, shift others down
   sessions.unshift({
@@ -1433,6 +1518,17 @@ async function switchToSession(index) {
   activeHsdTitle = target.hsdTitle || "";
   activeConversationId = target.conversationId || "";
   sessionMessages = [...(target.messages || [])];
+
+  // Reset pending state from previous tab to prevent cross-tab contamination
+  _pendingSendMessage = null;
+  _pendingCidContextRestore = false;
+  _pendingSessionRestart = false;
+  currentAiMsg = null;
+  currentAiText = "";
+  accumulatedAnswer = "";
+  _showingMenuPanel = false;
+
+  console.log(`[switchToSession] → tab ${index}, hsd=${activeHsdId}, cid=${activeConversationId}, bridgeCid=${bridgeSessionCid}`);
 
   // Update UI
   updateHeaderTitle();
@@ -1767,6 +1863,143 @@ function applyLang(lang) {
 
 // Init language on load
 applyLang(uiLang);
+
+// ── Debug Mode Setting ──────────────────────────────────────────────────────
+const debugModeCheck = document.getElementById("debug-mode-check");
+const debugModeApplyBtn = document.getElementById("debug-mode-apply");
+let _debugModeSaved = false; // last saved state
+
+// ── Auto-Interact Mode ────────────────────────────────────────────────────
+const autoInteractCheck = document.getElementById("auto-interact-check");
+let autoInteractEnabled = false;
+let _showingMenuPanel = false; // true while What's Next shows MENU items
+
+(async () => {
+  try {
+    const stored = await chrome.storage.local.get({ autoInteract: false });
+    autoInteractEnabled = !!stored.autoInteract;
+    if (autoInteractCheck) autoInteractCheck.checked = autoInteractEnabled;
+  } catch { /* ignore */ }
+})();
+
+if (autoInteractCheck) {
+  autoInteractCheck.addEventListener("change", async () => {
+    autoInteractEnabled = autoInteractCheck.checked;
+    await chrome.storage.local.set({ autoInteract: autoInteractEnabled });
+    showToast(autoInteractEnabled
+      ? (uiLang === "zh" ? "✅ 自動互動模式已開啟" : "✅ Auto-Interact Mode enabled")
+      : (uiLang === "zh" ? "⭕ 自動互動模式已關閉" : "⭕ Auto-Interact Mode disabled")
+    );
+  });
+}
+
+/**
+ * Parse [MENU:START:state=...]...[MENU:END] blocks from AI response.
+ * Returns array of {num, label, prompt} for each numbered item.
+ */
+function parseMenuBlock(text) {
+  const blockMatch = text.match(/\[MENU:START[^\]]*\]([\s\S]*?)\[MENU:END\]/);
+  if (!blockMatch) return null;
+  const block = blockMatch[1];
+  const items = [];
+  // Match numbered lines: "1. Label" or "1) Label"
+  for (const m of block.matchAll(/^\s*(\d+)[.)\s]\s*(.+)$/gm)) {
+    items.push({ num: m[1], label: m[2].trim(), prompt: m[1] });
+  }
+  return items.length > 0 ? items : null;
+}
+
+/**
+ * Show parsed menu items as buttons in the What's Next panel.
+ */
+function showMenuInPanel(menuItems) {
+  const grid = document.getElementById("post-analysis-grid");
+  const panel = document.getElementById("post-analysis-panel");
+  if (!grid || !panel) return;
+
+  _showingMenuPanel = true;
+
+  // Clear existing buttons and rebuild with menu items
+  grid.innerHTML = "";
+
+  // Menu items from GNAI
+  for (const item of menuItems) {
+    const el = document.createElement("button");
+    el.className = "post-analysis-btn";
+    el.textContent = `${item.num}. ${item.label.substring(0, 50)}`;
+    el.title = item.label;
+    el.addEventListener("click", () => {
+      panel.classList.add("collapsed");
+      const titleEl = panel.querySelector(".post-analysis-title");
+      if (titleEl) titleEl.textContent = _POST_TITLE_SHORT;
+      // The panel will be restored to original buttons once the AI responds (in onReady)
+      sendUserMessage(item.prompt, `${item.num}. ${item.label}`);
+    });
+    grid.appendChild(el);
+  }
+
+  // "All" and "Skip" buttons
+  for (const label of ["All", "Skip"]) {
+    const el = document.createElement("button");
+    el.className = "post-analysis-btn";
+    el.textContent = label;
+    el.addEventListener("click", () => {
+      panel.classList.add("collapsed");
+      const titleEl = panel.querySelector(".post-analysis-title");
+      if (titleEl) titleEl.textContent = _POST_TITLE_SHORT;
+      sendUserMessage(label.toLowerCase(), label);
+    });
+    grid.appendChild(el);
+  }
+
+  // Update panel title
+  const titleEl = panel.querySelector(".post-analysis-title");
+  if (titleEl) titleEl.textContent = uiLang === "zh" ? "📋 請選擇要分析的項目" : "📋 Select items to analyze";
+
+  panel.classList.remove("collapsed");
+  panel.classList.add("show");
+}
+
+(async () => {
+  try {
+    const stored = await chrome.storage.local.get({ debugMode: false });
+    _debugModeSaved = !!stored.debugMode;
+    debugModeCheck.checked = _debugModeSaved;
+  } catch { /* ignore */ }
+})();
+
+debugModeCheck.addEventListener("change", () => {
+  // Show Apply button only when value differs from saved state
+  debugModeApplyBtn.style.display = (debugModeCheck.checked !== _debugModeSaved) ? "block" : "none";
+});
+
+debugModeApplyBtn.addEventListener("click", async () => {
+  const newVal = debugModeCheck.checked;
+  const msg = newVal
+    ? (uiLang === "zh" ? "啟用 Debug Mode 後，下次啟動 Bridge 時會顯示 CLI 視窗。\n需要重啟 Bridge 才會生效，是否立即重啟？" : "Enabling Debug Mode will show the Bridge console window.\nA Bridge restart is required. Restart now?")
+    : (uiLang === "zh" ? "停用 Debug Mode 後，Bridge CLI 視窗將會隱藏。\n需要重啟 Bridge 才會生效，是否立即重啟？" : "Disabling Debug Mode will hide the Bridge console window.\nA Bridge restart is required. Restart now?");
+
+  const confirmed = await showModal(
+    uiLang === "zh" ? "套用 Debug Mode" : "Apply Debug Mode",
+    msg,
+    uiLang === "zh" ? "重啟 Bridge" : "Restart Bridge",
+    uiLang === "zh" ? "稍後" : "Later"
+  );
+
+  // Save regardless of restart choice
+  _debugModeSaved = newVal;
+  await chrome.storage.local.set({ debugMode: newVal });
+  debugModeApplyBtn.style.display = "none";
+  showToast(uiLang === "zh" ? "✅ Debug Mode 設定已儲存" : "✅ Debug Mode setting saved");
+
+  if (confirmed && port) {
+    // Restart bridge: stop session → re-launch with new debug flag
+    port.postMessage({ action: "stop_session" });
+    setTimeout(() => {
+      port.postMessage({ action: "restart_bridge" });
+    }, 500);
+  }
+});
 
 btnSettings.addEventListener("click", (e) => {
   e.stopPropagation();

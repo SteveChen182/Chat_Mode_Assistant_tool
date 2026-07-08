@@ -78,14 +78,19 @@ def is_bridge_running():
     return False, None
 
 
-def launch_bridge():
+def launch_bridge(debug_mode=False):
     """Spawn bridge server as a detached background process."""
     env = os.environ.copy()
     # Default to port 8776; if occupied, bridge will fail and caller retries
     env["BRIDGE_PORT"] = str(BRIDGE_PORT)
     env["BRIDGE_DEBUG"] = "1"
 
-    flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NEW_CONSOLE
+    if debug_mode:
+        # Debug mode: show console window for troubleshooting
+        flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NEW_CONSOLE
+    else:
+        # Normal mode: hide console window
+        flags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.CREATE_NO_WINDOW
     if getattr(sys, "frozen", False):
         # Bundled exe: launch bridge_server.exe directly (no Python needed)
         cmd = [BRIDGE_SCRIPT]
@@ -117,7 +122,8 @@ def main():
                     os.remove(PORT_FILE)
             except OSError:
                 pass
-            launch_bridge()
+            debug_mode = msg.get("debug_mode", False)
+            launch_bridge(debug_mode=debug_mode)
             send_message({"status": "launching"})
         except Exception as e:
             send_message({"status": "error", "message": str(e)})
