@@ -75,6 +75,7 @@ Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
 
 ; ── Post-install: launch Configure wizard ────────────────────────────────────
 [Run]
+; Open extension folder after install
 Filename: "{app}\extension"; \
     Description: "Open extension folder (for Chrome 'Load unpacked')"; \
     Flags: shellexec nowait postinstall skipifsilent

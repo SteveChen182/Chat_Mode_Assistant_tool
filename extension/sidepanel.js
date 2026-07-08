@@ -639,7 +639,7 @@ function onReady(accumulatedAnswer) {
   }
 
   // If this is the first ready after session start, show welcome
-  if (!accumulatedAnswer) {
+  if (!accumulatedAnswer && !isLogAnalysisMode) {
     hideOnboarding();
     addSystemMsg("Session ready. Type an HSD ID to begin analysis.");
   }
@@ -1895,6 +1895,8 @@ const regressionHsdInfo = document.getElementById("regression-hsd-info");
 const btnRegression = document.getElementById("btn-regression");
 const btnBackToChat = document.getElementById("btn-back-to-chat");
 const btnLogAnalysis = document.getElementById("btn-log-analysis");
+const btnLogReset    = document.getElementById("btn-log-reset");
+const headerControls = document.getElementById("header-controls");
 const logAnalysisBar = document.getElementById("log-analysis-bar");
 const logAnalysisExit = document.getElementById("log-analysis-exit");
 const logPathInput = document.getElementById("log-path-input");
@@ -2015,6 +2017,8 @@ async function switchToLogAnalysisMode() {
   // Update header appearance
   document.querySelector(".header").style.background = HEADER_COLOR_LOG;
   headerTitle.textContent = "Log Analysis Mode";
+  headerControls.classList.add("log-mode-active");
+  document.body.classList.add("log-mode");
   logAnalysisBar.classList.add("show");
 
   // Show splash and restart bridge with displaydebugger
@@ -2031,6 +2035,8 @@ async function exitLogAnalysisMode() {
 
   // Restore header
   document.querySelector(".header").style.background = HEADER_COLOR_CHAT;
+  headerControls.classList.remove("log-mode-active");
+  document.body.classList.remove("log-mode");
   logAnalysisBar.classList.remove("show");
 
   // Save log session state, then restore the pre-log session
@@ -2089,6 +2095,31 @@ async function exitLogAnalysisMode() {
 btnLogAnalysis.addEventListener("click", switchToLogAnalysisMode);
 logAnalysisExit.addEventListener("click", exitLogAnalysisMode);
 
+btnLogReset.addEventListener("click", async () => {
+  const confirmed = await showModal(
+    "Reset Log Analysis",
+    "This will clear the log/man file paths and all chat messages. Continue?",
+    "Reset",
+    "Cancel"
+  );
+  if (!confirmed) return;
+
+  // Clear path inputs
+  logPathInput.value = "";
+  manPathInput.value = "";
+  btnLogAnalyze.disabled = true;
+
+  // Clear chat area and session state
+  chatArea.innerHTML = "";
+  sessionMessages = [];
+  activeConversationId = "";
+  _postAnalysisShown = false;
+  hidePostAnalysisPanel();
+  quickActions.classList.remove("show");
+  quickActions.innerHTML = "";
+  heroCta.classList.remove("show");
+});
+
 // ── Log Analysis Toolbar ──────────────────────────────────────────────────
 
 // Enable Analyze button only when a log path is provided
@@ -2098,17 +2129,38 @@ logPathInput.addEventListener("input", () => {
 
 // ── Browse button helpers ─────────────────────────────────────────────────
 
+const _dialogTimeouts = {};  // field -> timeout id
+
 function openFileBrowseDialog(field, title) {
   if (!port) { showToast("Bridge not connected", "error"); return; }
-  // Disable the browse button while dialog is open
   const btn = field === "log" ? btnBrowseLog : btnBrowseMan;
+
+  // If already waiting, cancel the old timeout and reset (allow re-click)
+  if (_dialogTimeouts[field]) {
+    clearTimeout(_dialogTimeouts[field]);
+    delete _dialogTimeouts[field];
+  }
+
   btn.disabled = true;
   btn.textContent = "⏳";
   port.postMessage({ action: "file_dialog", field, title });
+
+  // Safety timeout: if no result in 60s, re-enable the button
+  _dialogTimeouts[field] = setTimeout(() => {
+    delete _dialogTimeouts[field];
+    btn.disabled = false;
+    btn.innerHTML = "&#128193;";
+    showToast("File dialog timed out — try again", "warn");
+  }, 10_000);
 }
 
 function onFileDialogResult(field, path) {
-  // Re-enable browse button
+  // Cancel the safety timeout
+  if (_dialogTimeouts[field]) {
+    clearTimeout(_dialogTimeouts[field]);
+    delete _dialogTimeouts[field];
+  }
+
   const btn = field === "log" ? btnBrowseLog : btnBrowseMan;
   btn.disabled = false;
   btn.innerHTML = "&#128193;";
@@ -2125,6 +2177,43 @@ function onFileDialogResult(field, path) {
 
 btnBrowseLog.addEventListener("click", () => openFileBrowseDialog("log", "Select Log File"));
 btnBrowseMan.addEventListener("click", () => openFileBrowseDialog("man", "Select Man File"));
+
+// ── Drag-and-drop for log/man path inputs ─────────────────────────────────
+function setupDropTarget(inputEl, field) {
+  inputEl.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    inputEl.classList.add("drag-over");
+  });
+  inputEl.addEventListener("dragleave", () => {
+    inputEl.classList.remove("drag-over");
+  });
+  inputEl.addEventListener("drop", (e) => {
+    e.preventDefault();
+    inputEl.classList.remove("drag-over");
+    // Chrome extension: DataTransferItem.getAsFile() gives a File object
+    // but its .path is not exposed. We send the filename to bridge via
+    // a special action so the bridge can resolve the full path from the
+    // file name passed through the webkitRelativePath or use file.name.
+    // Better approach: use the file entry to get the full path via
+    // chrome.runtime messaging with the file handle.
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    // file.path is available in Electron; in Chrome extensions it's not directly
+    // accessible. We post to the bridge asking it to resolve the path by name.
+    // As a fallback, populate with the filename so the user sees something.
+    const fullPath = file.path || file.name;
+    if (field === "log") {
+      logPathInput.value = fullPath;
+      btnLogAnalyze.disabled = !fullPath.trim();
+    } else {
+      manPathInput.value = fullPath;
+    }
+  });
+}
+
+setupDropTarget(logPathInput, "log");
+setupDropTarget(manPathInput, "man");
 
 btnLogAnalyze.addEventListener("click", () => {
   const logPath = logPathInput.value.trim();
