@@ -998,7 +998,7 @@
       <button id="btn-regression" class="header-btn chat-only" title="Regression Tool" style="background:#d4a017;color:#fff;font-weight:700;" disabled>R</button>
       <button id="btn-log-analysis" class="header-btn chat-only" title="Log Analysis Mode (displaydebugger)">📋 Log</button>
       <button id="btn-log-reset" class="header-btn log-only" title="Reset — clear paths and chat">&#x21BA; Reset</button>
-      <div class="history-wrap chat-only">
+      <div class="history-wrap chat-only" style="display:none">
         <button id="btn-history" class="header-btn" title="Session History">&#8634;</button>
         <div id="historyMenu" class="history-menu"></div>
       </div>
@@ -1036,6 +1036,10 @@
           <label class="settings-check-row" id="auto-interact-row">
             <input type="checkbox" id="auto-interact-check">
             <span class="settings-check-label">自動互動模式 (Menu → What's Next)</span>
+          </label>
+          <label class="settings-check-row" id="progress-filter-row">
+            <input type="checkbox" id="progress-filter-check">
+            <span class="settings-check-label">進度區塊隱藏 (=====…===== → 狀態列)</span>
           </label>
           <hr class="settings-divider">
           <div class="settings-section-title">Developer</div>

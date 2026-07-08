@@ -34,7 +34,7 @@ const QUICK_ACTIONS_TABLE = [
   { label: "No",          prompt: "no",                                                     display: "No",                 group: "yesno", show: "yesno" },
 
   // ── 第一次分析完成後顯示 ──
-  { label: "📋 Suggestion",        prompt: "Provide a brief summary version of this sighting next suggestion with table style.Skip all attachment check, include latest action item if issue still open",              display: "Suggestion of next step",         group: "post", show: "post-analysis" },
+  { label: "📋 Suggestion",        prompt: "Provide a brief summary version of next step suggestion with table style.Skip all attachment check, include latest action item if issue still open",              display: "Suggestion of next step",         group: "post", show: "post-analysis" },
   { label: "🔍 Potential Root Cause",     prompt: "What is the most likely root cause? (skip all attachment check)",                            display: "Potential Root Cause",      group: "post", show: "post-analysis" },
   { label: "📝 Lastest Action Items",   prompt: "List latest three comment's action items and who is action owner.",                             display: "Latest Action Items",    group: "post", show: "post-analysis" },
   { label: "🔄 More Similiar issues",      prompt: "List 10 similar issues' ID, title and score by table style.",        display: "List 10 similiar issues",       group: "post", show: "post-analysis" },
@@ -572,6 +572,23 @@ function onAnswerChunk(text) {
   currentAiText += text;
   isStreaming = true;
 
+  // Update status bar with current progress block / ASCII progress bar label
+  if (progressFilterEnabled) {
+    const { blockLabel, inBlock, progressLabel, progressDone } = getProgressFilteredText(currentAiText);
+    if (inBlock && blockLabel) {
+      // Inside ===...=== block: show the label
+      setStatus("connected", blockLabel.substring(0, 50));
+    } else if (!inBlock && blockLabel && !progressLabel) {
+      // Block just closed, no progress bar yet: ✅ block label
+      setStatus("connected", `✅ ${blockLabel.substring(0, 48)}`);
+    } else if (progressLabel) {
+      // ASCII progress bar: ⏳ for in-progress, ✅ for 100%
+      setStatus("connected", progressDone
+        ? `✅ ${progressLabel.substring(0, 48)}`
+        : `⏳ ${progressLabel.substring(0, 48)}`);
+    }
+  }
+
   // Skip render entirely if tab is not visible
   if (document.hidden) return;
 
@@ -579,6 +596,14 @@ function onAnswerChunk(text) {
   if (renderTimer) clearTimeout(renderTimer);
   renderTimer = setTimeout(() => {
     if (!currentAiMsg) return;
+
+    // When progress filter is on, render only the filtered (non-block) text
+    if (progressFilterEnabled) {
+      const { display } = getProgressFilteredText(currentAiText);
+      currentAiMsg.innerHTML = renderMarkdown(display);
+      scrollToBottom();
+      return;
+    }
 
     if (currentAiText.length < PROGRESSIVE_THRESHOLD) {
       // Small text: full render (accurate)
@@ -757,7 +782,10 @@ function finalizeAiMsg() {
     // Always do a full re-render on finalize for correctness
     frozenNode = null;
     tailNode = null;
-    currentAiMsg.innerHTML = renderMarkdown(currentAiText);
+    const finalDisplay = progressFilterEnabled
+      ? getProgressFilteredText(currentAiText).display
+      : currentAiText;
+    currentAiMsg.innerHTML = renderMarkdown(finalDisplay);
     scrollToBottom();
   }
   currentAiMsg = null;
@@ -1892,6 +1920,83 @@ if (autoInteractCheck) {
       : (uiLang === "zh" ? "⭕ 自動互動模式已關閉" : "⭕ Auto-Interact Mode disabled")
     );
   });
+}
+
+// ── Progress Block Filter ───────────────────────────────────────────
+const progressFilterCheck = document.getElementById("progress-filter-check");
+let progressFilterEnabled = false;
+
+(async () => {
+  try {
+    const stored = await chrome.storage.local.get({ progressFilter: false });
+    progressFilterEnabled = !!stored.progressFilter;
+    if (progressFilterCheck) progressFilterCheck.checked = progressFilterEnabled;
+  } catch { /* ignore */ }
+})();
+
+if (progressFilterCheck) {
+  progressFilterCheck.addEventListener("change", async () => {
+    progressFilterEnabled = progressFilterCheck.checked;
+    await chrome.storage.local.set({ progressFilter: progressFilterEnabled });
+    showToast(progressFilterEnabled
+      ? (uiLang === "zh" ? "✅ 進度區塊隱藏已開啟" : "✅ Progress block filter enabled")
+      : (uiLang === "zh" ? "⭕ 進度區塊隱藏已關閉" : "⭕ Progress block filter disabled")
+    );
+  });
+}
+
+/**
+ * Filter ===...=== progress blocks from AI text for chat display.
+ * @returns {{ display: string, statusText: string, inBlock: boolean }}
+ *   display    – text with all progress blocks removed
+ *   statusText – last label seen inside a block (e.g. "DONE - CHECKING HSD ATTACHMENTS")
+ *   inBlock    – true if the text ends inside an open (unclosed) block
+ */
+function getProgressFilteredText(text) {
+  const isSep        = (line) => /^={10,}\s*$/.test(line);
+  const isProgressBar = (line) => /^\[=+[ >]*\]\s*\d+%/.test(line.trim());
+
+  const lines = text.split('\n');
+  const displayLines = [];
+  let inBlock      = false;
+  let blockLabel   = "";   // last label inside ===...=== block
+  let progressLabel = "";  // extracted label from last [===] XX% bar
+  let progressDone  = false; // true if last progress bar was 100%
+
+  for (const line of lines) {
+    if (isSep(line)) {
+      inBlock = !inBlock;
+      // separator lines hidden from chat
+    } else if (inBlock) {
+      const t = line.trim();
+      if (t) blockLabel = t;
+      // block content hidden from chat
+    } else if (isProgressBar(line)) {
+      // [===...] XX% Description  → hidden from chat, track for status bar
+      const m = line.trim().match(/^\[=+[ >]*\]\s*(\d+)%\s*(.*)/);
+      if (m) {
+        progressDone  = parseInt(m[1]) === 100;
+        progressLabel = progressDone ? m[2].trim() : `${m[1]}% ${m[2].trim()}`;
+      }
+    } else {
+      displayLines.push(line);
+    }
+  }
+
+  // Collapse consecutive blank lines (artifacts from removed progress bars)
+  const collapsed = [];
+  let blankRun = 0;
+  for (const line of displayLines) {
+    if (line.trim() === "") {
+      blankRun++;
+      if (blankRun <= 1) collapsed.push(line);
+    } else {
+      blankRun = 0;
+      collapsed.push(line);
+    }
+  }
+
+  return { display: collapsed.join('\n'), blockLabel, inBlock, progressLabel, progressDone };
 }
 
 /**
