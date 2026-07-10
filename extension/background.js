@@ -172,29 +172,23 @@ async function ensureBridgeRunning(sendStatus) {
 // Chrome suspends Service Workers after ~30s of inactivity. During long tool
 // execution (RAG search, Sherlog), no events flow back, causing suspension.
 // This keep-alive prevents that by periodic self-ping while a session is active.
-// It also monitors SSE health and reconnects if the stream dropped silently.
+// ── Lazy SSE reconnect (no idle polling) ──────────────────────────────────
+// SSE is reconnected on-demand when the user sends a message, not periodically.
 
-let keepAliveInterval = null;
-
-function startKeepAlive() {
-  if (keepAliveInterval) return;
-  keepAliveInterval = setInterval(async () => {
-    try {
-      const health = await healthCheck();
-      // If session is active but SSE is disconnected, force reconnect
-      if (health.status === "ok" && health.session_active && !currentEventSource) {
-        console.log("[bg] Keep-alive detected dead SSE — reconnecting");
-        startStreaming();
-      }
-    } catch { /* ignore */ }
-  }, 15000); // every 15s
-}
-
-function stopKeepAlive() {
-  if (keepAliveInterval) {
-    clearInterval(keepAliveInterval);
-    keepAliveInterval = null;
+/**
+ * Ensure the SSE stream is connected before sending a message.
+ * If already open, resolves immediately.
+ * If not, calls startStreaming() and waits up to 3s for onopen.
+ */
+async function ensureSseConnected() {
+  if (currentEventSource && currentEventSource.readyState === EventSource.OPEN) return;
+  startStreaming();
+  // Poll up to 3s (30 × 100ms) for SSE to open
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 100));
+    if (currentEventSource && currentEventSource.readyState === EventSource.OPEN) return;
   }
+  // Proceed after timeout — sendMessage will fail gracefully if bridge is gone
 }
 
 // ── SSE Stream consumer ────────────────────────────────────────────────────
@@ -313,7 +307,6 @@ chrome.runtime.onConnect.addListener((port) => {
           if (health.session_active && !currentEventSource) {
             console.log("[bg] Re-establishing SSE stream after health check");
             startStreaming();
-            startKeepAlive();
           }
           break;
         }
@@ -346,7 +339,6 @@ chrome.runtime.onConnect.addListener((port) => {
             }
             port.postMessage({ action: "session_started", ...startResult });
             startStreaming();
-            startKeepAlive();
           } finally {
             isStarting = false;
           }
@@ -354,19 +346,16 @@ chrome.runtime.onConnect.addListener((port) => {
         }
 
         case "send": {
+          // Ensure SSE is connected before sending so we don't miss the response
+          await ensureSseConnected();
           const sendResult = await sendMessage(msg.message);
           if (sendResult.error === "session_busy") {
             port.postMessage({ type: "send_rejected", reason: "session_busy", message: sendResult.message || "AI is still processing." });
-          }
-          // Ensure SSE is connected after successful send
-          if (!currentEventSource && bridgePort) {
-            startStreaming();
           }
           break;
         }
 
         case "stop_session": {
-          stopKeepAlive();
           if (currentEventSource) {
             currentEventSource.close();
             currentEventSource = null;
