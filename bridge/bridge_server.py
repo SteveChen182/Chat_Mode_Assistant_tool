@@ -439,7 +439,7 @@ class ChatSession:
         if not dt_cmd:
             raise RuntimeError("dt command not found in PATH")
 
-        cmd = f'{dt_cmd} gnai chat --json --assistant {self.assistant}'
+        cmd = f'{dt_cmd} gnai chat --json --assistant={self.assistant}'
         if self.conversation_id:
             cmd += f' --conversation-id {self.conversation_id}'
             _debug(f"[session] CID mode: resuming conversation {self.conversation_id}")
