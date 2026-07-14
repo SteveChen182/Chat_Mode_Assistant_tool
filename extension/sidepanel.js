@@ -2587,6 +2587,12 @@ regressionInput.addEventListener("input", () => {
 
 connectPort();
 
+// Populate version badge in Settings menu
+(function () {
+  const el = document.getElementById('app-version-badge');
+  if (el) el.textContent = 'v' + chrome.runtime.getManifest().version;
+}());
+
 // Regression button wiring
 document.getElementById("reg-gfx-btn").addEventListener("click", () => {
   if (typeof checkGfxRegression === "function") checkGfxRegression();
