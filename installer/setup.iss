@@ -101,6 +101,7 @@ Type: dirifempty;      Name: "{app}"
 
 var
   EnvCheckPage: TInputOptionWizardPage;
+  IsUpgrade: Boolean;
 
 { Force-terminate bridge_server.exe before files are copied (upgrade installs). }
 function PrepareToInstall(var NeedsRestart: Boolean): String;
@@ -108,6 +109,11 @@ var
   ResultCode: Integer;
 begin
   Result := '';
+
+  { Detect upgrade: bridge_server.exe already present means this overwrites }
+  { an existing install. App dir is resolved and files not yet copied.      }
+  IsUpgrade := FileExists(ExpandConstant('{app}\bridge_server.exe'));
+
   Exec('taskkill.exe', '/F /IM bridge_server.exe', '', SW_HIDE,
        ewWaitUntilTerminated, ResultCode);
   { ResultCode 0 = process killed, 128 = process not found — both are fine. }
@@ -194,15 +200,38 @@ procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID = wpFinished then
   begin
-    WizardForm.FinishedLabel.Caption :=
-      'Installation complete!' + #13#10 + #13#10 +
-      'Last step: load the Chrome extension.' + #13#10 + #13#10 +
-      '  1. Open Chrome  >>  chrome://extensions/' + #13#10 +
-      '  2. Enable "Developer Mode" (top-right toggle)' + #13#10 +
-      '  3. Click "Load unpacked"' + #13#10 +
-      '  4. Select this folder:' + #13#10 +
-      '     ' + ExpandConstant('{app}\extension');
-    WizardForm.FinishedLabel.AutoSize := True;
+    if IsUpgrade then
+    begin
+      WizardForm.FinishedLabel.Caption :=
+        'Update complete!' + #13#10 + #13#10 +
+        'IMPORTANT: You must reload the extension in Chrome for the' + #13#10 +
+        'update to take effect.' + #13#10 + #13#10 +
+        '  1. Open Chrome  >>  chrome://extensions/' + #13#10 +
+        '  2. Find "Chat Mode Assistant"' + #13#10 +
+        '  3. Click the reload icon (circular arrow)';
+      WizardForm.FinishedLabel.AutoSize := True;
+
+      { Pop up a reminder so the user does not miss the reload step. }
+      MsgBox(
+        'Update installed successfully.' + #13#10 + #13#10 +
+        'Please reload the extension in Chrome for the changes to take effect:' + #13#10 + #13#10 +
+        '  1. Open  chrome://extensions/' + #13#10 +
+        '  2. Find "Chat Mode Assistant"' + #13#10 +
+        '  3. Click the reload (circular arrow) icon.',
+        mbInformation, MB_OK);
+    end
+    else
+    begin
+      WizardForm.FinishedLabel.Caption :=
+        'Installation complete!' + #13#10 + #13#10 +
+        'Last step: load the Chrome extension.' + #13#10 + #13#10 +
+        '  1. Open Chrome  >>  chrome://extensions/' + #13#10 +
+        '  2. Enable "Developer Mode" (top-right toggle)' + #13#10 +
+        '  3. Click "Load unpacked"' + #13#10 +
+        '  4. Select this folder:' + #13#10 +
+        '     ' + ExpandConstant('{app}\extension');
+      WizardForm.FinishedLabel.AutoSize := True;
+    end;
   end;
 end;
 
