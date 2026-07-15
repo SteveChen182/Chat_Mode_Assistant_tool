@@ -2037,6 +2037,17 @@ function hideAnalysisMenuPanel() {
   if (panel) panel.classList.remove("show");
 }
 
+/** Restore What's Next panel immediately (collapsed) after menu is dismissed. */
+function _restoreWhatsNextAfterMenu() {
+  if (activeHsdId && _postAnalysisShown) {
+    postAnalysisPanel.classList.remove("collapsed");
+    postAnalysisPanel.classList.add("show");
+    postAnalysisPanel.classList.add("collapsed"); // show collapsed
+    const titleEl = postAnalysisPanel.querySelector(".post-analysis-title");
+    if (titleEl) titleEl.textContent = _POST_TITLE_SHORT;
+  }
+}
+
 function showMenuInPanel(menuItems) {
   _showingMenuPanel = true;
 
@@ -2049,26 +2060,30 @@ function showMenuInPanel(menuItems) {
 
   list.innerHTML = "";
 
-  // Numbered items: prompt = "analysis <num>. <label>"
+  // Numbered items
   for (const item of menuItems) {
     const el = document.createElement("button");
     el.className = "analysis-menu-item";
     el.textContent = `${item.num}. ${item.label}`;
     el.addEventListener("click", () => {
       hideAnalysisMenuPanel();
+      _restoreWhatsNextAfterMenu();
+      // If label contains "skip", just send "skip" without "analysis" prefix
+      const isSkip = /skip/i.test(item.label);
       const fullLabel = `${item.num}. ${item.label}`;
-      sendUserMessage(`analysis ${fullLabel}`, fullLabel);
+      sendUserMessage(isSkip ? "skip" : `analysis ${fullLabel}`, fullLabel);
     });
     list.appendChild(el);
   }
 
-  // All / Skip keep their original semantic values
+  // All / Skip standalone buttons
   for (const spec of [{ label: "All", prompt: "all" }, { label: "Skip", prompt: "skip" }]) {
     const el = document.createElement("button");
     el.className = "analysis-menu-item";
     el.textContent = spec.label;
     el.addEventListener("click", () => {
       hideAnalysisMenuPanel();
+      _restoreWhatsNextAfterMenu();
       sendUserMessage(spec.prompt, spec.label);
     });
     list.appendChild(el);
