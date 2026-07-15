@@ -219,7 +219,8 @@ Step "Running Inno Setup Compiler (version $AppVersion)..."
 $ManifestPath = Join-Path $ProjectRoot "extension\manifest.json"
 if (Test-Path $ManifestPath) {
     $content = Get-Content $ManifestPath -Raw
-    $content = $content -replace '"version"\s*:\s*"[^"]*"', '"version": "' + $AppVersion + '"'
+    $replacement = '"version": "' + $AppVersion + '"'
+    $content = $content -replace '"version"\s*:\s*"[^"]*"', $replacement
     [System.IO.File]::WriteAllText($ManifestPath, $content,
         [System.Text.UTF8Encoding]::new($false))  # UTF-8 without BOM
     OK "extension/manifest.json version set to $AppVersion"
