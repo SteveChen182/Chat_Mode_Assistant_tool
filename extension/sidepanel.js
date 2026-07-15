@@ -778,9 +778,17 @@ function finalizeAiMsg() {
     const finalDisplay = progressFilterEnabled
       ? getProgressFilteredText(currentAiText).display
       : currentAiText;
-    currentAiMsg.innerHTML = renderMarkdown(finalDisplay);
-    // Inject inline [Click] buttons for menu items (auto-interact mode)
-    if (autoInteractEnabled) injectMenuClickButtons(currentAiMsg, currentAiText);
+    if (autoInteractEnabled) {
+      const menuItems = extractMenuItems(currentAiText);
+      if (menuItems.length > 0) {
+        currentAiMsg.innerHTML = renderMenuItemsWithButtons(finalDisplay, menuItems);
+        bindMenuClickEvents(currentAiMsg, menuItems);
+      } else {
+        currentAiMsg.innerHTML = renderMarkdown(finalDisplay);
+      }
+    } else {
+      currentAiMsg.innerHTML = renderMarkdown(finalDisplay);
+    }
     scrollToBottom();
   }
   currentAiMsg = null;
@@ -2007,81 +2015,77 @@ function extractMenuItems(text) {
     const key = `${num}:${label}`;
     if (!seen.has(key)) { seen.add(key); items.push({ num, label }); }
   };
+  const scanBlock = (block) => {
+    // Plain numbers: 1. label  or  1) label
+    for (const m of block.matchAll(/^\s*(\d+)[.)]\s+(.+)$/gm)) add(m[1], m[2].trim());
+    // Emoji numbers: 1️⃣  label
+    for (const m of block.matchAll(/^\s*(\d)\uFE0F\u20E3\s+(.+)$/gm)) add(m[1], m[2].trim());
+  };
 
-  // Strategy 1: Tagged menus [MENU:START...]...[MENU:END]
-  for (const m of text.matchAll(/\[MENU:START[^\]]*\]([\s\S]*?)\[MENU:END\]/g)) {
-    for (const li of m[1].matchAll(/^\s*(\d+)[.)\s]\s*(.+)$/gm)) add(li[1], li[2].trim());
-  }
+  // Tagged menus [MENU:START...]...[MENU:END]
+  for (const m of text.matchAll(/\[MENU:START[^\]]*\]([\s\S]*?)\[MENU:END\]/g)) scanBlock(m[1]);
 
-  // Strategy 2: Untagged menu after ── Analysis Menu ── header
-  const headerRe = /─{2,}[^─\n]*Analysis Menu[^─\n]*─{2,}/;
-  const headerIdx = text.search(headerRe);
-  if (headerIdx >= 0) {
-    const afterHeader = text.substring(headerIdx);
-    for (const li of afterHeader.matchAll(/^\s*(\d+)[.)\s]\s*(.+)$/gm)) add(li[1], li[2].trim());
+  // Untagged: ── Analysis Menu ── or similar header
+  const headerIdx = text.search(/─{2,}[^─\n]*Analysis Menu[^─\n]*─{2,}/);
+  if (headerIdx >= 0) scanBlock(text.substring(headerIdx));
+
+  // Fallback: emoji-numbered items anywhere (e.g. custom header like 「DisplayDebugger 分析焦點選單」)
+  if (items.length === 0) {
+    for (const m of text.matchAll(/^\s*(\d)\uFE0F\u20E3\s+(.+)$/gm)) add(m[1], m[2].trim());
   }
 
   return items;
 }
 
 /**
- * Inject inline [Click] buttons after each menu item <li> in the rendered message.
- * Also hides [MENU:START] / [MENU:END] metadata lines.
+ * Render AI message text with [Click] buttons injected after each menu item.
+ * Uses placeholder markers that survive renderMarkdown’s escaping pipeline.
  */
-function injectMenuClickButtons(msgEl, rawText) {
-  const items = extractMenuItems(rawText);
-  if (items.length === 0) return;
+function renderMenuItemsWithButtons(displayText, items) {
+  // Strip [MENU:START...] / [MENU:END] tags before rendering
+  let text = displayText
+    .replace(/\[MENU:START[^\]]*\]/g, '')
+    .replace(/\[MENU:END\]/g, '');
 
-  const norm = (s) => s.toLowerCase().trim().replace(/\s+/g, ' ');
-
-  const allLis = msgEl.querySelectorAll('li');
-  let injected = 0;
-
-  for (const li of allLis) {
-    if (li.querySelector('.menu-click-btn')) continue;
-    const liNorm = norm(li.textContent);
-
-    const matched = items.find(item => {
-      const prefix = norm(item.label).substring(0, 30);
-      return liNorm.startsWith(prefix) || norm(item.label).startsWith(liNorm.substring(0, 25));
-    });
-    if (!matched) continue;
-
-    const btn = document.createElement('button');
-    btn.className = 'menu-click-btn';
-    btn.textContent = 'Click';
-    btn.title = matched.label;
-
-    const isSkip = /skip/i.test(matched.label);
-    const prompt = isSkip ? 'skip' : `analysis ${matched.num}. ${matched.label}`;
-    const displayText = `${matched.num}. ${matched.label}`;
-
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      // Disable all [Click] buttons in this message after one is selected
-      msgEl.querySelectorAll('.menu-click-btn').forEach(b => { b.disabled = true; });
-      sendUserMessage(prompt, displayText);
-    });
-
-    li.appendChild(btn);
-    injected++;
+  // Add 【MENUBTN:N】 placeholder after each matching line
+  // (【 and 】 are not HTML special chars, so they survive escapeHtml)
+  for (const item of items) {
+    const n = item.num;
+    // Emoji format: 1️⃣  ...
+    text = text.replace(
+      new RegExp(`(^[^\\n]*${n}\\uFE0F\\u20E3[^\\n]*)`, 'gm'),
+      (m) => m.includes(`【MENUBTN:${n}】`) ? m : `${m}【MENUBTN:${n}】`
+    );
+    // Plain format: N. ...  or  N) ...
+    text = text.replace(
+      new RegExp(`(^[ \\t]*${n}[.)]\\s+[^\\n]+)`, 'gm'),
+      (m) => m.includes(`【MENUBTN:${n}】`) ? m : `${m}【MENUBTN:${n}】`
+    );
   }
 
-  // Hide [MENU:START...] / [MENU:END] metadata lines from display
-  if (injected > 0) {
-    const walker = document.createTreeWalker(msgEl, NodeFilter.SHOW_TEXT, null, false);
-    let node;
-    const toHide = new Set();
-    while ((node = walker.nextNode())) {
-      if (/\[MENU:(START|END)/.test(node.textContent)) {
-        let el = node.parentElement;
-        while (el && el !== msgEl && ['SPAN', 'EM', 'STRONG', 'CODE', 'A'].includes(el.tagName)) {
-          el = el.parentElement;
-        }
-        if (el && el !== msgEl) toHide.add(el);
-      }
-    }
-    toHide.forEach(el => (el.style.display = 'none'));
+  // Render markdown
+  let html = renderMarkdown(text);
+
+  // Replace placeholders with button HTML (data-menunum for JS binding)
+  html = html.replace(/【MENUBTN:(\d+)】/g,
+    (_, num) => ` <button class="menu-click-btn" data-menunum="${num}">Click</button>`);
+
+  return html;
+}
+
+/** Bind click handlers to [Click] buttons injected by renderMenuItemsWithButtons. */
+function bindMenuClickEvents(msgEl, items) {
+  for (const btn of msgEl.querySelectorAll('.menu-click-btn[data-menunum]')) {
+    const item = items.find(i => i.num === btn.getAttribute('data-menunum'));
+    if (!item) continue;
+    const isSkip = /skip/i.test(item.label);
+    const prompt = isSkip ? 'skip' : `analysis ${item.num}. ${item.label}`;
+    const dispText = `${item.num}. ${item.label}`;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      msgEl.querySelectorAll('.menu-click-btn').forEach(b => { b.disabled = true; });
+      sendUserMessage(prompt, dispText);
+    });
   }
 }
 
