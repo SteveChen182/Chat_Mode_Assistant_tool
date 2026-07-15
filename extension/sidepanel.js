@@ -252,6 +252,17 @@ document.getElementById("post-analysis-header").addEventListener("click", () => 
   }
 });
 
+// Analysis menu panel close button
+document.getElementById("analysis-menu-close")?.addEventListener("click", () => {
+  hideAnalysisMenuPanel();
+  _showingMenuPanel = false;
+  // Restore What's Next if we had an active HSD
+  if (activeHsdId && _postAnalysisShown) {
+    postAnalysisPanel.classList.remove("collapsed");
+    postAnalysisPanel.classList.add("show");
+  }
+});
+
 // ── Save Chat as HTML ──────────────────────────────────────────────────────
 btnSave.addEventListener("click", () => {
   const title = headerTitle.textContent || "Chat Mode Assistant";
@@ -726,6 +737,7 @@ function onReady(accumulatedAnswer) {
   // If no new MENU found but we were showing a menu panel → restore original post-analysis buttons
   if (_showingMenuPanel && activeHsdId) {
     _showingMenuPanel = false;
+    hideAnalysisMenuPanel();
     _postAnalysisShown = false;
     showPostAnalysisPanel();
     postAnalysisPanel.classList.add("collapsed");
@@ -1437,6 +1449,7 @@ function startNewSession() {
   hidePostAnalysisPanel();
   _postAnalysisShown = false;
   _showingMenuPanel = false;
+  hideAnalysisMenuPanel();
 
   // Push new empty session at front, shift others down
   sessions.unshift({
@@ -1556,6 +1569,7 @@ async function switchToSession(index) {
   currentAiText = "";
   accumulatedAnswer = "";
   _showingMenuPanel = false;
+  hideAnalysisMenuPanel();
 
   console.log(`[switchToSession] → tab ${index}, hsd=${activeHsdId}, cid=${activeConversationId}, bridgeCid=${bridgeSessionCid}`);
 
@@ -2018,51 +2032,48 @@ function parseMenuBlock(text) {
 /**
  * Show parsed menu items as buttons in the What's Next panel.
  */
-function showMenuInPanel(menuItems) {
-  const grid = document.getElementById("post-analysis-grid");
-  const panel = document.getElementById("post-analysis-panel");
-  if (!grid || !panel) return;
+function hideAnalysisMenuPanel() {
+  const panel = document.getElementById("analysis-menu-panel");
+  if (panel) panel.classList.remove("show");
+}
 
+function showMenuInPanel(menuItems) {
   _showingMenuPanel = true;
 
-  // Clear existing buttons and rebuild with menu items
-  grid.innerHTML = "";
+  // Hide What's Next panel while menu is shown
+  hidePostAnalysisPanel();
 
-  // Menu items from GNAI
+  const panel = document.getElementById("analysis-menu-panel");
+  const list  = document.getElementById("analysis-menu-list");
+  if (!panel || !list) return;
+
+  list.innerHTML = "";
+
+  // Numbered items: prompt = "analysis <num>. <label>"
   for (const item of menuItems) {
     const el = document.createElement("button");
-    el.className = "post-analysis-btn";
-    el.textContent = `${item.num}. ${item.label.substring(0, 50)}`;
-    el.title = item.label;
+    el.className = "analysis-menu-item";
+    el.textContent = `${item.num}. ${item.label}`;
     el.addEventListener("click", () => {
-      panel.classList.add("collapsed");
-      const titleEl = panel.querySelector(".post-analysis-title");
-      if (titleEl) titleEl.textContent = _POST_TITLE_SHORT;
-      // The panel will be restored to original buttons once the AI responds (in onReady)
-      sendUserMessage(item.prompt, `${item.num}. ${item.label}`);
+      hideAnalysisMenuPanel();
+      const fullLabel = `${item.num}. ${item.label}`;
+      sendUserMessage(`analysis ${fullLabel}`, fullLabel);
     });
-    grid.appendChild(el);
+    list.appendChild(el);
   }
 
-  // "All" and "Skip" buttons
-  for (const label of ["All", "Skip"]) {
+  // All / Skip keep their original semantic values
+  for (const spec of [{ label: "All", prompt: "all" }, { label: "Skip", prompt: "skip" }]) {
     const el = document.createElement("button");
-    el.className = "post-analysis-btn";
-    el.textContent = label;
+    el.className = "analysis-menu-item";
+    el.textContent = spec.label;
     el.addEventListener("click", () => {
-      panel.classList.add("collapsed");
-      const titleEl = panel.querySelector(".post-analysis-title");
-      if (titleEl) titleEl.textContent = _POST_TITLE_SHORT;
-      sendUserMessage(label.toLowerCase(), label);
+      hideAnalysisMenuPanel();
+      sendUserMessage(spec.prompt, spec.label);
     });
-    grid.appendChild(el);
+    list.appendChild(el);
   }
 
-  // Update panel title
-  const titleEl = panel.querySelector(".post-analysis-title");
-  if (titleEl) titleEl.textContent = uiLang === "zh" ? "📋 請選擇要分析的項目" : "📋 Select items to analyze";
-
-  panel.classList.remove("collapsed");
   panel.classList.add("show");
 }
 
