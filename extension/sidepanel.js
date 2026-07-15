@@ -2040,32 +2040,43 @@ function extractMenuItems(text) {
  * Uses placeholder markers that survive renderMarkdown’s escaping pipeline.
  */
 function renderMenuItemsWithButtons(displayText, items) {
-  // Strip [MENU:START...] / [MENU:END] tags before rendering
-  let text = displayText
-    .replace(/\[MENU:START[^\]]*\]/g, '')
-    .replace(/\[MENU:END\]/g, '');
+  if (items.length === 0) return renderMarkdown(displayText);
 
-  // Add 【MENUBTN:N】 placeholder after each matching line
-  // (【 and 】 are not HTML special chars, so they survive escapeHtml)
-  for (const item of items) {
-    const n = item.num;
-    // Emoji format: 1️⃣  ...
-    text = text.replace(
-      new RegExp(`(^[^\\n]*${n}\\uFE0F\\u20E3[^\\n]*)`, 'gm'),
-      (m) => m.includes(`【MENUBTN:${n}】`) ? m : `${m}【MENUBTN:${n}】`
-    );
-    // Plain format: N. ...  or  N) ...
-    text = text.replace(
-      new RegExp(`(^[ \\t]*${n}[.)]\\s+[^\\n]+)`, 'gm'),
-      (m) => m.includes(`【MENUBTN:${n}】`) ? m : `${m}【MENUBTN:${n}】`
-    );
+  // Helper: inject 【MENUBTN:N】 markers into a scoped section only
+  const markSection = (section) => {
+    let s = section;
+    for (const item of items) {
+      const n = item.num;
+      s = s.replace(
+        new RegExp(`(^[^\n]*${n}\\uFE0F\\u20E3[^\n]*)`, 'gm'),
+        (m) => m.includes(`\u3010MENUBTN:${n}\u3011`) ? m : `${m}\u3010MENUBTN:${n}\u3011`
+      );
+      s = s.replace(
+        new RegExp(`(^[ \\t]*${n}[.)]\\s+[^\n]+)`, 'gm'),
+        (m) => m.includes(`\u3010MENUBTN:${n}\u3011`) ? m : `${m}\u3010MENUBTN:${n}\u3011`
+      );
+    }
+    return s;
+  };
+
+  let text = displayText;
+
+  // For tagged menus: mark INSIDE [MENU:START]...[MENU:END], then strip the tags
+  text = text.replace(/\[MENU:START[^\]]*\]([\s\S]*?)\[MENU:END\]/g,
+    (_, inner) => markSection(inner));
+
+  // For untagged menus: mark only in the section AFTER ── Analysis Menu ── header
+  const headerMatch = text.match(/─{2,}[^─\n]*Analysis Menu[^─\n]*─{2,}/);
+  if (headerMatch) {
+    const headerEnd = text.indexOf(headerMatch[0]) + headerMatch[0].length;
+    text = text.substring(0, headerEnd) + markSection(text.substring(headerEnd));
   }
 
   // Render markdown
   let html = renderMarkdown(text);
 
-  // Replace placeholders with button HTML (data-menunum for JS binding)
-  html = html.replace(/【MENUBTN:(\d+)】/g,
+  // Replace markers with button HTML
+  html = html.replace(/\u3010MENUBTN:(\d+)\u3011/g,
     (_, num) => ` <button class="menu-click-btn" data-menunum="${num}">Click</button>`);
 
   return html;
