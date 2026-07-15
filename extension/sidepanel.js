@@ -724,28 +724,7 @@ function onReady(accumulatedAnswer) {
   // }
 
   // Parse MENU block from AI response → show as buttons in What's Next panel
-  console.log(`[menu-debug] autoInteractEnabled=${autoInteractEnabled} accumulatedAnswer.length=${accumulatedAnswer?.length} hasMenu=${accumulatedAnswer?.includes('[MENU:START')}`);
-  if (autoInteractEnabled && accumulatedAnswer) {
-    const menuItems = parseMenuBlock(accumulatedAnswer);
-    console.log(`[menu-debug] parseMenuBlock result:`, menuItems);
-    if (menuItems) {
-      showMenuInPanel(menuItems);
-      if (sessionMessages.length > 0) { saveCurrentSession(); persistSessions(); }
-      setInputEnabled(true);
-      return; // Skip regular post-analysis panel
-    }
-  }
-
-  // If no new MENU found but we were showing a menu panel → restore original post-analysis buttons
-  if (_showingMenuPanel && activeHsdId) {
-    _showingMenuPanel = false;
-    hideAnalysisMenuPanel();
-    _postAnalysisShown = false;
-    showPostAnalysisPanel();
-    postAnalysisPanel.classList.add("collapsed");
-    const titleEl = postAnalysisPanel.querySelector(".post-analysis-title");
-    if (titleEl) titleEl.textContent = _POST_TITLE_SHORT;
-  }
+  // (Inline [Click] buttons are injected in finalizeAiMsg instead)
 
   // Show post-analysis fancy panel after first HSD analysis completes
   if (accumulatedAnswer && activeHsdId && !_postAnalysisShown) {
@@ -800,6 +779,8 @@ function finalizeAiMsg() {
       ? getProgressFilteredText(currentAiText).display
       : currentAiText;
     currentAiMsg.innerHTML = renderMarkdown(finalDisplay);
+    // Inject inline [Click] buttons for menu items (auto-interact mode)
+    if (autoInteractEnabled) injectMenuClickButtons(currentAiMsg, currentAiText);
     scrollToBottom();
   }
   currentAiMsg = null;
@@ -2016,19 +1997,92 @@ function getProgressFilteredText(text) {
 }
 
 /**
- * Parse [MENU:START:state=...]...[MENU:END] blocks from AI response.
- * Returns array of {num, label, prompt} for each numbered item.
+ * Extract numbered menu items from raw AI text.
+ * Handles both tagged [MENU:START]...[MENU:END] and untagged ── Analysis Menu ── blocks.
  */
-function parseMenuBlock(text) {
-  const blockMatch = text.match(/\[MENU:START[^\]]*\]([\s\S]*?)\[MENU:END\]/);
-  if (!blockMatch) return null;
-  const block = blockMatch[1];
+function extractMenuItems(text) {
   const items = [];
-  // Match numbered lines: "1. Label" or "1) Label"
-  for (const m of block.matchAll(/^\s*(\d+)[.)\s]\s*(.+)$/gm)) {
-    items.push({ num: m[1], label: m[2].trim(), prompt: m[1] });
+  const seen = new Set();
+  const add = (num, label) => {
+    const key = `${num}:${label}`;
+    if (!seen.has(key)) { seen.add(key); items.push({ num, label }); }
+  };
+
+  // Strategy 1: Tagged menus [MENU:START...]...[MENU:END]
+  for (const m of text.matchAll(/\[MENU:START[^\]]*\]([\s\S]*?)\[MENU:END\]/g)) {
+    for (const li of m[1].matchAll(/^\s*(\d+)[.)\s]\s*(.+)$/gm)) add(li[1], li[2].trim());
   }
-  return items.length > 0 ? items : null;
+
+  // Strategy 2: Untagged menu after ── Analysis Menu ── header
+  const headerRe = /─{2,}[^─\n]*Analysis Menu[^─\n]*─{2,}/;
+  const headerIdx = text.search(headerRe);
+  if (headerIdx >= 0) {
+    const afterHeader = text.substring(headerIdx);
+    for (const li of afterHeader.matchAll(/^\s*(\d+)[.)\s]\s*(.+)$/gm)) add(li[1], li[2].trim());
+  }
+
+  return items;
+}
+
+/**
+ * Inject inline [Click] buttons after each menu item <li> in the rendered message.
+ * Also hides [MENU:START] / [MENU:END] metadata lines.
+ */
+function injectMenuClickButtons(msgEl, rawText) {
+  const items = extractMenuItems(rawText);
+  if (items.length === 0) return;
+
+  const norm = (s) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+
+  const allLis = msgEl.querySelectorAll('li');
+  let injected = 0;
+
+  for (const li of allLis) {
+    if (li.querySelector('.menu-click-btn')) continue;
+    const liNorm = norm(li.textContent);
+
+    const matched = items.find(item => {
+      const prefix = norm(item.label).substring(0, 30);
+      return liNorm.startsWith(prefix) || norm(item.label).startsWith(liNorm.substring(0, 25));
+    });
+    if (!matched) continue;
+
+    const btn = document.createElement('button');
+    btn.className = 'menu-click-btn';
+    btn.textContent = 'Click';
+    btn.title = matched.label;
+
+    const isSkip = /skip/i.test(matched.label);
+    const prompt = isSkip ? 'skip' : `analysis ${matched.num}. ${matched.label}`;
+    const displayText = `${matched.num}. ${matched.label}`;
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Disable all [Click] buttons in this message after one is selected
+      msgEl.querySelectorAll('.menu-click-btn').forEach(b => { b.disabled = true; });
+      sendUserMessage(prompt, displayText);
+    });
+
+    li.appendChild(btn);
+    injected++;
+  }
+
+  // Hide [MENU:START...] / [MENU:END] metadata lines from display
+  if (injected > 0) {
+    const walker = document.createTreeWalker(msgEl, NodeFilter.SHOW_TEXT, null, false);
+    let node;
+    const toHide = new Set();
+    while ((node = walker.nextNode())) {
+      if (/\[MENU:(START|END)/.test(node.textContent)) {
+        let el = node.parentElement;
+        while (el && el !== msgEl && ['SPAN', 'EM', 'STRONG', 'CODE', 'A'].includes(el.tagName)) {
+          el = el.parentElement;
+        }
+        if (el && el !== msgEl) toHide.add(el);
+      }
+    }
+    toHide.forEach(el => (el.style.display = 'none'));
+  }
 }
 
 /**
