@@ -941,6 +941,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._handle_stop()
         elif self.path == "/bridge/shutdown":
             self._handle_shutdown()
+        elif self.path == "/toolkit/update":
+            self._handle_toolkit_update()
         elif self.path == "/driver-history":
             self._handle_driver_history_post()
         elif self.path == "/driver-history/delete":
@@ -975,6 +977,45 @@ class BridgeHandler(BaseHTTPRequestHandler):
         # Schedule server shutdown in a separate thread to allow response to be sent
         import threading
         threading.Thread(target=self.server.shutdown, daemon=True).start()
+
+    def _handle_toolkit_update(self):
+        """POST /toolkit/update  —  run git pull on SightingAssistantTool."""
+        import subprocess
+        toolkit_dir = os.environ.get("GNAI_TOOLKIT_DIRECTORY", "").strip()
+        if not toolkit_dir:
+            # Fallback: same logic as config.py — toolkit is two levels above src/utils
+            bridge_dir = os.path.dirname(os.path.abspath(__file__))
+            # bridge/ → project root, then find toolkit via default dt path
+            home = os.path.expanduser("~")
+            toolkit_dir = os.path.join(home, ".gnai", "toolkits", "SightingAssistantTool")
+
+        if not os.path.isdir(os.path.join(toolkit_dir, ".git")):
+            self._json_response(400, {"error": "not_a_git_repo", "path": toolkit_dir})
+            return
+
+        try:
+            result = subprocess.run(
+                ["git", "pull", "origin", "main"],
+                cwd=toolkit_dir,
+                capture_output=True, text=True, timeout=60
+            )
+            # Get latest commit after pull
+            commit = subprocess.run(
+                ["git", "log", "--oneline", "-1"],
+                cwd=toolkit_dir,
+                capture_output=True, text=True, timeout=10
+            ).stdout.strip()
+            self._json_response(200, {
+                "status": "ok" if result.returncode == 0 else "error",
+                "stdout": result.stdout.strip(),
+                "stderr": result.stderr.strip(),
+                "commit": commit,
+                "path": toolkit_dir,
+            })
+        except subprocess.TimeoutExpired:
+            self._json_response(504, {"error": "timeout"})
+        except Exception as e:
+            self._json_response(500, {"error": str(e)})
 
     # ── Driver History endpoints ─────────────────────────────────────────────
 

@@ -2107,6 +2107,47 @@ debugModeApplyBtn.addEventListener("click", async () => {
   }
 });
 
+// ── Toolkit Update Button ────────────────────────────────────────────────────
+document.getElementById("btn-toolkit-update")?.addEventListener("click", async () => {
+  const btn = document.getElementById("btn-toolkit-update");
+  const resultEl = document.getElementById("toolkit-update-result");
+  btn.disabled = true;
+  btn.textContent = "⏳ Updating...";
+  resultEl.style.display = "none";
+
+  try {
+    const bridgeUrl = `http://127.0.0.1:${await (async () => {
+      const stored = await chrome.storage.local.get({ bridgePort: 8776 });
+      return stored.bridgePort;
+    })()}`;
+    const resp = await fetch(`${bridgeUrl}/toolkit/update`, { method: "POST" });
+    const data = await resp.json();
+
+    if (data.status === "ok") {
+      const alreadyLatest = data.stdout.includes("Already up to date");
+      btn.textContent = "🔄 Update Toolkit (git pull)";
+      resultEl.style.display = "block";
+      resultEl.style.color = "#16a34a";
+      resultEl.textContent = alreadyLatest
+        ? `✅ Already up to date — ${data.commit}`
+        : `✅ Updated! ${data.commit}`;
+      if (!alreadyLatest) showToast("✅ Toolkit updated — restart session to apply", "success");
+    } else {
+      btn.textContent = "🔄 Update Toolkit (git pull)";
+      resultEl.style.display = "block";
+      resultEl.style.color = "#dc2626";
+      resultEl.textContent = `❌ ${data.error || data.stderr || "Update failed"}`;
+    }
+  } catch (e) {
+    btn.textContent = "🔄 Update Toolkit (git pull)";
+    resultEl.style.display = "block";
+    resultEl.style.color = "#dc2626";
+    resultEl.textContent = "❌ Bridge not connected";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 btnSettings.addEventListener("click", (e) => {
   e.stopPropagation();
   const menu = document.getElementById("settingsMenu");
