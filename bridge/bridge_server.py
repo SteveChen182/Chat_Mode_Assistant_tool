@@ -74,9 +74,16 @@ def _debug(msg):
 
 
 def _debug_to_file(line):
-    """Append to bridge_debug.log in the same directory as this script."""
+    """Append to bridge_debug.log; rotate when it exceeds 5 MB."""
     try:
         log_path = os.path.join(_SCRIPT_DIR, "bridge_debug.log")
+        # Rotate: if file > 5 MB, keep only the last 2 MB
+        if os.path.exists(log_path) and os.path.getsize(log_path) > 5 * 1024 * 1024:
+            with open(log_path, "rb") as f:
+                f.seek(-2 * 1024 * 1024, 2)
+                tail = f.read()
+            with open(log_path, "wb") as f:
+                f.write(b"[...rotated...]\n" + tail)
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(f"{time.strftime('%H:%M:%S')} {line}")
     except Exception:
@@ -88,10 +95,25 @@ _session_log_path = None
 
 
 def _init_session_log():
-    """Create a new session log file in bridge/log/ with timestamp-based name."""
+    """Create a new session log file in bridge/log/ with timestamp-based name.
+    Keeps only the latest 20 session logs; older ones are deleted."""
     global _session_log_path
     log_dir = os.path.join(_SCRIPT_DIR, "log")
     os.makedirs(log_dir, exist_ok=True)
+
+    # Prune old session logs — keep newest 20
+    try:
+        existing = sorted(
+            [f for f in os.listdir(log_dir) if f.startswith("session_") and f.endswith(".log")]
+        )  # lexicographic sort = chronological (timestamp filenames)
+        for old in existing[:-20]:  # delete all but last 20
+            try:
+                os.remove(os.path.join(log_dir, old))
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     filename = f"session_{time.strftime('%Y%m%d_%H%M%S')}.log"
     _session_log_path = os.path.join(log_dir, filename)
     _session_log("SESSION", f"Log started: {filename}")
