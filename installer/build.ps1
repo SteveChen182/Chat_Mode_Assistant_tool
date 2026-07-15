@@ -260,3 +260,41 @@ Write-Host "  Share BOTH files with end-users:"              -ForegroundColor Wh
 Write-Host "    1. check_env.exe  — run first to verify prerequisites" -ForegroundColor White
 Write-Host "    2. Chat_Mode_Assistant_Setup_${AppVersion}.exe  — main installer"     -ForegroundColor White
 Write-Host ""
+
+# 13. Publish GitHub Release
+Step "Publishing GitHub Release v$AppVersion..."
+
+$ghCmd = Get-Command gh -ErrorAction SilentlyContinue
+if (-not $ghCmd) {
+    Write-Host "  [SKIP] GitHub CLI (gh) not found — skipping release." -ForegroundColor Yellow
+    Write-Host "         Install from: https://cli.github.com/" -ForegroundColor Yellow
+} else {
+    # Check if this tag/release already exists
+    $existing = gh release view "v$AppVersion" 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  [WARN] Release v$AppVersion already exists on GitHub." -ForegroundColor Yellow
+        $overwrite = Read-Host "  Delete and recreate? (y/N)"
+        if ($overwrite -eq 'y' -or $overwrite -eq 'Y') {
+            gh release delete "v$AppVersion" --yes 2>&1 | Out-Null
+            git tag -d "v$AppVersion" 2>&1 | Out-Null
+            git push origin ":refs/tags/v$AppVersion" 2>&1 | Out-Null
+            Write-Host "  Old release deleted." -ForegroundColor DarkGray
+        } else {
+            Write-Host "  Skipping release publish." -ForegroundColor Yellow
+            exit 0
+        }
+    }
+
+    gh release create "v$AppVersion" `
+        --title "v$AppVersion" `
+        --notes "Chat Mode Assistant $AppVersion`n`nFiles:`n- **Chat_Mode_Assistant_Setup_${AppVersion}.exe** — run this to install`n- **check_env.exe** — run this first to verify prerequisites" `
+        $outputExe `
+        $outputCheck
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  [WARN] GitHub Release creation failed. Files are still at $OutputDir" -ForegroundColor Yellow
+    } else {
+        OK "GitHub Release v$AppVersion published"
+        Write-Host "  https://github.com/SteveChen182/Chat_Mode_Assistant_tool/releases/tag/v$AppVersion" -ForegroundColor Cyan
+    }
+}
