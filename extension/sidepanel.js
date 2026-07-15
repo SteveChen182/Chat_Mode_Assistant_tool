@@ -724,8 +724,10 @@ function onReady(accumulatedAnswer) {
   // }
 
   // Parse MENU block from AI response → show as buttons in What's Next panel
+  console.log(`[menu-debug] autoInteractEnabled=${autoInteractEnabled} accumulatedAnswer.length=${accumulatedAnswer?.length} hasMenu=${accumulatedAnswer?.includes('[MENU:START')}`);
   if (autoInteractEnabled && accumulatedAnswer) {
     const menuItems = parseMenuBlock(accumulatedAnswer);
+    console.log(`[menu-debug] parseMenuBlock result:`, menuItems);
     if (menuItems) {
       showMenuInPanel(menuItems);
       if (sessionMessages.length > 0) { saveCurrentSession(); persistSessions(); }
