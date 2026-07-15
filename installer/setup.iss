@@ -5,7 +5,11 @@
 ; ============================================================================
 
 #define MyAppName      "Chat Mode Assistant"
-#define MyAppVersion   "0.1.0"
+; MyAppVersion is normally injected by build.ps1 via /DMyAppVersion=x.y.z
+; Fall back to a placeholder when compiling setup.iss directly without build.ps1.
+#ifndef MyAppVersion
+  #define MyAppVersion "0.0.0"
+#endif
 #define MyAppPublisher "Intel"
 #define MyNmName       "com.chat_mode_assistant.bridge"
 #define ExtensionId    "pmbnnkfhdkommfpphknjpppmlmbihomi"
@@ -25,7 +29,7 @@ AllowNoIcons=yes
 
 ; Output installer to C:\Intel\
 OutputDir=C:\Intel
-OutputBaseFilename=Chat_Mode_Assistant_Setup
+OutputBaseFilename=Chat_Mode_Assistant_Setup_{#MyAppVersion}
 
 ; Compression
 Compression=lzma2/max
@@ -50,6 +54,9 @@ FinishedLabel=Installation complete. See instructions below.
 
 ; ── Files ─────────────────────────────────────────────────────────────────────
 [Files]
+; Environment checker — extracted to temp dir for pre-install check only
+Source: "dist\check_env.exe"; DestDir: "{tmp}"; Flags: nocompression dontcopy
+
 ; Bridge server (standalone exe, no Python needed)
 Source: "dist\bridge_server.exe"; DestDir: "{app}"; Flags: ignoreversion
 
@@ -92,6 +99,86 @@ Type: dirifempty;      Name: "{app}"
 ; ── Pascal code: generate nm_manifest.json at install time ───────────────────
 [Code]
 
+var
+  EnvCheckPage: TInputOptionWizardPage;
+  IsUpgrade: Boolean;
+
+{ Force-terminate bridge_server.exe before files are copied (upgrade installs). }
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Result := '';
+
+  { Detect upgrade: bridge_server.exe already present means this overwrites }
+  { an existing install. App dir is resolved and files not yet copied.      }
+  IsUpgrade := FileExists(ExpandConstant('{app}\bridge_server.exe'));
+
+  Exec('taskkill.exe', '/F /IM bridge_server.exe', '', SW_HIDE,
+       ewWaitUntilTerminated, ResultCode);
+  { ResultCode 0 = process killed, 128 = process not found — both are fine. }
+end;
+
+{ Create environment-check page immediately after the Welcome page. }
+procedure InitializeWizard;
+begin
+  EnvCheckPage := CreateInputOptionPage(wpWelcome,
+    'Environment Check',
+    'Verify system prerequisites before installation',
+    'Would you like to run the environment checker now?',
+    False, False);
+  EnvCheckPage.Add('Yes — run environment check (recommended)');
+  EnvCheckPage.Add('No  — skip and proceed directly to installation');
+  EnvCheckPage.Values[0] := True;
+end;
+
+{ Gate the Next button on the environment-check page. }
+function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := True;
+
+  if CurPageID = EnvCheckPage.ID then
+  begin
+    if EnvCheckPage.SelectedValueIndex = 0 then
+    begin
+      { Extract check_env.exe to the temp directory, then run it. }
+      ExtractTemporaryFile('check_env.exe');
+
+      if not Exec(ExpandConstant('{tmp}\check_env.exe'), '', '',
+                  SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+      begin
+        { Could not launch the checker — allow proceeding with a notice. }
+        MsgBox('Unable to launch the environment checker.' + #13#10 +
+               'Proceeding with installation.',
+               mbInformation, MB_OK);
+      end
+      else if ResultCode = 1 then
+      begin
+        { One or more checks failed — ask the user whether to continue. }
+        Result := MsgBox(
+          'Some environment checks failed.' + #13#10 +
+          'It is recommended to resolve the issues before installing.' + #13#10 + #13#10 +
+          'Continue installation anyway?',
+          mbConfirmation, MB_YESNO) = IDYES;
+      end
+      else if (ResultCode <> 0) and (ResultCode <> 2) then
+      begin
+        { Unknown exit code — checker may have crashed; warn and ask. }
+        Result := MsgBox(
+          'The environment checker exited unexpectedly (code: ' + IntToStr(ResultCode) + ').' + #13#10 +
+          'This may indicate a crash. Continue installation anyway?',
+          mbConfirmation, MB_YESNO) = IDYES;
+      end;
+      { ResultCode = 0 → all passed, proceed normally.              }
+      { ResultCode = 2 → checker closed before checks ran (treated  }
+      {                  as "skip"), proceed normally.               }
+    end;
+    { SelectedValueIndex = 1 → user chose Skip, proceed normally. }
+  end;
+end;
+
 { Write nm_manifest.json pointing to native_host.exe in the install directory. }
 procedure WriteNativeHostManifest(AppDir: String);
 var
@@ -121,15 +208,38 @@ procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID = wpFinished then
   begin
-    WizardForm.FinishedLabel.Caption :=
-      'Installation complete!' + #13#10 + #13#10 +
-      'Last step: load the Chrome extension.' + #13#10 + #13#10 +
-      '  1. Open Chrome  >>  chrome://extensions/' + #13#10 +
-      '  2. Enable "Developer Mode" (top-right toggle)' + #13#10 +
-      '  3. Click "Load unpacked"' + #13#10 +
-      '  4. Select this folder:' + #13#10 +
-      '     ' + ExpandConstant('{app}\extension');
-    WizardForm.FinishedLabel.AutoSize := True;
+    if IsUpgrade then
+    begin
+      WizardForm.FinishedLabel.Caption :=
+        'Update complete!' + #13#10 + #13#10 +
+        'IMPORTANT: You must reload the extension in Chrome for the' + #13#10 +
+        'update to take effect.' + #13#10 + #13#10 +
+        '  1. Open Chrome  >>  chrome://extensions/' + #13#10 +
+        '  2. Find "Chat Mode Assistant"' + #13#10 +
+        '  3. Click the reload icon (circular arrow)';
+      WizardForm.FinishedLabel.AutoSize := True;
+
+      { Pop up a reminder so the user does not miss the reload step. }
+      MsgBox(
+        'Update installed successfully.' + #13#10 + #13#10 +
+        'Please reload the extension in Chrome for the changes to take effect:' + #13#10 + #13#10 +
+        '  1. Open  chrome://extensions/' + #13#10 +
+        '  2. Find "Chat Mode Assistant"' + #13#10 +
+        '  3. Click the reload (circular arrow) icon.',
+        mbInformation, MB_OK);
+    end
+    else
+    begin
+      WizardForm.FinishedLabel.Caption :=
+        'Installation complete!' + #13#10 + #13#10 +
+        'Last step: load the Chrome extension.' + #13#10 + #13#10 +
+        '  1. Open Chrome  >>  chrome://extensions/' + #13#10 +
+        '  2. Enable "Developer Mode" (top-right toggle)' + #13#10 +
+        '  3. Click "Load unpacked"' + #13#10 +
+        '  4. Select this folder:' + #13#10 +
+        '     ' + ExpandConstant('{app}\extension');
+      WizardForm.FinishedLabel.AutoSize := True;
+    end;
   end;
 end;
 

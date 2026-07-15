@@ -12,7 +12,7 @@ import subprocess
 import sys
 import threading
 import tkinter as tk
-from tkinter import font as tkfont
+from tkinter import font as tkfont, messagebox
 
 
 # ── Check functions ────────────────────────────────────────────────────────
@@ -408,6 +408,12 @@ CHECKS = [
      "dt gnai toolkits register intel-innersource/drivers.gpu.core.sherlog-toolkit"),
 ]
 
+# Index of the sighting row inside CHECKS (used to attach the config button)
+_SIGHTING_IDX = next(i for i, (label, _, _c) in enumerate(CHECKS) if label == "sighting")
+
+# Recommended config content written to sighting toolkit's install directory
+SIGHTING_CONFIG_CONTENT = """{\n  \"version\": \"1.0\",\n  \"configured\": true,\n  \"features\": {\n    \"state_tokens_enabled\": false,\n    \"verbose_progress_updates\": false,\n    \"table_output_format\": true,\n    \"html_report_generation\": false,\n    \"subprocess_pause\": {\n      \"displaydebugger\": true,\n      \"sherlog\": true\n    }\n  },\n  \"cache\": {\n    \"enabled\": true,\n    \"rag_mandatory_checklist\": true,\n    \"rag_bkm\": true,\n    \"hsd_article\": false,\n    \"force_refresh\": false\n  },\n  \"paths\": {\n    \"gfx_repo_path\": \"\"\n  }\n}"""
+
 
 # ── GUI ────────────────────────────────────────────────────────────────────
 
@@ -436,6 +442,7 @@ class App(tk.Tk):
         self.title("Chat Mode Assistant — Environment Check")
         self.configure(bg=self.BG)
         self.resizable(True, True)
+        self._exit_code = 2  # 0=passed, 1=failed, 2=not completed
         self._fonts()
         self._build()
         self._center()
@@ -501,7 +508,16 @@ class App(tk.Tk):
             ) if install_cmd else None
             # Install button is hidden initially; pack() is called in _update_row when needed
 
-            self._rows.append((badge, detail_lbl, install_btn))
+            # Config button — only for the sighting row
+            config_btn = tk.Button(
+                info_frame, text="⚙  Apply Recommended Config",
+                font=self.f_mono,
+                command=lambda idx=i: self._apply_sighting_config(idx),
+                bg="#059669", fg="white", relief="flat",
+                padx=10, pady=3, cursor="hand2",
+            ) if i == _SIGHTING_IDX else None
+
+            self._rows.append((badge, detail_lbl, install_btn, config_btn))
 
         # ── Divider ────────────────────────────────────────────────────────
         tk.Frame(self._body, bg=self.BORDER, height=1).pack(fill="x", pady=(16, 10))
@@ -545,13 +561,17 @@ class App(tk.Tk):
         self._summary.config(text="Checking...", fg=self.GRAY)
         self._help.config(text="")
 
-        # Reset all rows to "running" state
-        for badge, detail, install_btn in self._rows:
+        # Reset all rows
+        for i, (badge, detail, install_btn, config_btn) in enumerate(self._rows):
             badge.config(text="⏳", fg=self.ORANGE)
             detail.config(text="Checking...", fg=self.GRAY)
             if install_btn:
                 install_btn.pack_forget()
                 install_btn.config(state="normal", text="▶  Install")
+            if config_btn:
+                config_btn.pack_forget()
+                config_btn.config(state="normal", text="⚙  Apply Recommended Config",
+                                  bg="#059669")
 
         def worker():
             results = []
@@ -560,16 +580,15 @@ class App(tk.Tk):
                     ok, msg = fn()
                 except Exception as e:
                     ok, msg = False, f"Error: {e}"
-                results.append((i, ok, msg))
-                # Update UI from main thread
                 self.after(0, self._update_row, i, ok, msg)
+                results.append((i, ok, msg))
 
             self.after(0, self._show_summary, results)
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _update_row(self, i, ok, msg):
-        badge, detail, install_btn = self._rows[i]
+        badge, detail, install_btn, config_btn = self._rows[i]
         if ok is True:
             icon, color = self.STATUS_OK
             detail_color = self.TEXT_MID
@@ -592,6 +611,13 @@ class App(tk.Tk):
                 install_btn.pack(anchor="w", pady=(4, 0))
             else:
                 install_btn.pack_forget()
+
+        # Show config button only when sighting toolkit is confirmed installed
+        if config_btn:
+            if ok is True:
+                config_btn.pack(anchor="w", pady=(4, 0))
+            else:
+                config_btn.pack_forget()
 
     def _show_summary(self, results):
         failed  = [(i, msg) for i, ok, msg in results if ok is False]
@@ -623,10 +649,11 @@ class App(tk.Tk):
             self._help.config(text="\n".join(help_lines))
 
         self._btn_recheck.config(state="normal")
+        self._exit_code = 1 if failed else 0
 
     def _install_toolkit(self, i):
         """Open a PowerShell console to run the register command, then re-check."""
-        _, _, install_btn = self._rows[i]
+        _, _, install_btn, _ = self._rows[i]
         cmd = CHECKS[i][2]
         if not cmd:
             return
@@ -646,6 +673,38 @@ class App(tk.Tk):
     def _recheck(self):
         self._run_checks()
 
+    def _apply_sighting_config(self, row_idx: int):
+        """Write the recommended config.local.json to the sighting toolkit directory."""
+        _, _, _, config_btn = self._rows[row_idx]
+        toolkits, err = _get_installed_toolkits()
+        if err or not toolkits or "sighting" not in toolkits:
+            messagebox.showerror(
+                "Error",
+                "Cannot determine sighting toolkit path.\n" + (err or "Toolkit not found"),
+            )
+            return
+
+        toolkit_path = toolkits["sighting"]["path"]
+        if not toolkit_path or not os.path.isdir(toolkit_path):
+            messagebox.showerror(
+                "Error",
+                f"Sighting toolkit path not found or is not a directory:\n{toolkit_path}",
+            )
+            return
+
+        config_path = os.path.join(toolkit_path, "config.local.json")
+        try:
+            with open(config_path, "w", encoding="utf-8") as f:
+                f.write(SIGHTING_CONFIG_CONTENT)
+            if config_btn:
+                config_btn.config(text="✓  Config Applied", state="disabled", bg=self.GREEN)
+            messagebox.showinfo(
+                "Config Applied",
+                f"Recommended config written to:\n{config_path}",
+            )
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to write config:\n{e}")
+
     def _on_close(self):
         """Kill all active gnai subprocesses before closing the window."""
         with _active_procs_lock:
@@ -657,13 +716,13 @@ class App(tk.Tk):
     def _on_resize(self, event):
         if event.widget is self:
             inner_w = max(200, event.width - 80)
-            for _, detail, _ in self._rows:
+            for _, detail, _, _cb in self._rows:
                 detail.config(wraplength=inner_w)
             self._help.config(wraplength=inner_w)
 
     def _center(self):
         self.update_idletasks()
-        w, h = self.winfo_reqwidth(), self.winfo_reqheight()
+        w, h = 800, 600
         sw = self.winfo_screenwidth()
         sh = self.winfo_screenheight()
         self.geometry(f"{w}x{h}+{(sw - w) // 2}+{(sh - h) // 2}")
@@ -676,3 +735,4 @@ class App(tk.Tk):
 if __name__ == "__main__":
     app = App()
     app.mainloop()
+    sys.exit(getattr(app, '_exit_code', 2))

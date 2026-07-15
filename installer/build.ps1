@@ -24,6 +24,13 @@ $DistDir      = Join-Path $InstallerDir "dist"
 $BuildDir     = Join-Path $InstallerDir "build"
 $OutputDir    = "C:\Intel"
 
+# ── Read version from version.txt ────────────────────────────────────────────
+$VersionFile = Join-Path $ProjectRoot "version.txt"
+if (-not (Test-Path $VersionFile)) { Write-Host "[WARN] version.txt not found — defaulting to 0.0.0" -ForegroundColor Yellow; $AppVersion = "0.0.0" }
+else { $AppVersion = (Get-Content $VersionFile -Raw).Trim() }
+Write-Host ""
+Write-Host "  Version: $AppVersion" -ForegroundColor Cyan
+
 Write-Host ""
 Write-Host "===============================================" -ForegroundColor Cyan
 Write-Host "  Chat Mode Assistant -- Installer Build"       -ForegroundColor Cyan
@@ -202,9 +209,21 @@ if (-not (Test-Path $OutputDir)) {
 OK "$OutputDir ready"
 
 # 10. Run Inno Setup
-Step "Running Inno Setup Compiler..."
+Step "Running Inno Setup Compiler (version $AppVersion)..."
+
+# Patch extension/manifest.json version before packaging
+$ManifestPath = Join-Path $ProjectRoot "extension\manifest.json"
+if (Test-Path $ManifestPath) {
+    $manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
+    $manifest.version = $AppVersion
+    $manifest | ConvertTo-Json -Depth 10 | Set-Content $ManifestPath -Encoding UTF8
+    OK "extension/manifest.json version set to $AppVersion"
+} else {
+    Write-Host "  [WARN] extension/manifest.json not found — skipping patch" -ForegroundColor Yellow
+}
+
 $issFile = Join-Path $InstallerDir "setup.iss"
-& $iscc $issFile
+& $iscc "/DMyAppVersion=$AppVersion" $issFile
 
 if ($LASTEXITCODE -ne 0) { Fail "Inno Setup compilation failed." }
 
@@ -217,7 +236,7 @@ Copy-Item $checkEnvSrc $checkEnvDst -Force
 OK "check_env.exe copied"
 
 # 12. Done
-$outputExe    = Join-Path $OutputDir "Chat_Mode_Assistant_Setup.exe"
+$outputExe    = Join-Path $OutputDir "Chat_Mode_Assistant_Setup_${AppVersion}.exe"
 $outputCheck  = Join-Path $OutputDir "check_env.exe"
 if (-not (Test-Path $outputExe)) { Fail "Expected output not found: $outputExe" }
 $finalSize      = "{0:N0}" -f (Get-Item $outputExe).Length
@@ -234,5 +253,5 @@ Write-Host "  Size         : $checkEnvSize bytes" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Share BOTH files with end-users:"              -ForegroundColor White
 Write-Host "    1. check_env.exe  — run first to verify prerequisites" -ForegroundColor White
-Write-Host "    2. Chat_Mode_Assistant_Setup.exe  — main installer"     -ForegroundColor White
+Write-Host "    2. Chat_Mode_Assistant_Setup_${AppVersion}.exe  — main installer"     -ForegroundColor White
 Write-Host ""
