@@ -212,11 +212,16 @@ OK "$OutputDir ready"
 Step "Running Inno Setup Compiler (version $AppVersion)..."
 
 # Patch extension/manifest.json version before packaging
+# Use regex replace (not ConvertFrom-Json/ConvertTo-Json) to avoid:
+#   - Key reordering by PowerShell 5.1
+#   - UTF-8 BOM being injected (which can break Chrome extension loading)
+#   - Long "key" field being truncated by ConvertTo-Json
 $ManifestPath = Join-Path $ProjectRoot "extension\manifest.json"
 if (Test-Path $ManifestPath) {
-    $manifest = Get-Content $ManifestPath -Raw | ConvertFrom-Json
-    $manifest.version = $AppVersion
-    $manifest | ConvertTo-Json -Depth 10 | Set-Content $ManifestPath -Encoding UTF8
+    $content = Get-Content $ManifestPath -Raw
+    $content = $content -replace '"version"\s*:\s*"[^"]*"', '"version": "' + $AppVersion + '"'
+    [System.IO.File]::WriteAllText($ManifestPath, $content,
+        [System.Text.UTF8Encoding]::new($false))  # UTF-8 without BOM
     OK "extension/manifest.json version set to $AppVersion"
 } else {
     Write-Host "  [WARN] extension/manifest.json not found — skipping patch" -ForegroundColor Yellow
