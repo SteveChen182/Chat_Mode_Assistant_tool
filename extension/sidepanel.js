@@ -2025,14 +2025,12 @@ function extractMenuItems(text) {
   // Tagged menus [MENU:START...]...[MENU:END]
   for (const m of text.matchAll(/\[MENU:START[^\]]*\]([\s\S]*?)\[MENU:END\]/g)) scanBlock(m[1]);
 
-  // Untagged: ── Analysis Menu ── or similar header
+  // Untagged: ── Analysis Menu ── header
   const headerIdx = text.search(/─{2,}[^─\n]*Analysis Menu[^─\n]*─{2,}/);
   if (headerIdx >= 0) scanBlock(text.substring(headerIdx));
 
-  // Fallback: emoji-numbered items anywhere (e.g. custom header like 「DisplayDebugger 分析焦點選單」)
-  if (items.length === 0) {
-    for (const m of text.matchAll(/^\s*(\d)\uFE0F\u20E3\s+(.+)$/gm)) add(m[1], m[2].trim());
-  }
+  // ⚠️ No fallback scan — only inject [Click] when explicit menu context is present.
+  // This prevents regular numbered lists in AI responses from getting buttons.
 
   return items;
 }
