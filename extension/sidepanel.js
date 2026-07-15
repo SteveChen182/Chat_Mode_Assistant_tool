@@ -2067,7 +2067,6 @@ function showMenuInPanel(menuItems) {
     el.textContent = `${item.num}. ${item.label}`;
     el.addEventListener("click", () => {
       hideAnalysisMenuPanel();
-      _restoreWhatsNextAfterMenu();
       // If label contains "skip", just send "skip" without "analysis" prefix
       const isSkip = /skip/i.test(item.label);
       const fullLabel = `${item.num}. ${item.label}`;
@@ -2083,7 +2082,6 @@ function showMenuInPanel(menuItems) {
     el.textContent = spec.label;
     el.addEventListener("click", () => {
       hideAnalysisMenuPanel();
-      _restoreWhatsNextAfterMenu();
       sendUserMessage(spec.prompt, spec.label);
     });
     list.appendChild(el);
