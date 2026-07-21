@@ -740,6 +740,11 @@ class ChatSession:
         if "steps" in data:
             steps = data["steps"]
             if isinstance(steps, list) and steps:
+                # A tool is actively running — cancel the idle timer so it does
+                # NOT synthesise a false 'ready' event mid-execution. Tools like
+                # Sherlog/DisplayDebugger can take 1-5 minutes between chunks,
+                # far longer than the 2 s idle threshold.
+                self._cancel_idle_timer()
                 step = steps[0]
                 return {
                     "type": "tool_start",
@@ -750,6 +755,9 @@ class ChatSession:
 
         # Tool request (detailed): {"request": {...}, ...}
         if "request" in data:
+            # Same reasoning as tool_start above: a tool is actively running,
+            # so suppress the idle-timeout's synthetic 'ready' event.
+            self._cancel_idle_timer()
             req = data["request"]
             meta = req.get("meta", {})
             config = meta.get("config", {})
@@ -1120,9 +1128,13 @@ class BridgeHandler(BaseHTTPRequestHandler):
         body = self._read_json_body()
         assistant = body.get("assistant", DEFAULT_ASSISTANT)
         conversation_id = body.get("conversation_id", None)
-        # If session already active, return it instead of killing
+        # If a session is already active with the SAME assistant, reuse it instead
+        # of killing/restarting. If the caller requested a *different* assistant
+        # (e.g. switching Chat -> Log Analysis Mode, which needs "displaydebugger"),
+        # fall through and restart with the new assistant — otherwise the bridge
+        # would silently keep running the old assistant forever.
         existing = _get_session()
-        if existing and existing.is_alive:
+        if existing and existing.is_alive and existing.assistant == assistant:
             self._json_response(200, {
                 "status": "already_active",
                 "assistant": existing.assistant,
@@ -1131,6 +1143,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 "message": "Session already running.",
             })
             return
+        if existing and existing.is_alive:
+            _debug(f"[start] assistant change requested ({existing.assistant} -> {assistant}); restarting session")
         try:
             _debug(f"[start] creating session: assistant={assistant} cid={conversation_id}")
             session = _start_session(assistant, conversation_id)

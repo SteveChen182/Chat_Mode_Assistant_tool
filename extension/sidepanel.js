@@ -1092,6 +1092,21 @@ function setInputEnabled(enabled) {
   const tabItems = document.querySelectorAll(".tab-item");
   tabItems.forEach(tab => { tab.style.pointerEvents = enabled ? "" : "none"; });
   if (enabled) inputEl.focus();
+
+  // Log Analysis Mode: the header status dot collapses to a colorless circle
+  // when "connected" (no visible text), so it can't tell the user whether
+  // GNAI is still working. Mirror the same busy/ready signal in a dedicated
+  // status pill inside the Log Analysis bar instead.
+  if (isLogAnalysisMode) {
+    setLogAnalysisStatus(enabled ? "ready" : "busy");
+    if (btnLogAnalyze) btnLogAnalyze.disabled = !enabled || !logPathInput.value.trim();
+  }
+}
+
+function setLogAnalysisStatus(state) {
+  if (!logAnalysisStatus) return;
+  logAnalysisStatus.className = `log-analysis-status ${state}`;
+  logAnalysisStatus.textContent = state === "busy" ? "⏳ Analyzing..." : "✅ Ready";
 }
 
 // ── Auto-scroll state ────────────────────────────────────────────────────────
@@ -2372,6 +2387,7 @@ const btnLogReset    = document.getElementById("btn-log-reset");
 const headerControls = document.getElementById("header-controls");
 const logAnalysisBar = document.getElementById("log-analysis-bar");
 const logAnalysisExit = document.getElementById("log-analysis-exit");
+const logAnalysisStatus = document.getElementById("log-analysis-status");
 const logPathInput = document.getElementById("log-path-input");
 const manPathInput = document.getElementById("man-path-input");
 const btnLogAnalyze = document.getElementById("btn-log-analyze");
