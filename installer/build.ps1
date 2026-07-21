@@ -73,6 +73,24 @@ if ($pywinptyOk -ne "ok") {
     OK "pywinpty found"
 }
 
+# Check regression-check dependencies (requests, requests_kerberos, urllib3)
+# — required at build time so PyInstaller can discover and bundle them into
+# bridge_server.exe alongside the regression_checker module.
+$regressionReqs = Join-Path $ProjectRoot "external\Check-gfx-driver-regression\requirements.txt"
+$regressionDepsOk = python -c "import requests, requests_kerberos, urllib3; print('ok')" 2>$null
+if ($regressionDepsOk -ne "ok") {
+    Write-Host "  Installing regression-check dependencies..." -ForegroundColor Yellow
+    if (Test-Path $regressionReqs) {
+        pip install -r $regressionReqs --quiet
+    } else {
+        pip install requests requests_kerberos urllib3 --quiet
+    }
+    if ($LASTEXITCODE -ne 0) { Fail "Failed to install regression-check dependencies." }
+    OK "regression-check dependencies installed"
+} else {
+    OK "regression-check dependencies found"
+}
+
 # 2. Check / install PyInstaller
 Step "Checking PyInstaller..."
 $pyinstaller = Get-Command pyinstaller -ErrorAction SilentlyContinue
@@ -127,6 +145,18 @@ foreach ($pyd in $pydFiles) {
     Write-Host "  + including $($pyd.Name)" -ForegroundColor DarkGray
 }
 
+# Bundle the GFX/GOP driver regression modules (external/Check-gfx-driver-regression)
+# into bridge_server.exe. bridge_server.py imports these as plain top-level
+# modules (import regression_checker / regression_bridge / regression_cache),
+# so PyInstaller can resolve and freeze them as long as their folder is on the
+# search path (--paths) at analysis time. Without this they are silently
+# missing from the frozen exe and the regression check tool fails at runtime.
+$regressionDir = Join-Path $ProjectRoot "external\Check-gfx-driver-regression"
+if (-not (Test-Path $regressionDir)) {
+    Fail "Regression module folder not found: $regressionDir"
+}
+Write-Host "  regression module dir: $regressionDir" -ForegroundColor DarkGray
+
 python -m PyInstaller `
     --onefile `
     --name bridge_server `
@@ -134,6 +164,11 @@ python -m PyInstaller `
     --workpath $BuildDir `
     --specpath $InstallerDir `
     --noconfirm `
+    --paths $regressionDir `
+    --hidden-import regression_checker `
+    --hidden-import regression_bridge `
+    --hidden-import regression_cache `
+    --collect-all requests_kerberos `
     @addBinaryArgs `
     $bridgeScript
 

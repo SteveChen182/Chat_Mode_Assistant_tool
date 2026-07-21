@@ -168,11 +168,19 @@ def _is_disconnect(err):
 
 
 # ── Regression module (Check-gfx-driver-regression) ───────────────────────
-_REGRESSION_MODULE_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "external", "Check-gfx-driver-regression")
-)
-if os.path.isdir(_REGRESSION_MODULE_DIR) and _REGRESSION_MODULE_DIR not in sys.path:
-    sys.path.insert(0, _REGRESSION_MODULE_DIR)
+# When frozen (PyInstaller onefile), regression_checker/regression_bridge/
+# regression_cache are bundled directly into the exe (see installer/build.ps1
+# --paths flag), so they import without needing the external/ folder on disk.
+# In dev mode (running bridge_server.py from source), fall back to locating
+# the sibling external/Check-gfx-driver-regression directory.
+if not getattr(sys, "frozen", False):
+    _REGRESSION_MODULE_DIR = os.path.normpath(
+        os.path.join(_SCRIPT_DIR, "..", "external", "Check-gfx-driver-regression")
+    )
+    if os.path.isdir(_REGRESSION_MODULE_DIR) and _REGRESSION_MODULE_DIR not in sys.path:
+        sys.path.insert(0, _REGRESSION_MODULE_DIR)
+else:
+    _REGRESSION_MODULE_DIR = "<bundled>"
 
 try:
     import regression_checker as _rc
@@ -207,7 +215,7 @@ except ImportError as _e:
         def lookup_multi(self, *a): return {}
         def save_multi(self, *a): pass
 
-_BRIDGE_DIR = os.path.dirname(os.path.abspath(__file__))
+_BRIDGE_DIR = _SCRIPT_DIR
 _driver_history      = _DriverHistoryStore(data_dir=_BRIDGE_DIR)
 _build_version_cache = _BuildVersionCache(data_dir=_BRIDGE_DIR)
 
