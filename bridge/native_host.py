@@ -41,25 +41,40 @@ def _read_port_file():
 
 
 def _is_pid_alive(pid):
-    """Check if a given PID is still running (Windows)."""
+    """Check if a given PID is still running (Windows).
+    Uses GetExitCodeProcess to distinguish zombie handles from live processes."""
     try:
         import ctypes
         kernel32 = ctypes.windll.kernel32
         handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
-        if handle:
-            kernel32.CloseHandle(handle)
+        if not handle:
+            return False
+        # GetExitCodeProcess: if still active, exit_code = 259 (STILL_ACTIVE)
+        exit_code = ctypes.c_ulong()
+        result = kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
+        kernel32.CloseHandle(handle)
+        if result and exit_code.value == 259:  # STILL_ACTIVE
             return True
+        return False
     except Exception:
         pass
     return False
 
 
 def _is_bridge_launching():
-    """Check if bridge was recently spawned but hasn't written port file yet."""
+    """Check if bridge was recently spawned but hasn't written port file yet.
+    Returns False (and cleans up stale PID file) if the process is dead."""
     try:
         with open(PID_FILE) as f:
             pid = int(f.read().strip())
-        return _is_pid_alive(pid)
+        if _is_pid_alive(pid):
+            return True
+        # PID file exists but process is dead — clean up stale files
+        try:
+            os.remove(PID_FILE)
+        except OSError:
+            pass
+        return False
     except Exception:
         return False
 
