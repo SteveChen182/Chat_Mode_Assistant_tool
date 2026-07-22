@@ -354,6 +354,7 @@ function connectPort() {
       // Session lifecycle
       case "session_started":
         _pendingSessionRestart = false;
+        _cancelConnectionTimeout();
         bridgeSessionCid = msg.conversation_id || "";
         console.log(`[session_started] status=${msg.status} cid="${bridgeSessionCid}" activeCid="${activeConversationId}" match=${bridgeSessionCid === activeConversationId}`);
         // Restore default placeholder (may have been changed by stop reconnect state)
@@ -408,12 +409,14 @@ function connectPort() {
         updateConnectionSplash(msg.message || "Starting...", "");
         break;
       case "bridge_unavailable":
+        _cancelConnectionTimeout();
         setStatus("disconnected", "No Bridge");
         updateConnectionSplash("Bridge unavailable", "Run: cd bridge && python bridge_server.py");
         addSystemMsg("❌ Bridge server not available. Please run:\n  cd bridge && python bridge_server.py\n\nOr set up auto-launch: .\\install_native_host.ps1");
         setInputEnabled(false);
         break;
       case "session_start_error":
+        _cancelConnectionTimeout();
         setStatus("disconnected", "Session Error");
         updateConnectionSplash("Session failed to start", msg.error || "Unknown error");
         addSystemMsg(`❌ Session error: ${msg.error}\n\nMake sure 'dt' is in your PATH.`);
@@ -1471,6 +1474,8 @@ function startNewSession() {
 
   if (port) {
     bridgeSessionCid = "";  // new session has no CID yet
+    showConnectionSplash("Starting new session...", "");
+    _startConnectionTimeout();
     port.postMessage({ action: "start_session" });
   }
 }
@@ -2854,10 +2859,41 @@ _restoreTransferState().then((restored) => {
   });
 });
 
+// ── Connection Timeout with Retry ──────────────────────────────────────────
+let _connectionTimeout = null;
+
+function _startConnectionTimeout() {
+  _cancelConnectionTimeout();
+  _connectionTimeout = setTimeout(() => {
+    _connectionTimeout = null;
+    // Show retry UI in splash
+    if (splashEl && splashEl.style.display !== 'none') {
+      splashText.textContent = uiLang === 'zh' ? '⚠️ 連線逾時' : '⚠️ Connection timeout';
+      splashSub.innerHTML = `<button id="splash-retry-btn" style="margin-top:8px;padding:6px 18px;background:#5F80AB;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">${uiLang === 'zh' ? '🔄 重試' : '🔄 Retry'}</button>`;
+      splashProgress.classList.add('done');
+      document.getElementById('splash-retry-btn')?.addEventListener('click', () => {
+        splashSub.textContent = '';
+        splashProgress.classList.remove('done');
+        splashText.textContent = uiLang === 'zh' ? '重新連線中...' : 'Reconnecting...';
+        _startConnectionTimeout();
+        if (port) port.postMessage({ action: 'start_session' });
+      });
+    }
+  }, 20000); // 20 seconds
+}
+
+function _cancelConnectionTimeout() {
+  if (_connectionTimeout) {
+    clearTimeout(_connectionTimeout);
+    _connectionTimeout = null;
+  }
+}
+
 // Auto-start: connect to bridge
 setTimeout(async () => {
   if (!port) return;
   setStatus("connected", "Connecting...");
   showConnectionSplash("Connecting to bridge server...", "Initializing session");
+  _startConnectionTimeout();
   port.postMessage({ action: "start_session" });
 }, 300);
