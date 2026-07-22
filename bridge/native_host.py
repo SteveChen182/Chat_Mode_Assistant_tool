@@ -28,6 +28,7 @@ else:
     BRIDGE_SCRIPT = os.path.join(SCRIPT_DIR, "bridge_server.py")
 
 PORT_FILE = os.path.join(SCRIPT_DIR, "bridge.port")
+PID_FILE = os.path.join(SCRIPT_DIR, "bridge.pid")
 
 
 def _read_port_file():
@@ -37,6 +38,30 @@ def _read_port_file():
             return int(f.read().strip())
     except Exception:
         return None
+
+
+def _is_pid_alive(pid):
+    """Check if a given PID is still running (Windows)."""
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if handle:
+            kernel32.CloseHandle(handle)
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _is_bridge_launching():
+    """Check if bridge was recently spawned but hasn't written port file yet."""
+    try:
+        with open(PID_FILE) as f:
+            pid = int(f.read().strip())
+        return _is_pid_alive(pid)
+    except Exception:
+        return False
 
 
 def _bridge_url(port):
@@ -112,6 +137,10 @@ def main():
         running, port = is_bridge_running()
         if running:
             send_message({"status": "already_running", "port": port})
+            return
+        # Check if bridge was already spawned (PID alive but port file not ready yet)
+        if _is_bridge_launching():
+            send_message({"status": "launching"})
             return
         # Not running: spawn bridge and return IMMEDIATELY (no waiting).
         # background.js will poll with "check" until bridge.port appears.
