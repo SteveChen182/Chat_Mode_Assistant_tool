@@ -425,6 +425,31 @@
       white-space: nowrap;
     }
     .log-analysis-bar .btn-exit:hover { background: #1d4ed8; color: #fff; }
+    .log-analysis-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .log-analysis-status {
+      display: inline-flex;
+      align-items: center;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+      transition: background 0.2s, color 0.2s;
+    }
+    .log-analysis-status.busy {
+      background: #fef3c7; color: #92400e;
+      animation: logStatusPulse 1.2s ease-in-out infinite;
+    }
+    .log-analysis-status.ready { background: #dcfce7; color: #15803d; }
+    @keyframes logStatusPulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.5; }
+    }
     .log-analysis-bar .btn-analyze {
       background: #1d4ed8; color: #fff; border: none; border-radius: 6px;
       padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
@@ -1153,7 +1178,10 @@
   <!-- Log Analysis mode bar -->
   <div id="log-analysis-bar" class="log-analysis-bar">
     <div class="log-analysis-title-row">
-      <span>📋 Log Analysis Mode &mdash; displaydebugger</span>
+      <div class="log-analysis-title-group">
+        <span>📋 Log Analysis Mode &mdash; displaydebugger</span>
+        <span id="log-analysis-status" class="log-analysis-status busy">⏳ Starting...</span>
+      </div>
       <button id="log-analysis-exit" class="btn-exit">&#8592; Exit Log Mode</button>
     </div>
     <div class="log-analysis-input-row">

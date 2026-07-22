@@ -171,7 +171,7 @@ async function ensureBridgeRunning(sendStatus) {
 // ── Service Worker keep-alive ───────────────────────────────────────────────
 // Chrome suspends Service Workers after ~30s of inactivity. During long tool
 // execution (RAG search, Sherlog), no events flow back, causing suspension.
-// This keep-alive prevents that by periodic self-ping while a session is active.
+// This is mitigated by the lazy SSE reconnect below (no periodic self-ping).
 // ── Lazy SSE reconnect (no idle polling) ──────────────────────────────────
 // SSE is reconnected on-demand when the user sends a message, not periodically.
 
@@ -367,7 +367,6 @@ chrome.runtime.onConnect.addListener((port) => {
 
         case "restart_bridge": {
           // Kill current bridge and re-launch with updated settings (e.g. debug mode)
-          stopKeepAlive();
           if (currentEventSource) {
             currentEventSource.close();
             currentEventSource = null;
@@ -388,7 +387,6 @@ chrome.runtime.onConnect.addListener((port) => {
             if (!startResult.error) {
               port.postMessage({ action: "session_started", ...startResult });
               startStreaming();
-              startKeepAlive();
             }
           }
           break;
@@ -402,7 +400,6 @@ chrome.runtime.onConnect.addListener((port) => {
           isStarting = true;
           try {
             // Stop current session cleanly
-            stopKeepAlive();
             if (currentEventSource) {
               currentEventSource.close();
               currentEventSource = null;
@@ -427,7 +424,6 @@ chrome.runtime.onConnect.addListener((port) => {
             }
             port.postMessage({ action: "session_started", ...restartResult });
             startStreaming();
-            startKeepAlive();
           } finally {
             isStarting = false;
           }
@@ -463,10 +459,6 @@ chrome.runtime.onConnect.addListener((port) => {
     if (activePort === port) activePort = null;
     // Don't close SSE on port disconnect — Service Worker may revive and
     // sidepanel will reconnect. Keep SSE alive to avoid losing events.
-    // Only stop keep-alive if no EventSource is active.
-    if (!currentEventSource) {
-      stopKeepAlive();
-    }
   });
 });
 

@@ -14,6 +14,22 @@ import threading
 import tkinter as tk
 from tkinter import font as tkfont, messagebox
 
+# Where to grab the latest dt.exe when it's missing from PATH.
+DT_DOWNLOAD_URL = "https://gfx-assets.intel.com/artifactory/gfx-build-assets/build-tools/devtool-go/latest/artifacts/win64/dt.exe"
+
+# Opens the download in the default browser, then reminds the user to run
+# `dt.exe install` once the download finishes (mirrors the toolkit "Install"
+# button flow — runs in a PowerShell console via _install_toolkit()).
+DT_INSTALL_HELP_CMD = (
+    f"Start-Process '{DT_DOWNLOAD_URL}'; "
+    "Write-Host ''; "
+    "Write-Host 'Downloading dt.exe in your browser...' -ForegroundColor Cyan; "
+    "Write-Host 'Once the download finishes, run this from the downloaded file''s folder:'; "
+    "Write-Host '  dt.exe install' -ForegroundColor Yellow; "
+    "Write-Host ''; "
+    "Read-Host 'Press Enter to close this window'"
+)
+
 
 # ── Check functions ────────────────────────────────────────────────────────
 
@@ -40,7 +56,10 @@ def check_dt_in_path():
             return True, f"{path}  ({version[:60]})"
         except Exception as e:
             return True, f"{path}  (version check failed: {e})"
-    return False, "dt not found in PATH — install Intel Developer Toolkit CLI"
+    return False, (
+        "dt not found in PATH — download the latest dt.exe from "
+        f"{DT_DOWNLOAD_URL} and run 'dt.exe install'"
+    )
 
 
 def check_gnai_connection():
@@ -398,8 +417,8 @@ def _make_toolkit_check(toolkit_name: str, assistant_name: str):
 
 
 CHECKS = [
-    ("Intel dt CLI (PATH)",      check_dt_in_path,  None),
-    ("GNAI 連線測試",               check_gnai_connection, None),
+    ("Intel dt CLI (PATH)",      check_dt_in_path,  DT_INSTALL_HELP_CMD),
+    ("GNAI Connection Test",     check_gnai_connection, None),
     ("sighting",       _make_toolkit_check("sighting",        "sighting_assistant"),
      "dt gnai toolkits register intel-sandbox/SightingAssistantTool"),
     ("displaydebugger", _make_toolkit_check("displaydebugger", "displaydebugger"),
@@ -410,6 +429,11 @@ CHECKS = [
 
 # Index of the sighting row inside CHECKS (used to attach the config button)
 _SIGHTING_IDX = next(i for i, (label, _, _c) in enumerate(CHECKS) if label == "sighting")
+
+# Index of the dt CLI row (its "Install" button downloads dt.exe instead of
+# running a toolkit register command)
+_DT_IDX = next(i for i, (label, _, _c) in enumerate(CHECKS) if label == "Intel dt CLI (PATH)")
+
 
 # Recommended config content written to sighting toolkit's install directory
 SIGHTING_CONFIG_CONTENT = """{\n  \"version\": \"1.0\",\n  \"configured\": true,\n  \"features\": {\n    \"state_tokens_enabled\": false,\n    \"verbose_progress_updates\": false,\n    \"table_output_format\": true,\n    \"html_report_generation\": false,\n    \"subprocess_pause\": {\n      \"displaydebugger\": true,\n      \"sherlog\": true\n    }\n  },\n  \"cache\": {\n    \"enabled\": true,\n    \"rag_mandatory_checklist\": true,\n    \"rag_bkm\": true,\n    \"hsd_article\": false,\n    \"force_refresh\": false\n  },\n  \"paths\": {\n    \"gfx_repo_path\": \"\"\n  }\n}"""
@@ -466,9 +490,37 @@ class App(tk.Tk):
         tk.Label(h, text="Environment Check — Prerequisites",
                  font=self.f_sub, fg="#93c5fd", bg=self.HEADER_BG).pack(anchor="w")
 
-        # ── Body ───────────────────────────────────────────────────────────
-        self._body = tk.Frame(self, bg=self.BG, padx=28, pady=20)
-        self._body.pack(fill="both", expand=True)
+        # ── Body (scrollable) ────────────────────────────────────────────
+        # Wrapped in a Canvas + Scrollbar so content that doesn't fit the
+        # window height gets a vertical slider instead of being clipped.
+        scroll_container = tk.Frame(self, bg=self.BG)
+        scroll_container.pack(fill="both", expand=True)
+
+        self._canvas = tk.Canvas(scroll_container, bg=self.BG, highlightthickness=0)
+        self._vscroll = tk.Scrollbar(scroll_container, orient="vertical",
+                                     command=self._canvas.yview)
+        self._canvas.configure(yscrollcommand=self._vscroll.set)
+        self._canvas.pack(side="left", fill="both", expand=True)
+        # Scrollbar is shown/hidden on demand by _update_scrollbar_visibility()
+
+        self._body = tk.Frame(self._canvas, bg=self.BG, padx=28, pady=20)
+        self._body_window = self._canvas.create_window((0, 0), window=self._body, anchor="nw")
+
+        def _on_body_configure(event):
+            self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+            self._update_scrollbar_visibility()
+        self._body.bind("<Configure>", _on_body_configure)
+
+        def _on_canvas_configure(event):
+            self._canvas.itemconfig(self._body_window, width=event.width)
+            self._update_scrollbar_visibility()
+        self._canvas.bind("<Configure>", _on_canvas_configure)
+
+        # Mouse wheel scrolling (Windows sends delta in multiples of 120)
+        def _on_mousewheel(event):
+            if self._vscroll.winfo_ismapped():
+                self._canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        self._canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
         tk.Label(self._body,
                  text="Checking the following prerequisites:",
@@ -500,7 +552,7 @@ class App(tk.Tk):
             detail_lbl.pack(fill="x")
 
             install_btn = tk.Button(
-                info_frame, text="▶  Install",
+                info_frame, text=("⬇  Download dt.exe" if i == _DT_IDX else "▶  Install"),
                 font=self.f_mono,
                 command=lambda idx=i: self._install_toolkit(idx),
                 bg=self.BLUE, fg="white", relief="flat",
@@ -567,7 +619,10 @@ class App(tk.Tk):
             detail.config(text="Checking...", fg=self.GRAY)
             if install_btn:
                 install_btn.pack_forget()
-                install_btn.config(state="normal", text="▶  Install")
+                install_btn.config(
+                    state="normal",
+                    text="⬇  Download dt.exe" if i == _DT_IDX else "▶  Install",
+                )
             if config_btn:
                 config_btn.pack_forget()
                 config_btn.config(state="normal", text="⚙  Apply Recommended Config",
@@ -603,11 +658,13 @@ class App(tk.Tk):
         detail.config(text=msg, fg=detail_color)
 
         # Show install button only when toolkit is confirmed not installed
+        # (or, for the dt CLI row, whenever dt itself is missing from PATH)
         if install_btn:
             toolkit_not_installed = ok is False and (
                 "not installed" in msg or "missing dependency" in msg
             )
-            if toolkit_not_installed:
+            dt_missing = (i == _DT_IDX and ok is False)
+            if toolkit_not_installed or dt_missing:
                 install_btn.pack(anchor="w", pady=(4, 0))
             else:
                 install_btn.pack_forget()
@@ -715,18 +772,34 @@ class App(tk.Tk):
 
     def _on_resize(self, event):
         if event.widget is self:
-            inner_w = max(200, event.width - 80)
+            inner_w = max(200, event.width - 100)
             for _, detail, _, _cb in self._rows:
                 detail.config(wraplength=inner_w)
             self._help.config(wraplength=inner_w)
 
+    def _update_scrollbar_visibility(self):
+        """Show the vertical scrollbar only when body content overflows the canvas."""
+        bbox = self._canvas.bbox("all")
+        if not bbox:
+            return
+        content_h = bbox[3] - bbox[1]
+        canvas_h = self._canvas.winfo_height()
+        if content_h > canvas_h:
+            if not self._vscroll.winfo_ismapped():
+                self._vscroll.pack(side="right", fill="y")
+        else:
+            if self._vscroll.winfo_ismapped():
+                self._vscroll.pack_forget()
+
     def _center(self):
         self.update_idletasks()
-        w, h = 800, 600
         sw = self.winfo_screenwidth()
         sh = self.winfo_screenheight()
+        # Default to 1366x768, clamped so it still fits on smaller screens
+        w = min(1366, sw)
+        h = min(768, sh)
         self.geometry(f"{w}x{h}+{(sw - w) // 2}+{(sh - h) // 2}")
-        self.minsize(w, h)
+        self.minsize(min(800, w), min(600, h))
         self.bind("<Configure>", self._on_resize)
 
 
