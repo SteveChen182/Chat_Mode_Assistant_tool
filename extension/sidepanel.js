@@ -60,6 +60,8 @@ const statusBadge = document.getElementById("status-badge");
 const btnHistory = null; // removed — replaced by tab bar
 const btnSettings = document.getElementById("btn-settings");
 const btnPopout = document.getElementById("btn-popout");
+const btnResetConnection = document.getElementById("btn-reset-connection");
+const connectionResetResult = document.getElementById("connection-reset-result");
 const onboardingEl = document.getElementById("onboarding");
 const onboardingImportBtn = document.getElementById("onboarding-import-btn");
 const onboardingHsdInput = document.getElementById("onboarding-hsd-input");
@@ -356,6 +358,7 @@ function connectPort() {
         _pendingSessionRestart = false;
         _cancelConnectionTimeout();
         bridgeSessionCid = msg.conversation_id || "";
+        if (msg.status !== "already_active") _sessionReadyNoticeShown = false;
         console.log(`[session_started] status=${msg.status} cid="${bridgeSessionCid}" activeCid="${activeConversationId}" match=${bridgeSessionCid === activeConversationId}`);
         // Restore default placeholder (may have been changed by stop reconnect state)
         inputEl.placeholder = "Type a message or HSD ID...";
@@ -401,6 +404,14 @@ function connectPort() {
         } else {
           setInputEnabled(false);
         }
+        break;
+      case "session_interrupted":
+        removeToolIndicator();
+        removeTypingIndicator();
+        isStreaming = false;
+        currentAiMsg = null;
+        currentAiText = "";
+        addSystemMsg(uiLang === "zh" ? "已停止目前分析，正在重新連線..." : "Current analysis stopped. Reconnecting...");
         break;
 
       // Startup progress
@@ -519,6 +530,51 @@ function connectPort() {
         // SSE will auto-reconnect in background.js; if it gives up, we'll get bridge_unavailable
         break;
 
+      case "recovery_progress":
+        setStatus("connected", "Resetting...");
+        showConnectionSplash(msg.message || "Resetting connection...", "Bridge and CLI will be restarted.");
+        if (connectionResetResult) {
+          connectionResetResult.className = "connection-reset-result";
+          connectionResetResult.style.display = "block";
+          connectionResetResult.textContent = msg.message || "Resetting connection...";
+        }
+        break;
+
+      case "recovery_result": {
+        if (btnResetConnection) btnResetConnection.disabled = false;
+        const diagnosis = msg.diagnosis || {};
+        const layerNames = {
+          bridge: uiLang === "zh" ? "Bridge" : "Bridge",
+          cli: "CLI",
+          interface: uiLang === "zh" ? "介面/串流" : "UI/stream",
+          unknown: uiLang === "zh" ? "未知" : "unknown",
+        };
+        const layer = layerNames[diagnosis.layer] || diagnosis.layer || layerNames.unknown;
+        if (msg.ok) {
+          setStatus("connected", "Reconnected");
+          const text = uiLang === "zh"
+            ? `已完成完整重置並重新連線。重置前判斷：${layer}（${diagnosis.detail || diagnosis.code || "無詳細資訊"}）`
+            : `Full reset completed. Previous issue was classified as ${layer}: ${diagnosis.detail || diagnosis.code || "no details"}`;
+          if (connectionResetResult) {
+            connectionResetResult.className = "connection-reset-result success";
+            connectionResetResult.textContent = text;
+          }
+          addSystemMsg(`✅ ${text}`);
+        } else {
+          setStatus("disconnected", "Reset Failed");
+          hideConnectionSplash();
+          const text = uiLang === "zh"
+            ? `完整重置失敗。重置前判斷：${layer}。失敗原因：${msg.error || diagnosis.detail || "未知錯誤"}`
+            : `Full reset failed. Previous issue: ${layer}. Failure: ${msg.error || diagnosis.detail || "unknown error"}`;
+          if (connectionResetResult) {
+            connectionResetResult.className = "connection-reset-result error";
+            connectionResetResult.textContent = text;
+          }
+          addSystemMsg(`❌ ${text}`);
+        }
+        break;
+      }
+
       // GNAI config auto-repair events
       case "config_repaired":
         _configAutoFixed = true;
@@ -535,11 +591,26 @@ function connectPort() {
 
       // Health check result (also used after port reconnect)
       case "health_result":
+        if (msg.status === "stale_instance") {
+          setStatus("disconnected", "Bridge Restarted");
+          updateConnectionSplash("Bridge instance changed", "Reconnecting to the current bridge process...");
+          setInputEnabled(false);
+          break;
+        }
         if (msg.session_active) {
-          setStatus("connected", msg.session_waiting_input ? "Connected" : "Processing...");
+          const cliState = msg.cli?.state || (msg.session_waiting_input ? "ready" : "processing");
+          setStatus("connected", cliState === "ready" ? "Connected" : "Processing...");
           setInputEnabled(!!msg.session_waiting_input);
-          if (msg.conversation_id) updateConversationId(msg.conversation_id);
+          if (msg.conversation_id) {
+            bridgeSessionCid = msg.conversation_id;
+            updateConversationId(msg.conversation_id);
+          }
           if (msg.session_waiting_input) hideConnectionSplash();
+        } else if (msg.cli?.state === "exited") {
+          setStatus("disconnected", "CLI Exited");
+          const detail = msg.cli.last_error?.detail || "The dt chat process stopped unexpectedly.";
+          updateConnectionSplash("CLI process exited", detail);
+          setInputEnabled(false);
         } else {
           setStatus("connected", "No Session");
         }
@@ -716,7 +787,8 @@ function onReady(accumulatedAnswer) {
 
   // If this is the first ready after session start, show welcome
   // But only if there are existing messages (not a brand-new empty session with onboarding)
-  if (!accumulatedAnswer && !isLogAnalysisMode && sessionMessages.length > 0) {
+  if (!accumulatedAnswer && !isLogAnalysisMode && sessionMessages.length > 0 && !_sessionReadyNoticeShown) {
+    _sessionReadyNoticeShown = true;
     hideOnboarding();
     addSystemMsg("Session ready. Type an HSD ID to begin analysis.");
   }
@@ -1083,11 +1155,10 @@ function setInputEnabled(enabled) {
   inputEl.disabled = !enabled;
   sendBtn.disabled = !enabled;
   btnImport.disabled = !enabled;
-  // Protect against accidental interruption: disable most toolbar buttons while AI is running
-  // Only Stop and Popout remain functional during streaming
+  // Protect against accidental interruption: disable actions that mutate the
+  // session while AI is running. Settings remains available for recovery.
   if (btnNew) btnNew.disabled = !enabled;
   if (btnSave) btnSave.disabled = !enabled;
-  if (btnSettings) btnSettings.disabled = !enabled;
   // Tab bar clicks should also be gated
   const tabItems = document.querySelectorAll(".tab-item");
   tabItems.forEach(tab => { tab.style.pointerEvents = enabled ? "" : "none"; });
@@ -1157,6 +1228,7 @@ let _pendingCidContextRestore = false; // true after cid_mismatch — next send 
 let _configAutoFixed = false;   // set when bridge auto-repaired config.yaml; triggers auto-restart on end
 let _suppressNextSessionStopped = false; // suppress session_stopped side effects on tab switch
 let _pendingSessionRestart = false;      // true while an atomic session switch is in progress
+let _sessionReadyNoticeShown = false;    // suppress duplicate ready notices after SSE reconnects
 
 function updateHeaderSubtitle(title) {
   activeHsdTitle = title || "";
@@ -1479,7 +1551,13 @@ function startNewSession() {
 
 btnStop.addEventListener("click", () => {
   if (port) {
-    port.postMessage({ action: "stop_session" });
+    setInputEnabled(false);
+    const interruptMsg = {
+      action: "interrupt_session",
+      assistant: isLogAnalysisMode ? "displaydebugger" : "sighting_assistant",
+    };
+    if (activeConversationId) interruptMsg.conversation_id = activeConversationId;
+    port.postMessage(interruptMsg);
   }
 });
 
@@ -2217,6 +2295,38 @@ debugModeApplyBtn.addEventListener("click", async () => {
   }
 });
 
+btnResetConnection?.addEventListener("click", async () => {
+  const confirmed = await showModal(
+    uiLang === "zh" ? "完整重置連線" : "Reset Connection",
+    uiLang === "zh"
+      ? "這會強制關閉目前的 Bridge 與 CLI，啟動全新程序並重新連到目前 Session。畫面中的聊天紀錄不會清除。"
+      : "This force-closes the current Bridge and CLI, starts fresh processes, and reconnects the current session. Visible chat history will be preserved.",
+    uiLang === "zh" ? "重置並重連" : "Reset & Reconnect",
+    uiLang === "zh" ? "取消" : "Cancel"
+  );
+  if (!confirmed || !port) return;
+
+  btnResetConnection.disabled = true;
+  document.getElementById("settingsMenu")?.classList.remove("show");
+  setInputEnabled(false);
+  removeToolIndicator();
+  removeTypingIndicator();
+  isStreaming = false;
+  currentAiMsg = null;
+  currentAiText = "";
+  showConnectionSplash(
+    uiLang === "zh" ? "正在完整重置連線..." : "Resetting connection...",
+    uiLang === "zh" ? "重新啟動 Bridge 與 CLI" : "Restarting Bridge and CLI"
+  );
+
+  const recoveryMsg = {
+    action: "recover_connection",
+    assistant: isLogAnalysisMode ? "displaydebugger" : "sighting_assistant",
+  };
+  if (activeConversationId) recoveryMsg.conversation_id = activeConversationId;
+  port.postMessage(recoveryMsg);
+});
+
 // ── Toolkit Update Button ────────────────────────────────────────────────────
 document.getElementById("btn-toolkit-update")?.addEventListener("click", async () => {
   const btn = document.getElementById("btn-toolkit-update");
@@ -2284,6 +2394,7 @@ document.addEventListener("click", (e) => {
 
 // ── Pop-out / Pop-in Toggle ──────────────────────────────────────────────────
 const _isPopup = new URLSearchParams(window.location.search).has("popup");
+const _hostWindowId = Number.parseInt(new URLSearchParams(window.location.search).get("hostWindowId"), 10);
 
 // Update button icon based on mode
 if (_isPopup) {
@@ -2318,7 +2429,7 @@ if (onboardingGoBtn && onboardingHsdInput) {
   });
 }
 
-async function _saveStateForTransfer() {
+function _saveStateForTransfer() {
   // Save current state into sessions[activeSessionIndex] before transferring
   saveCurrentSession();
   // Save full UI state so the new window can restore it exactly
@@ -2333,13 +2444,18 @@ async function _saveStateForTransfer() {
     activeSessionIndex: activeSessionIndex,
     timestamp: Date.now(),
   };
-  await chrome.storage.local.set({ _popoutTransfer: transferData });
+  return chrome.storage.local.set({ _popoutTransfer: transferData });
 }
 
-btnPopout.addEventListener("click", async () => {
-  await _saveStateForTransfer();
+btnPopout.addEventListener("click", () => {
+  _saveStateForTransfer().catch((error) => {
+    console.error("[popout] failed to save transfer state:", error);
+  });
   if (_isPopup) {
-    chrome.runtime.sendMessage({ action: "popout_close" });
+    chrome.runtime.sendMessage({
+      action: "popout_close",
+      hostWindowId: Number.isInteger(_hostWindowId) ? _hostWindowId : undefined,
+    });
   } else {
     chrome.runtime.sendMessage({ action: "popout_open" });
   }
@@ -2831,9 +2947,16 @@ async function _restoreTransferState() {
 
 _restoreTransferState().then((restored) => {
   if (restored) {
-    // Session already running — just do a health check to sync status & re-attach SSE
+    // The destination view is restored; attach to the existing session if present.
     hideConnectionSplash();
-    if (port) port.postMessage({ action: "health" });
+    if (port) {
+      port.postMessage({ action: "view_ready", view: _isPopup ? "popup" : "sidepanel" });
+      port.postMessage({
+        action: "initialize_view",
+        assistant: isLogAnalysisMode ? "displaydebugger" : "sighting_assistant",
+        conversation_id: activeConversationId || undefined,
+      });
+    }
     return;
   }
 
@@ -2852,6 +2975,14 @@ _restoreTransferState().then((restored) => {
       updateConversationId(activeConversationId);
       rebuildChatArea();
       hideOnboarding();
+    }
+    if (port) {
+      port.postMessage({ action: "view_ready", view: _isPopup ? "popup" : "sidepanel" });
+      port.postMessage({
+        action: "initialize_view",
+        assistant: isLogAnalysisMode ? "displaydebugger" : "sighting_assistant",
+        conversation_id: activeConversationId || undefined,
+      });
     }
   });
 });
@@ -2886,11 +3017,4 @@ function _cancelConnectionTimeout() {
   }
 }
 
-// Auto-start: connect to bridge
-setTimeout(async () => {
-  if (!port) return;
-  setStatus("connected", "Connecting...");
-  showConnectionSplash("Connecting to bridge server...", "Initializing session");
-  _startConnectionTimeout();
-  port.postMessage({ action: "start_session" });
-}, 300);
+// View initialization is handled by _restoreTransferState above.

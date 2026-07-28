@@ -27,6 +27,7 @@ import threading
 import time
 import ctypes
 import ctypes.wintypes
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 # ── PyInstaller compatibility ─────────────────────────────────────────────────
@@ -59,6 +60,9 @@ DT_PATH_OVERRIDE = os.environ.get("BRIDGE_DT_PATH", "").strip()
 DEBUG_LOG = os.environ.get("BRIDGE_DEBUG", "1").strip().lower() in {"1", "true", "yes"}
 AUTO_CLOSE_PAUSE_WINDOWS = os.environ.get("BRIDGE_AUTO_CLOSE_PAUSE", "1").strip().lower() in {"1", "true", "yes"}
 PAUSE_SCAN_INTERVAL = int(os.environ.get("BRIDGE_PAUSE_SCAN_INTERVAL", "3"))
+PROTOCOL_VERSION = 2
+INSTANCE_ID = uuid.uuid4().hex
+STARTED_AT = time.time()
 
 
 def _debug(msg):
@@ -460,6 +464,10 @@ class ChatSession:
         self._cid_expired_notified = False       # prevent duplicate cid_expired events
         self._idle_timer = None                  # timer to synthesize 'ready' if '> ' prompt is missed
         self._idle_timer_lock = threading.Lock()
+        self._tool_active = False                # suppress synthetic ready while a tool is running
+        self.started_at = None
+        self.last_output_at = None
+        self.last_error = None
 
     def start(self):
         if not HAS_WINPTY:
@@ -481,6 +489,7 @@ class ChatSession:
         # wrapped by ConPTY. At 80 cols, dt inserts ANSI cursor codes mid-JSON,
         # corrupting every answer chunk and causing json.loads() to fail.
         self._pty = PtyProcess.spawn(cmd, dimensions=(50, 500))
+        self.started_at = time.time()
         _debug(f"pty pid={self._pty.pid}")
 
         self._reader_thread = threading.Thread(
@@ -509,6 +518,7 @@ class ChatSession:
             self._cancel_idle_timer()
             self._waiting_input.clear()
             self._ignore_prompt = True           # ignore echo'd prompts until usage
+            self._tool_active = False
             self.accumulated_answer = ""
             self._pty.write(clean_text + "\r")
             _session_log("INPUT", clean_text)
@@ -619,6 +629,7 @@ class ChatSession:
                     time.sleep(0.05)
                     continue
 
+                self.last_output_at = time.time()
                 buf += data
 
                 # Process complete lines
@@ -649,8 +660,19 @@ class ChatSession:
 
         except Exception as e:
             if not self._stop_event.is_set():
+                self.last_error = {
+                    "code": "PTY_READER_ERROR",
+                    "detail": str(e),
+                    "at": time.time(),
+                }
                 _debug(f"pty reader error: {e}")
         finally:
+            if not self._stop_event.is_set() and self.last_error is None:
+                self.last_error = {
+                    "code": "CLI_EXITED",
+                    "detail": "The dt chat process exited unexpectedly.",
+                    "at": time.time(),
+                }
             _debug("pty reader exiting")
             self.event_queue.put({"type": "end"})
 
@@ -663,6 +685,7 @@ class ChatSession:
         if line.startswith("> ") or line == ">":
             if self._ignore_prompt:
                 return  # echo'd prompt right after send, ignore
+            self._tool_active = False
             self._ready.set()
             if not self._waiting_input.is_set():
                 _debug(f"[pty] prompt detected → ready")
@@ -755,9 +778,10 @@ class ChatSession:
             # silently ignored and the session is stuck waiting forever.
             if self._ignore_prompt:
                 self._ignore_prompt = False
-            # Reset the idle timer: if '> ' prompt is not seen within 2 s of
-            # the last answer chunk, _on_idle_timeout will synthesise 'ready'.
-            self._reset_idle_timer()
+            # Tool output can contain answer chunks with long pauses. Do not
+            # interpret those pauses as turn completion; wait for usage/prompt.
+            if not self._tool_active:
+                self._reset_idle_timer()
             return {"type": "answer", "text": text}
 
         # Tool steps: {"steps": [...], ...}
@@ -768,6 +792,7 @@ class ChatSession:
                 # NOT synthesise a false 'ready' event mid-execution. Tools like
                 # Sherlog/DisplayDebugger can take 1-5 minutes between chunks,
                 # far longer than the 2 s idle threshold.
+                self._tool_active = True
                 self._cancel_idle_timer()
                 step = steps[0]
                 return {
@@ -781,6 +806,7 @@ class ChatSession:
         if "request" in data:
             # Same reasoning as tool_start above: a tool is actively running,
             # so suppress the idle-timeout's synthetic 'ready' event.
+            self._tool_active = True
             self._cancel_idle_timer()
             req = data["request"]
             meta = req.get("meta", {})
@@ -808,6 +834,7 @@ class ChatSession:
         # Usage (response complete): {"usage": {...}, ...}
         if "usage" in data:
             self._ignore_prompt = False   # next '> ' prompt is the real one
+            self._tool_active = False
             return {"type": "usage", "usage": data["usage"]}
 
         # Error from gnai (e.g. tool execution failure, connection abort)
@@ -1035,12 +1062,31 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def _handle_health(self):
         session = _get_session()
+        if not session:
+            cli_state = "stopped"
+        elif not session.is_alive:
+            cli_state = "exited"
+        elif session.is_waiting_input:
+            cli_state = "ready"
+        else:
+            cli_state = "processing"
         self._json_response(200, {
             "status": "ok",
+            "instance_id": INSTANCE_ID,
+            "protocol_version": PROTOCOL_VERSION,
+            "pid": os.getpid(),
+            "uptime_seconds": round(time.time() - STARTED_AT, 3),
             "session_active": session is not None and session.is_alive,
             "session_waiting_input": session.is_waiting_input if session else False,
             "session_id": session.session_id if session else None,
-            "conversation_id": session.conversation_id if session else None,
+            "conversation_id": (session.session_id or session.conversation_id) if session else None,
+            "cli": {
+                "state": cli_state,
+                "pid": session.pid if session else None,
+                "started_at": session.started_at if session else None,
+                "last_output_at": session.last_output_at if session else None,
+                "last_error": session.last_error if session else None,
+            },
         })
 
     def _handle_shutdown(self):
@@ -1351,6 +1397,7 @@ def _is_port_in_use(host, port):
 
 _PID_FILE  = os.path.join(_SCRIPT_DIR, "bridge.pid")
 _PORT_FILE = os.path.join(_SCRIPT_DIR, "bridge.port")
+_DISCOVERY_FILE = os.path.join(_SCRIPT_DIR, "bridge.discovery.json")
 
 
 def _write_pid_file():
@@ -1389,6 +1436,58 @@ def _remove_port_file():
         pass
 
 
+def _read_discovery_file():
+    try:
+        with open(_DISCOVERY_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def _write_discovery_file(port):
+    discovery = {
+        "instance_id": INSTANCE_ID,
+        "protocol_version": PROTOCOL_VERSION,
+        "pid": os.getpid(),
+        "port": port,
+        "started_at": STARTED_AT,
+    }
+    temp_path = f"{_DISCOVERY_FILE}.{os.getpid()}.tmp"
+    try:
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(discovery, f, separators=(",", ":"))
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, _DISCOVERY_FILE)
+    finally:
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except OSError:
+            pass
+
+
+def _remove_discovery_file(instance_id=INSTANCE_ID):
+    discovery = _read_discovery_file()
+    if not discovery or discovery.get("instance_id") != instance_id:
+        return False
+    try:
+        os.remove(_DISCOVERY_FILE)
+        return True
+    except OSError:
+        return False
+
+
+def _cleanup_discovery_files(instance_id=INSTANCE_ID):
+    discovery = _read_discovery_file()
+    if not discovery or discovery.get("instance_id") != instance_id:
+        return False
+    _remove_pid_file()
+    _remove_port_file()
+    return _remove_discovery_file(instance_id)
+
+
 def main():
     if not HAS_WINPTY:
         sys.stderr.write(
@@ -1423,8 +1522,9 @@ def main():
     _debug(f"listening on port: {actual_port}")
     _debug(f"auto-close pause windows: {AUTO_CLOSE_PAUSE_WINDOWS}")
 
+    _write_discovery_file(actual_port)
     _write_pid_file()
-    _write_port_file(actual_port)   # lets native_host discover the port
+    _write_port_file(actual_port)   # protocol-v1 compatibility during rollout
 
     _debug(f"Chat Mode Bridge Server running on http://{HOST}:{actual_port} (PID: {os.getpid()})")
     _debug(f"Press Ctrl+C to stop")
@@ -1436,8 +1536,7 @@ def main():
         _stop_session()
         server.shutdown()
     finally:
-        _remove_pid_file()
-        _remove_port_file()
+        _cleanup_discovery_files()
 
 
 if __name__ == "__main__":

@@ -488,6 +488,10 @@
     .settings-check-badge { font-size: 10px; background: #dbeafe; color: #1d4ed8; border-radius: 4px; padding: 1px 5px; font-weight: 600; }
     .settings-apply-btn { margin: 6px 0 2px; padding: 4px 12px; font-size: 11px; background: var(--primary); color: #fff; border: none; border-radius: 4px; cursor: pointer; }
     .settings-apply-btn:hover { opacity: 0.85; }
+    .settings-apply-btn:disabled { opacity: 0.55; cursor: wait; }
+    .connection-reset-result { display: none; margin: 5px 14px 8px; font-size: 11px; line-height: 1.45; color: #4b5563; overflow-wrap: anywhere; }
+    .connection-reset-result.success { display: block; color: #15803d; }
+    .connection-reset-result.error { display: block; color: #b91c1c; }
     .tool-progress-bar { display: flex; align-items: center; gap: 8px; padding: 5px 14px; background: #f0f4ff; border-top: 1px solid #e0e7ef; font-size: 12px; color: #4a5568; }
     .tool-progress-bar .spinner { width: 12px; height: 12px; border: 2px solid #c0c8d8; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -1153,6 +1157,10 @@
             <span class="settings-check-label">Debug Mode (Show Bridge Console)</span>
           </label>
           <button id="debug-mode-apply" class="settings-apply-btn" style="display:none;">Apply</button>
+          <hr class="settings-divider">
+          <div class="settings-section-title">Connection Recovery</div>
+          <button id="btn-reset-connection" class="settings-apply-btn" style="display:block;margin:4px auto 0;width:80%;text-align:center;">&#x21BB; Reset Connection</button>
+          <div id="connection-reset-result" class="connection-reset-result"></div>
           <hr class="settings-divider">
           <div class="settings-section-title">SightingAssistantTool</div>
           <button id="btn-toolkit-update" class="settings-apply-btn" style="display:block;margin:4px auto 0;width:80%;text-align:center;">&#x1F504; Update Toolkit (git pull)</button>

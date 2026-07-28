@@ -59,6 +59,7 @@ Source: "dist\check_env.exe"; DestDir: "{tmp}"; Flags: nocompression dontcopy
 
 ; Bridge server (standalone exe, no Python needed)
 Source: "dist\bridge_server.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\bridge\fix_gnai_config.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Native Messaging host launcher
 Source: "dist\native_host.exe";   DestDir: "{app}"; Flags: ignoreversion
@@ -91,6 +92,8 @@ Filename: "{app}\extension"; \
 [UninstallDelete]
 Type: files;           Name: "{app}\nm_manifest.json"
 Type: files;           Name: "{app}\bridge.pid"
+Type: files;           Name: "{app}\bridge.port"
+Type: files;           Name: "{app}\bridge.discovery.json"
 Type: files;           Name: "{app}\bridge_debug.log"
 Type: filesandordirs;  Name: "{app}\log"
 ; Remove the install dir itself if empty after uninstall

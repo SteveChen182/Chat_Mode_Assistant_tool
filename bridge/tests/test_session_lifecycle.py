@@ -22,6 +22,10 @@ class FakeSession:
         self.is_alive = True
         self.started = False
         self.stopped = False
+        self.pid = 1234
+        self.started_at = 100.0
+        self.last_output_at = 101.0
+        self.last_error = None
         self.__class__.created.append(self)
 
     def start(self):
@@ -85,6 +89,38 @@ class SessionLifecycleTests(unittest.TestCase):
         self.assertTrue(existing.stopped)
         self.assertIsNot(session, existing)
         self.assertTrue(session.started)
+
+    def test_tool_answer_does_not_restart_idle_ready_timer(self):
+        session = bridge_server.ChatSession()
+        with (
+            patch.object(session, "_cancel_idle_timer") as cancel_timer,
+            patch.object(session, "_reset_idle_timer") as reset_timer,
+        ):
+            tool_event = session._classify_event({
+                "steps": [{"name": "read_article", "type": "tool", "args": {}}],
+            })
+            answer_event = session._classify_event({"answer": "working..."})
+
+        self.assertEqual(tool_event["type"], "tool_start")
+        self.assertEqual(answer_event["type"], "answer")
+        cancel_timer.assert_called_once()
+        reset_timer.assert_not_called()
+
+    def test_health_reports_actual_gnai_conversation_id(self):
+        session = FakeSession("sighting_assistant", "requested-cid")
+        session.session_id = "actual-cid"
+        bridge_server._current_session = session
+        handler = object.__new__(bridge_server.BridgeHandler)
+        captured = {}
+
+        def capture_response(status, payload):
+            captured.update({"status": status, "payload": payload})
+
+        handler._json_response = capture_response
+        handler._handle_health()
+
+        self.assertEqual(captured["status"], 200)
+        self.assertEqual(captured["payload"]["conversation_id"], "actual-cid")
 
 
 if __name__ == "__main__":
