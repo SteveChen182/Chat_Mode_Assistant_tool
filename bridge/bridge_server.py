@@ -676,7 +676,7 @@ class ChatSession:
 
         _debug(f"[pty] {line[:200]}")
 
-        # Skip non-JSON lines
+        # Skip non-JSON lines (but forward meaningful status messages to UI)
         if not line.startswith("{"):
             # Detect GNAI config YAML corruption error
             if not self._config_error_handled and (
@@ -686,7 +686,31 @@ class ChatSession:
             ):
                 self._config_error_handled = True
                 self._handle_config_error(line)
-            _debug(f"[pty] (skipped non-JSON)")
+
+            # Forward recognisable startup / progress lines as "info" events
+            # so the UI can show meaningful status instead of appearing stuck.
+            lower = line.lower()
+            is_status = False
+
+            # pip / requirements install progress
+            if "installing" in lower or "requirement" in lower or "downloading" in lower or "collecting" in lower:
+                is_status = True
+            # dt / gnai status messages
+            elif "loading" in lower or "updating" in lower or "checking" in lower:
+                is_status = True
+            # Error messages (not YAML config — those are handled above)
+            elif lower.startswith("error") or "error:" in lower or "failed" in lower:
+                is_status = True
+            # Spinner / progress indicators (◐ ◑ ◒ ◓ ⠋ ⠙ etc.)
+            elif line and line[0] in "◐◑◒◓⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏✔✓✗":
+                is_status = True
+
+            if is_status:
+                clean = line.strip()[:120]
+                _debug(f"[pty] (non-JSON status → info) {clean}")
+                self.event_queue.put({"type": "info", "text": clean})
+            else:
+                _debug(f"[pty] (skipped non-JSON)")
             return
 
         # Skip echo of user input (PTY echoes back what we write)
