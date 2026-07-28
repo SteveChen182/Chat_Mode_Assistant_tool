@@ -22,7 +22,7 @@ function sleep(ms) {
 
 // ── Bridge API helpers ─────────────────────────────────────────────────────
 
-async function bridgeFetch(path, options = {}) {
+async function bridgeFetch(path, options = {}, timeoutMs = 10000) {
   // Recover port from session storage if lost (e.g. after Service Worker restart)
   if (!bridgePort) {
     try {
@@ -33,17 +33,38 @@ async function bridgeFetch(path, options = {}) {
   const base = getBridgeUrl();
   if (!base) throw new Error("Bridge port not yet known");
   const url = `${base}${path}`;
-  const resp = await fetch(url, {
-    ...options,
-    headers: { "Content-Type": "application/json", ...options.headers },
-  });
-  return resp;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...options,
+      headers: { "Content-Type": "application/json", ...options.headers },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error(`Bridge request timed out after ${timeoutMs}ms: ${path}`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function startSession(assistant, conversationId) {
   const body = { assistant: assistant || "sighting_assistant" };
   if (conversationId) body.conversation_id = conversationId;
   const resp = await bridgeFetch("/session/start", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  return resp.json();
+}
+
+async function switchSession(assistant, conversationId) {
+  const body = { assistant: assistant || "sighting_assistant" };
+  if (conversationId) body.conversation_id = conversationId;
+  const resp = await bridgeFetch("/session/switch", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -65,7 +86,7 @@ async function stopSession() {
 
 async function healthCheck() {
   try {
-    const resp = await bridgeFetch("/health");
+    const resp = await bridgeFetch("/health", {}, 3000);
     return await resp.json();
   } catch {
     return { status: "unreachable" };
@@ -399,12 +420,10 @@ chrome.runtime.onConnect.addListener((port) => {
           }
           isStarting = true;
           try {
-            // Stop current session cleanly
             if (currentEventSource) {
               currentEventSource.close();
               currentEventSource = null;
             }
-            try { await stopSession(); } catch { /* ignore if no session */ }
 
             // Ensure bridge is still running
             const bridgeReady = await ensureBridgeRunning((status) => {
@@ -417,7 +436,7 @@ chrome.runtime.onConnect.addListener((port) => {
 
             // Start new session with the specified assistant
             port.postMessage({ type: "startup_status", message: `Starting ${msg.assistant || "assistant"}...` });
-            const restartResult = await startSession(msg.assistant, msg.conversation_id);
+            const restartResult = await switchSession(msg.assistant, msg.conversation_id);
             if (restartResult.error) {
               port.postMessage({ action: "session_start_error", error: restartResult.error });
               break;
@@ -437,7 +456,7 @@ chrome.runtime.onConnect.addListener((port) => {
           // the file picker was open (stale `port` would silently drop the message).
           try {
             const title = encodeURIComponent(msg.title || "Open File");
-            const resp = await bridgeFetch(`/dialog/file?title=${title}`);
+            const resp = await bridgeFetch(`/dialog/file?title=${title}`, {}, 305000);
             const data = await resp.json();
             _postToActivePort({ action: "file_dialog_result", field: msg.field, ...data });
           } catch (err) {

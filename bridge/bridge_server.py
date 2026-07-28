@@ -908,18 +908,27 @@ def _get_session():
     return _current_session
 
 
-def _start_session(assistant=None, conversation_id=None):
+def _start_session(assistant=None, conversation_id=None, force_restart=False):
     global _current_session
     with _session_lock:
+        resolved_assistant = assistant or DEFAULT_ASSISTANT
+        if (
+            not force_restart
+            and _current_session
+            and _current_session.is_alive
+            and _current_session.assistant == resolved_assistant
+            and _current_session.conversation_id == conversation_id
+        ):
+            return _current_session, True
         if _current_session and _current_session.is_alive:
             _current_session.stop()
             _close_session_log()
         _init_session_log()
-        session = ChatSession(assistant, conversation_id)
+        session = ChatSession(resolved_assistant, conversation_id)
         session.start()
         _session_log("SESSION", f"assistant={session.assistant} conversation_id={session.conversation_id}")
         _current_session = session
-        return session
+        return session, False
 
 
 def _stop_session():
@@ -997,6 +1006,8 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
         if self.path == "/session/start":
             self._handle_start()
+        elif self.path == "/session/switch":
+            self._handle_switch()
         elif self.path == "/session/send":
             self._handle_send()
         elif self.path == "/session/stop":
@@ -1152,35 +1163,37 @@ class BridgeHandler(BaseHTTPRequestHandler):
         body = self._read_json_body()
         assistant = body.get("assistant", DEFAULT_ASSISTANT)
         conversation_id = body.get("conversation_id", None)
-        # If a session is already active with the SAME assistant, reuse it instead
-        # of killing/restarting. If the caller requested a *different* assistant
-        # (e.g. switching Chat -> Log Analysis Mode, which needs "displaydebugger"),
-        # fall through and restart with the new assistant — otherwise the bridge
-        # would silently keep running the old assistant forever.
-        existing = _get_session()
-        if existing and existing.is_alive and existing.assistant == assistant:
-            self._json_response(200, {
-                "status": "already_active",
-                "assistant": existing.assistant,
-                "conversation_id": existing.conversation_id,
-                "session_waiting_input": existing.is_waiting_input,
-                "message": "Session already running.",
-            })
-            return
-        if existing and existing.is_alive:
-            _debug(f"[start] assistant change requested ({existing.assistant} -> {assistant}); restarting session")
         try:
             _debug(f"[start] creating session: assistant={assistant} cid={conversation_id}")
-            session = _start_session(assistant, conversation_id)
+            session, reused = _start_session(assistant, conversation_id)
             _debug(f"[start] session created: session.conversation_id={session.conversation_id} session.session_id={session.session_id}")
+            self._json_response(200, {
+                "status": "already_active" if reused else "starting",
+                "assistant": session.assistant,
+                "conversation_id": session.conversation_id,
+                "session_waiting_input": session.is_waiting_input,
+                "message": "Session already running." if reused else "Session spawned. Connect to /session/stream for events.",
+            })
+        except Exception as e:
+            _debug(f"[start] ERROR: {e}")
+            self._json_response(500, {"error": str(e)})
+
+    def _handle_switch(self):
+        body = self._read_json_body()
+        assistant = body.get("assistant", DEFAULT_ASSISTANT)
+        conversation_id = body.get("conversation_id", None)
+        try:
+            _debug(f"[switch] replacing session: assistant={assistant} cid={conversation_id}")
+            session, _ = _start_session(assistant, conversation_id, force_restart=True)
             self._json_response(200, {
                 "status": "starting",
                 "assistant": session.assistant,
                 "conversation_id": session.conversation_id,
-                "message": "Session spawned. Connect to /session/stream for events.",
+                "session_waiting_input": session.is_waiting_input,
+                "message": "Session switched. Connect to /session/stream for events.",
             })
         except Exception as e:
-            _debug(f"[start] ERROR: {e}")
+            _debug(f"[switch] ERROR: {e}")
             self._json_response(500, {"error": str(e)})
 
     def _handle_send(self):

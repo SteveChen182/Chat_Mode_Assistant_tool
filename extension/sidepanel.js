@@ -920,13 +920,10 @@ function generateQuickActions(text) {
 function _restartBridgeForSession() {
   if (!port) return;
   _pendingSessionRestart = true;
-  port.postMessage({ action: "stop_session" });
-  setTimeout(() => {
-    const startMsg = { action: "start_session" };
-    if (activeConversationId) startMsg.conversation_id = activeConversationId;
-    port.postMessage(startMsg);
-    showConnectionSplash("切換 Session...", "載入對話紀錄，請稍候（最多 90 秒）");
-  }, 300);
+  const restartMsg = { action: "restart_session" };
+  if (activeConversationId) restartMsg.conversation_id = activeConversationId;
+  port.postMessage(restartMsg);
+  showConnectionSplash("切換 Session...", "載入對話紀錄，請稍候（最多 90 秒）");
 }
 
 /**
@@ -1159,7 +1156,7 @@ let _pendingSendMessage = null; // message queued to send after lazy bridge rest
 let _pendingCidContextRestore = false; // true after cid_mismatch — next send should prepend HSD context
 let _configAutoFixed = false;   // set when bridge auto-repaired config.yaml; triggers auto-restart on end
 let _suppressNextSessionStopped = false; // suppress session_stopped side effects on tab switch
-let _pendingSessionRestart = false;      // true when stop_session was called to immediately restart
+let _pendingSessionRestart = false;      // true while an atomic session switch is in progress
 
 function updateHeaderSubtitle(title) {
   activeHsdTitle = title || "";
