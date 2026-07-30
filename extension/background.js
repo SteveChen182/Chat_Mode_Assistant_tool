@@ -306,12 +306,56 @@ async function ensureSseConnected() {
 let currentEventSource = null;
 let sseReconnectTimer = null;
 let sseReconnectAttempts = 0;
+let configRepairRestarting = false;
 const uiPorts = new Set();
 let activePort = null; // Most recently ready sidepanel/popup port
+let bridgeShutdownTimer = null;
+const BRIDGE_SHUTDOWN_GRACE_MS = 10000;
 let pendingPopoutWindowId = null;
 let pendingPopupReady = false;
 let pendingPopinWindowId = null;
 let popoutHostWindowId = null;
+
+function cancelBridgeShutdown() {
+  if (bridgeShutdownTimer) {
+    clearTimeout(bridgeShutdownTimer);
+    bridgeShutdownTimer = null;
+  }
+  if (bridgePort) {
+    bridgeFetch("/bridge/shutdown/cancel", { method: "POST", body: "{}" }, 2000).catch(() => {});
+  }
+}
+
+function scheduleBridgeShutdown() {
+  cancelBridgeShutdown();
+  if (bridgePort) {
+    bridgeFetch("/bridge/shutdown/schedule", {
+      method: "POST",
+      body: JSON.stringify({ delay_seconds: BRIDGE_SHUTDOWN_GRACE_MS / 1000 }),
+    }, 2000).catch((error) => {
+      console.warn("[bg] Failed to schedule Bridge-owned shutdown:", error);
+    });
+  }
+  bridgeShutdownTimer = setTimeout(async () => {
+    bridgeShutdownTimer = null;
+    if (uiPorts.size > 0 || pendingPopoutWindowId || pendingPopinWindowId) return;
+    if (currentEventSource) {
+      currentEventSource.close();
+      currentEventSource = null;
+    }
+    if (sseReconnectTimer) {
+      clearTimeout(sseReconnectTimer);
+      sseReconnectTimer = null;
+    }
+    try {
+      await sendNativeMessage({ action: "shutdown" });
+    } catch (error) {
+      console.warn("[bg] Failed to shut down bridge after app close:", error);
+    } finally {
+      clearBridgeIdentity();
+    }
+  }, BRIDGE_SHUTDOWN_GRACE_MS);
+}
 
 function completePopoutHandoff() {
   if (!pendingPopoutWindowId || !pendingPopupReady) return;
@@ -372,6 +416,9 @@ function startStreaming() {
       try {
         const data = JSON.parse(e.data);
         _postToActivePort({ type, ...data });
+        if (type === "config_repaired") {
+          restartSessionAfterConfigRepair(data);
+        }
       } catch {
         _postToActivePort({ type, raw: e.data });
       }
@@ -421,6 +468,33 @@ function startStreaming() {
   return es;
 }
 
+async function restartSessionAfterConfigRepair(event) {
+  if (configRepairRestarting) return;
+  configRepairRestarting = true;
+  try {
+    if (currentEventSource) {
+      currentEventSource.close();
+      currentEventSource = null;
+    }
+    if (sseReconnectTimer) {
+      clearTimeout(sseReconnectTimer);
+      sseReconnectTimer = null;
+    }
+    await sleep(500);
+    const result = await switchSession(event.assistant, event.conversation_id);
+    if (result.error) throw new Error(result.error);
+    _postToActivePort({ action: "session_started", ...result });
+    startStreaming();
+  } catch (error) {
+    _postToActivePort({
+      action: "session_start_error",
+      error: `GNAI config was repaired, but the session restart failed: ${error.message || error}`,
+    });
+  } finally {
+    configRepairRestarting = false;
+  }
+}
+
 // ── Message handling from sidepanel ────────────────────────────────────────
 
 let isStarting = false;
@@ -429,6 +503,7 @@ let isRecovering = false;
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "sidepanel") return;
 
+  cancelBridgeShutdown();
   uiPorts.add(port);
   activePort = port;
 
@@ -743,8 +818,7 @@ chrome.runtime.onConnect.addListener((port) => {
   port.onDisconnect.addListener(() => {
     uiPorts.delete(port);
     if (activePort === port) activePort = [...uiPorts].at(-1) || null;
-    // Don't close SSE on port disconnect — Service Worker may revive and
-    // sidepanel will reconnect. Keep SSE alive to avoid losing events.
+    if (uiPorts.size === 0) scheduleBridgeShutdown();
   });
 });
 

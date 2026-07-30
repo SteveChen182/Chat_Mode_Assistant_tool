@@ -289,6 +289,16 @@ def main():
         except Exception as e:
             send_message({"status": "error", "message": str(e)})
 
+    elif action == "shutdown":
+        try:
+            previous_pid = _terminate_bridge_process()
+            send_message({
+                "status": "stopped",
+                "previous_pid": previous_pid,
+            })
+        except Exception as e:
+            send_message({"status": "error", "message": str(e)})
+
     else:
         send_message({"status": "error", "message": f"Unknown action: {action}"})
 

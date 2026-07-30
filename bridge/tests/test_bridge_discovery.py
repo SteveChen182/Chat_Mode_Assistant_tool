@@ -139,6 +139,19 @@ class BridgeDiscoveryTests(unittest.TestCase):
             self.assertFalse(os.path.exists(pid_path))
             self.assertFalse(os.path.exists(port_path))
 
+    def test_native_host_shutdown_terminates_without_relaunch(self):
+        with (
+            patch.object(native_host, "read_message", return_value={"action": "shutdown"}),
+            patch.object(native_host, "_terminate_bridge_process", return_value=4321) as terminate,
+            patch.object(native_host, "launch_bridge") as launch,
+            patch.object(native_host, "send_message") as send,
+        ):
+            native_host.main()
+
+        terminate.assert_called_once_with()
+        launch.assert_not_called()
+        send.assert_called_once_with({"status": "stopped", "previous_pid": 4321})
+
     @staticmethod
     def _health_opener(payload):
         response = MagicMock()

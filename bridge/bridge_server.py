@@ -462,6 +462,7 @@ class ChatSession:
         self._ignore_prompt = False              # ignore '> ' prompt until usage event (avoids echo)
         self._config_error_handled = False       # prevent duplicate auto-fix attempts
         self._cid_expired_notified = False       # prevent duplicate cid_expired events
+        self._pending_cid_expired = False        # wait for a healthy prompt before reporting expiry
         self._idle_timer = None                  # timer to synthesize 'ready' if '> ' prompt is missed
         self._idle_timer_lock = threading.Lock()
         self._tool_active = False                # suppress synthetic ready while a tool is running
@@ -685,6 +686,15 @@ class ChatSession:
         if line.startswith("> ") or line == ">":
             if self._ignore_prompt:
                 return  # echo'd prompt right after send, ignore
+            if self._pending_cid_expired and not self._cid_expired_notified:
+                self._pending_cid_expired = False
+                self._cid_expired_notified = True
+                _debug(f"[cid_expired] requested CID={self.conversation_id} opened a fresh conversation")
+                self.event_queue.put({
+                    "type": "cid_expired",
+                    "requested_cid": self.conversation_id,
+                    "message": "Conversation expired. Starting fresh session.",
+                })
             self._tool_active = False
             self._ready.set()
             if not self._waiting_input.is_set():
@@ -869,19 +879,15 @@ class ChatSession:
                 _debug(f"[cid_check] Welcome={has_welcome} 👋={has_wave} → expired={has_welcome and has_wave}")
             if (self.conversation_id and not self._cid_expired_notified
                     and has_welcome and has_wave):
-                self._cid_expired_notified = True
-                _debug(f"[cid_expired] ★ DETECTED ★ requested CID={self.conversation_id} but got Welcome → pushing cid_expired event")
-                self.event_queue.put({
-                    "type": "cid_expired",
-                    "requested_cid": self.conversation_id,
-                    "message": "Conversation expired. Starting fresh session.",
-                })
+                self._pending_cid_expired = True
+                _debug(f"[cid_check] deferring expiry until a healthy prompt: {self.conversation_id}")
             return {"type": "info", "text": data["msg"]}
 
         return None
 
     def _handle_config_error(self, error_line):
         """Auto-repair ~/.gnai/config.yaml when dt reports a YAML parse error."""
+        self._pending_cid_expired = False
         _debug(f"[config error] detected: {error_line[:200]}")
         fix_script = os.path.join(_SCRIPT_DIR, "fix_gnai_config.ps1")
         if os.name != "nt" or not os.path.exists(fix_script):
@@ -900,6 +906,8 @@ class ChatSession:
                 self.event_queue.put({
                     "type": "config_repaired",
                     "message": "GNAI 設定檔已自動修復，重新啟動 session...",
+                    "assistant": self.assistant,
+                    "conversation_id": self.conversation_id,
                 })
             else:
                 _debug(f"[config error] auto-fix failed: {result.stderr[:300]}")
@@ -928,6 +936,35 @@ class ChatSession:
 # ── Global Session Manager ──────────────────────────────────────────────────
 _current_session = None
 _session_lock = threading.Lock()
+_shutdown_timer = None
+_shutdown_timer_lock = threading.Lock()
+
+
+def _cancel_scheduled_shutdown():
+    global _shutdown_timer
+    with _shutdown_timer_lock:
+        if _shutdown_timer is not None:
+            _shutdown_timer.cancel()
+            _shutdown_timer = None
+
+
+def _schedule_shutdown(server, delay_seconds):
+    global _shutdown_timer
+
+    def shutdown():
+        global _shutdown_timer
+        with _shutdown_timer_lock:
+            _shutdown_timer = None
+        _debug("[shutdown] UI grace period elapsed; stopping Bridge and CLI")
+        _stop_session()
+        server.shutdown()
+
+    _cancel_scheduled_shutdown()
+    with _shutdown_timer_lock:
+        _shutdown_timer = threading.Timer(delay_seconds, shutdown)
+        _shutdown_timer.daemon = True
+        _shutdown_timer.start()
+    _debug(f"[shutdown] scheduled in {delay_seconds:.1f}s")
 
 
 def _get_session():
@@ -1041,6 +1078,10 @@ class BridgeHandler(BaseHTTPRequestHandler):
             self._handle_stop()
         elif self.path == "/bridge/shutdown":
             self._handle_shutdown()
+        elif self.path == "/bridge/shutdown/schedule":
+            self._handle_shutdown_schedule()
+        elif self.path == "/bridge/shutdown/cancel":
+            self._handle_shutdown_cancel()
         elif self.path == "/toolkit/update":
             self._handle_toolkit_update()
         elif self.path == "/driver-history":
@@ -1091,11 +1132,22 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def _handle_shutdown(self):
         """Gracefully shut down the bridge server process."""
+        _cancel_scheduled_shutdown()
         _stop_session()
         self._json_response(200, {"status": "shutting_down"})
         # Schedule server shutdown in a separate thread to allow response to be sent
         import threading
         threading.Thread(target=self.server.shutdown, daemon=True).start()
+
+    def _handle_shutdown_schedule(self):
+        body = self._read_json_body()
+        delay_seconds = max(1.0, min(float(body.get("delay_seconds", 10)), 60.0))
+        _schedule_shutdown(self.server, delay_seconds)
+        self._json_response(200, {"status": "scheduled", "delay_seconds": delay_seconds})
+
+    def _handle_shutdown_cancel(self):
+        _cancel_scheduled_shutdown()
+        self._json_response(200, {"status": "cancelled"})
 
     def _handle_toolkit_update(self):
         """POST /toolkit/update  —  run git pull on SightingAssistantTool."""
