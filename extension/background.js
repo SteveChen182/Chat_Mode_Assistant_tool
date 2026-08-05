@@ -10,6 +10,16 @@ let bridgePort = null;   // set after first successful NM launch/check
 let bridgeInstanceId = null;
 let bridgeProtocolVersion = null;
 const NM_HOST_NAME = "com.chat_mode_assistant.bridge";
+let appActivated = false;
+
+async function hasAppActivation() {
+  if (appActivated) return true;
+  try {
+    const stored = await chrome.storage.session.get({ appActivated: false });
+    appActivated = !!stored.appActivated;
+  } catch { /* session storage unavailable */ }
+  return appActivated;
+}
 
 function getBridgeUrl() {
   return bridgePort ? `http://127.0.0.1:${bridgePort}` : null;
@@ -205,6 +215,11 @@ async function waitForBridgeDiscovery(sendStatus, maxSeconds = 45) {
  * Returns true if bridge is ready.
  */
 async function ensureBridgeRunning(sendStatus) {
+  if (!await hasAppActivation()) {
+    sendStatus("Waiting for Chat Mode Assistant to be opened...");
+    return false;
+  }
+
   // Step 1: Try to recover persisted port from a previous launch
   sendStatus("Checking bridge...");
   if (!bridgePort) {
@@ -408,7 +423,7 @@ function startStreaming() {
 
   const eventTypes = [
     "answer", "tool_start", "tool_request", "usage", "ready", "info", "end", "goodbye",
-    "error", "cid_mismatch", "cid_expired", "config_repaired", "config_repair_failed"
+    "error", "cid_mismatch", "cid_expired", "credential_required", "config_repaired", "config_repair_failed"
   ];
 
   for (const type of eventTypes) {
@@ -525,6 +540,10 @@ chrome.runtime.onConnect.addListener((port) => {
         }
 
         case "initialize_view": {
+          if (!await hasAppActivation()) {
+            port.postMessage({ action: "activation_required" });
+            break;
+          }
           const bridgeReady = await ensureBridgeRunning((status) => {
             port.postMessage({ type: "startup_status", message: status });
           });
@@ -824,7 +843,22 @@ chrome.runtime.onConnect.addListener((port) => {
 
 // ── Side panel setup ───────────────────────────────────────────────────────
 
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+
+chrome.action.onClicked.addListener(async (tab) => {
+  appActivated = true;
+  try {
+    if (!Number.isInteger(tab.windowId)) return;
+    const activationSaved = chrome.storage.session.set({ appActivated: true });
+    const panelOpened = chrome.sidePanel.open({ windowId: tab.windowId }).catch((error) => {
+      console.debug("[bg] Side panel may already be open:", error);
+    });
+    await Promise.all([activationSaved, panelOpened]);
+    _postToActivePort({ action: "app_activated" });
+  } catch (error) {
+    console.error("[bg] Failed to open side panel from action click:", error);
+  }
+});
 
 // ── Pop-out / Pop-in Window Management ─────────────────────────────────────
 

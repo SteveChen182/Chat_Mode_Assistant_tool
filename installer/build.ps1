@@ -15,6 +15,10 @@
       - Inno Setup 6  (https://jrsoftware.org/isinfo.php)
 #>
 
+param(
+    [switch]$SkipPublish
+)
+
 $ErrorActionPreference = "Stop"
 
 # Paths
@@ -298,6 +302,11 @@ Write-Host "    2. Chat_Mode_Assistant_Setup_${AppVersion}.exe  — main install
 Write-Host ""
 
 # 13. Publish GitHub Release
+if ($SkipPublish) {
+    Write-Host "  [SKIP] GitHub Release publishing disabled for this build." -ForegroundColor Yellow
+    exit 0
+}
+
 Step "Publishing GitHub Release v$AppVersion..."
 
 $ghCmd = Get-Command gh -ErrorAction SilentlyContinue

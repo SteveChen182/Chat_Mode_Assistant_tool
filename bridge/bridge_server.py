@@ -65,6 +65,56 @@ INSTANCE_ID = uuid.uuid4().hex
 STARTED_AT = time.time()
 
 
+def _read_sighting_toolkit_path(config_path):
+    """Read the sighting toolkit path from GNAI's simple toolkit YAML list."""
+    try:
+        with open(config_path, "r", encoding="utf-8-sig") as config_file:
+            current_name = ""
+            for raw_line in config_file:
+                line = raw_line.strip()
+                name_match = re.match(r"^-?\s*name:\s*['\"]?([^'\"#]+)", line, re.IGNORECASE)
+                if name_match:
+                    current_name = name_match.group(1).strip().lower()
+                    continue
+                if current_name == "sighting":
+                    path_match = re.match(r"^path:\s*(.+?)\s*$", line, re.IGNORECASE)
+                    if path_match:
+                        return path_match.group(1).strip().strip("'\"")
+    except (OSError, UnicodeError):
+        pass
+    return ""
+
+
+def _resolve_sighting_toolkit_repo():
+    """Return (git repository path, checked paths) for SightingAssistantTool."""
+    home = os.path.expanduser("~")
+    candidates = [os.environ.get("GNAI_TOOLKIT_DIRECTORY", "").strip()]
+    candidates.append(_read_sighting_toolkit_path(os.path.join(home, ".gnai", "config.yaml")))
+
+    if not getattr(sys, "frozen", False):
+        candidates.append(os.path.abspath(os.path.join(_SCRIPT_DIR, "..", "external", "SightingAssistantTool")))
+
+    candidates.extend([
+        os.path.join(home, ".gnai", "toolkits", "SightingAssistantTool"),
+        os.path.join(home, ".gnai", "toolkits", "sighting"),
+    ])
+
+    checked = []
+    seen = set()
+    for candidate in candidates:
+        if not candidate:
+            continue
+        normalized = os.path.abspath(os.path.expandvars(os.path.expanduser(candidate)))
+        key = os.path.normcase(normalized)
+        if key in seen:
+            continue
+        seen.add(key)
+        checked.append(normalized)
+        if os.path.isdir(os.path.join(normalized, ".git")):
+            return normalized, checked
+    return "", checked
+
+
 def _debug(msg):
     if DEBUG_LOG:
         line = f"[bridge] {msg}\n"
@@ -466,6 +516,10 @@ class ChatSession:
         self._idle_timer = None                  # timer to synthesize 'ready' if '> ' prompt is missed
         self._idle_timer_lock = threading.Lock()
         self._tool_active = False                # suppress synthetic ready while a tool is running
+        self._turn_id = 0                        # identifies the latest submitted message
+        self._turn_started_at = None
+        self._diagnostic_timers = []
+        self._diagnostic_timer_lock = threading.Lock()
         self.started_at = None
         self.last_output_at = None
         self.last_error = None
@@ -524,11 +578,15 @@ class ChatSession:
             self._pty.write(clean_text + "\r")
             _session_log("INPUT", clean_text)
             _debug(f"sent: {clean_text[:100]}...")
+            self._turn_id += 1
+            self._turn_started_at = time.time()
+            self._schedule_stall_diagnostics(self._turn_id)
 
     def stop(self):
         """Terminate the chat session."""
         self._stop_event.set()
         self._cancel_idle_timer()
+        self._cancel_stall_diagnostics()
         with self._lock:
             if self._pty and self._pty.isalive():
                 try:
@@ -551,8 +609,59 @@ class ChatSession:
         return self._waiting_input.is_set()
 
     @property
+    def has_stream_activity(self):
+        reader_alive = bool(self._reader_thread and self._reader_thread.is_alive())
+        return self.is_alive or reader_alive or not self.event_queue.empty()
+
+    @property
     def pid(self):
         return self._pty.pid if self._pty else None
+
+    # ── Stall Diagnostics ──────────────────────────────────────────────────
+
+    def _schedule_stall_diagnostics(self, turn_id):
+        self._cancel_stall_diagnostics()
+        timers = []
+        for delay_seconds in (30.0, 90.0):
+            timer = threading.Timer(
+                delay_seconds,
+                self._log_stall_diagnostic,
+                args=(turn_id, delay_seconds),
+            )
+            timer.daemon = True
+            timers.append(timer)
+        with self._diagnostic_timer_lock:
+            self._diagnostic_timers = timers
+        for timer in timers:
+            timer.start()
+
+    def _cancel_stall_diagnostics(self):
+        with self._diagnostic_timer_lock:
+            timers = self._diagnostic_timers
+            self._diagnostic_timers = []
+        for timer in timers:
+            timer.cancel()
+
+    def _log_stall_diagnostic(self, turn_id, threshold_seconds):
+        if (turn_id != self._turn_id or self._stop_event.is_set()
+                or self._waiting_input.is_set()):
+            return
+        now = time.time()
+        turn_age = now - self._turn_started_at if self._turn_started_at else None
+        output_age = now - self.last_output_at if self.last_output_at else None
+        turn_age_text = f"{turn_age:.1f}s" if turn_age is not None else "n/a"
+        output_age_text = f"{output_age:.1f}s" if output_age is not None else "n/a"
+        pty_alive = bool(self._pty and self._pty.isalive())
+        reader_alive = bool(self._reader_thread and self._reader_thread.is_alive())
+        _debug(
+            f"[stall] turn={turn_id} threshold={threshold_seconds:.0f}s "
+            f"turn_age={turn_age_text} output_age={output_age_text} "
+            f"pty_alive={pty_alive} reader_alive={reader_alive} "
+            f"waiting_input={self._waiting_input.is_set()} tool_active={self._tool_active} "
+            f"ignore_prompt={self._ignore_prompt} queue_depth={self.event_queue.qsize()} "
+            f"requested_cid={self.conversation_id} actual_cid={self.session_id} "
+            f"last_error={self.last_error}"
+        )
 
     # ── Idle Timer ──────────────────────────────────────────────────────────
 
@@ -582,6 +691,7 @@ class ChatSession:
         if self._waiting_input.is_set() or self._stop_event.is_set():
             return  # already handled normally
         _debug("[idle] 2 s elapsed with no prompt — synthesising ready event")
+        self._cancel_stall_diagnostics()
         self._waiting_input.set()
         self.event_queue.put({
             "type": "ready",
@@ -686,13 +796,16 @@ class ChatSession:
         if line.startswith("> ") or line == ">":
             if self._ignore_prompt:
                 return  # echo'd prompt right after send, ignore
+            self._cancel_stall_diagnostics()
             if self._pending_cid_expired and not self._cid_expired_notified:
                 self._pending_cid_expired = False
                 self._cid_expired_notified = True
-                _debug(f"[cid_expired] requested CID={self.conversation_id} opened a fresh conversation")
+                requested_cid = self.conversation_id
+                self.conversation_id = None
+                _debug(f"[cid_expired] requested CID={requested_cid} opened a fresh conversation")
                 self.event_queue.put({
                     "type": "cid_expired",
-                    "requested_cid": self.conversation_id,
+                    "requested_cid": requested_cid,
                     "message": "Conversation expired. Starting fresh session.",
                 })
             self._tool_active = False
@@ -776,6 +889,17 @@ class ChatSession:
 
     def _classify_event(self, data):
         """Parse a JSON line from dt gnai chat --json into a typed event."""
+
+        # Interactive credential prompt cannot be completed through the app.
+        # Surface it immediately instead of waiting for dt's 60-second timeout.
+        if data.get("prompt"):
+            prompt = str(data["prompt"])
+            _debug(f"[credential] interactive prompt requested: {prompt}")
+            return {
+                "type": "credential_required",
+                "prompt": prompt,
+                "command": "dt gnai config set-credentials",
+            }
 
         # Answer chunk: {"answer": "text", ...}
         if "answer" in data:
@@ -1151,28 +1275,28 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
     def _handle_toolkit_update(self):
         """POST /toolkit/update  —  run git pull on SightingAssistantTool."""
-        import subprocess
-        toolkit_dir = os.environ.get("GNAI_TOOLKIT_DIRECTORY", "").strip()
+        toolkit_dir, checked_paths = _resolve_sighting_toolkit_repo()
         if not toolkit_dir:
-            # Fallback: same logic as config.py — toolkit is two levels above src/utils
-            bridge_dir = os.path.dirname(os.path.abspath(__file__))
-            # bridge/ → project root, then find toolkit via default dt path
-            home = os.path.expanduser("~")
-            toolkit_dir = os.path.join(home, ".gnai", "toolkits", "SightingAssistantTool")
+            self._json_response(400, {
+                "error": "toolkit_repo_not_found",
+                "checked_paths": checked_paths,
+            })
+            return
 
-        if not os.path.isdir(os.path.join(toolkit_dir, ".git")):
-            self._json_response(400, {"error": "not_a_git_repo", "path": toolkit_dir})
+        git_path = shutil.which("git")
+        if not git_path:
+            self._json_response(400, {"error": "git_not_found", "path": toolkit_dir})
             return
 
         try:
             result = subprocess.run(
-                ["git", "pull", "origin", "main"],
+                [git_path, "pull", "origin", "main"],
                 cwd=toolkit_dir,
                 capture_output=True, text=True, timeout=60
             )
             # Get latest commit after pull
             commit = subprocess.run(
-                ["git", "log", "--oneline", "-1"],
+                [git_path, "log", "--oneline", "-1"],
                 cwd=toolkit_dir,
                 capture_output=True, text=True, timeout=10
             ).stdout.strip()
@@ -1364,7 +1488,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
     def _handle_stream(self):
         """SSE endpoint: streams events from the chat process."""
         session = _get_session()
-        if not session or not session.is_alive:
+        if not session or not session.has_stream_activity:
             _debug(f"[stream] no active session to stream")
             self._json_response(400, {"error": "no_active_session"})
             return
@@ -1392,7 +1516,7 @@ class BridgeHandler(BaseHTTPRequestHandler):
                 self.wfile.write(f"event: ready\ndata: {payload}\n\n".encode("utf-8"))
                 self.wfile.flush()
 
-            while session.is_alive or not session.event_queue.empty():
+            while session.has_stream_activity:
                 try:
                     event = session.event_queue.get(timeout=2)
                 except queue.Empty:

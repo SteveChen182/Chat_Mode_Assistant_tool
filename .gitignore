@@ -32,6 +32,9 @@ SAT_*_Output/
 # Bridge debug/generated
 bridge/bridge_debug.log
 bridge/bridge.pid
+bridge/bridge.port
+bridge/bridge.discovery.json
+bridge/.cache/
 bridge/log/
 bridge/native_host.cmd
 bridge/com.chat_mode_assistant.bridge.json

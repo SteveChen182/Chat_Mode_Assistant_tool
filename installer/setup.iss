@@ -68,6 +68,17 @@ Source: "dist\native_host.exe";   DestDir: "{app}"; Flags: ignoreversion
 Source: "..\extension\*"; DestDir: "{app}\extension"; \
     Flags: ignoreversion recursesubdirs createallsubdirs
 
+; ── Upgrade cleanup ──────────────────────────────────────────────────────────
+; Recreate the Extension tree so files removed by a newer release cannot remain.
+; Runtime identity files are disposable and must never cross an upgrade.
+; Logs, driver history, Chrome storage, and ~/.gnai data are intentionally kept.
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\extension"
+Type: files;          Name: "{app}\configure.exe"
+Type: files;          Name: "{app}\bridge.pid"
+Type: files;          Name: "{app}\bridge.port"
+Type: files;          Name: "{app}\bridge.discovery.json"
+
 ; ── Registry ──────────────────────────────────────────────────────────────────
 ; Register Native Messaging host so Chrome can find native_host.exe
 [Registry]
@@ -91,6 +102,7 @@ Filename: "{app}\extension"; \
 ; ── Uninstall cleanup ─────────────────────────────────────────────────────────
 [UninstallDelete]
 Type: files;           Name: "{app}\nm_manifest.json"
+Type: files;           Name: "{app}\configure.exe"
 Type: files;           Name: "{app}\bridge.pid"
 Type: files;           Name: "{app}\bridge.port"
 Type: files;           Name: "{app}\bridge.discovery.json"
@@ -106,7 +118,7 @@ var
   EnvCheckPage: TInputOptionWizardPage;
   IsUpgrade: Boolean;
 
-{ Force-terminate bridge_server.exe before files are copied (upgrade installs). }
+{ Prevent Chrome from relaunching old binaries, then stop the entire Bridge tree. }
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
@@ -117,9 +129,21 @@ begin
   { an existing install. App dir is resolved and files not yet copied.      }
   IsUpgrade := FileExists(ExpandConstant('{app}\bridge_server.exe'));
 
-  Exec('taskkill.exe', '/F /IM bridge_server.exe', '', SW_HIDE,
-       ewWaitUntilTerminated, ResultCode);
-  { ResultCode 0 = process killed, 128 = process not found — both are fine. }
+  if IsUpgrade then
+  begin
+    { Temporarily disable Native Messaging until ssPostInstall recreates it. }
+    DeleteFile(ExpandConstant('{app}\nm_manifest.json'));
+
+    Exec('taskkill.exe', '/F /T /IM native_host.exe', '', SW_HIDE,
+         ewWaitUntilTerminated, ResultCode);
+    Exec('taskkill.exe', '/F /T /IM bridge_server.exe', '', SW_HIDE,
+         ewWaitUntilTerminated, ResultCode);
+    { ResultCode 0 = process killed, 128 = process not found — both are fine. }
+
+    DeleteFile(ExpandConstant('{app}\bridge.pid'));
+    DeleteFile(ExpandConstant('{app}\bridge.port'));
+    DeleteFile(ExpandConstant('{app}\bridge.discovery.json'));
+  end;
 end;
 
 { Create environment-check page immediately after the Welcome page. }
@@ -141,6 +165,10 @@ var
   ResultCode: Integer;
 begin
   Result := True;
+
+  { Silent deployments cannot interact with check_env.exe or its message boxes. }
+  if WizardSilent then
+    exit;
 
   if CurPageID = EnvCheckPage.ID then
   begin

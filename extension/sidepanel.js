@@ -426,6 +426,12 @@ function connectPort() {
         addSystemMsg("❌ Bridge server not available. Please run:\n  cd bridge && python bridge_server.py\n\nOr set up auto-launch: .\\install_native_host.ps1");
         setInputEnabled(false);
         break;
+      case "activation_required":
+        _viewInitialized = false;
+        break;
+      case "app_activated":
+        _initializeVisibleView();
+        break;
       case "session_start_error":
         _cancelConnectionTimeout();
         setStatus("disconnected", "Session Error");
@@ -464,29 +470,29 @@ function connectPort() {
         break;
       case "cid_expired":
         // GNAI showed Welcome despite having a CID → conversation expired
-        // BUT: if session has no prior AI messages, this is a brand-new CID (first use), not expiry
         const hasPriorConversation = sessionMessages.some(m => m.role === "assistant");
         console.warn(`[cid] expired: requested=${msg.requested_cid} hasPriorConversation=${hasPriorConversation}`);
-        if (!hasPriorConversation) {
-          // New session, first-time CID — this is normal, not an expiry
-          console.log("[cid] ignoring cid_expired for brand-new session (no prior messages)");
-          break;
-        }
-        // Clear the old CID — it's useless now; cid_mismatch will set the new one later
+        // Never send through a CLI process started with an invalid --conversation-id.
+        // Keep any pending message until a no-CID replacement process reaches ready.
+        _restartWithoutCidOnReady = true;
         if (sessions.length > 0) {
           sessions[activeSessionIndex].conversationId = "";
           persistSessions();
         }
         updateConversationId("");
-        // Flag so onReady auto-send will prepend HSD context
-        if (activeHsdId) _pendingCidContextRestore = true;
-        showToast(uiLang === "zh"
-          ? "⚠️ 舊 Session 已過期，已自動重置為新 Session"
-          : "⚠️ Previous session expired. A new session has been started.");
-        addSystemMsg(uiLang === "zh"
-          ? `⚠️ 舊的對話 Session 已過期（Conversation ID 已失效），GNAI 已自動開始新的 Session。\n之前的對話 context 已遺失，系統將自動補充 HSD context 重新提問。`
-          : `⚠️ Previous session has expired. A new session has been started automatically.\nPrior conversation context is lost. The system will re-attach HSD context and resend your question.`
-        );
+        if (hasPriorConversation) {
+          // Existing conversation lost its server-side context.
+          if (activeHsdId) _pendingCidContextRestore = true;
+          showToast(uiLang === "zh"
+            ? "⚠️ 舊 Session 已過期，已自動重置為新 Session"
+            : "⚠️ Previous session expired. A new session has been started.");
+          addSystemMsg(uiLang === "zh"
+            ? `⚠️ 舊的對話 Session 已過期（Conversation ID 已失效），GNAI 已自動開始新的 Session。\n之前的對話 context 已遺失，系統將自動補充 HSD context 重新提問。`
+            : `⚠️ Previous session has expired. A new session has been started automatically.\nPrior conversation context is lost. The system will re-attach HSD context and resend your question.`
+          );
+        } else {
+          console.log("[cid] provisional CID opened as a fresh conversation; no prior context was lost");
+        }
         break;
       case "usage":
         onUsage(msg.usage);
@@ -521,6 +527,23 @@ function connectPort() {
       case "info":
         onInfo(msg.text || "");
         break;
+      case "credential_required": {
+        removeToolIndicator();
+        removeTypingIndicator();
+        isStreaming = false;
+        setStatus("disconnected", "GNAI Login Required");
+        setInputEnabled(false);
+        const command = msg.command || "dt gnai config set-credentials";
+        const text = uiLang === "zh"
+          ? `GNAI 登入憑證已失效。請關閉 App，使用一般權限（非系統管理員）的 PowerShell 執行：\n\n${command}\n\n完成後重新開啟 App。`
+          : `Your GNAI credentials have expired. Close the app and run this command in a non-administrator PowerShell:\n\n${command}\n\nThen reopen the app.`;
+        updateConnectionSplash(
+          uiLang === "zh" ? "需要重新登入 GNAI" : "GNAI login required",
+          text
+        );
+        addSystemMsg(`⚠️ ${text}`);
+        break;
+      }
       case "end":
       case "goodbye":
         onEnd();
@@ -764,6 +787,13 @@ function onReady(accumulatedAnswer) {
   setStatus("connected", "Connected");
   hideConnectionSplash();
 
+  if (_restartWithoutCidOnReady) {
+    _restartWithoutCidOnReady = false;
+    console.warn("[onReady] expired CID process is ready; restarting without CID before send");
+    _restartBridgeForSession();
+    return;
+  }
+
   // Auto-send pending message (from lazy session switch)
   if (_pendingSendMessage) {
     let msg = _pendingSendMessage;
@@ -817,7 +847,21 @@ function onReady(accumulatedAnswer) {
 
 function onInfo(text) {
   // Loading messages, toolkit progress, etc.
-  if (text.includes("Loading toolkits") || text.includes("Loading")) {
+  if (text.toLowerCase().includes("installing python requirements")) {
+    if (uiLang === "zh") {
+      setStatus("connected", "正在安裝 Python 套件...");
+      updateConnectionSplash(
+        "正在安裝必要的 Python 套件",
+        "首次執行可能需要幾分鐘，期間畫面可能暫時沒有變化。請保持視窗開啟並耐心等候。"
+      );
+    } else {
+      setStatus("connected", "Installing Python packages...");
+      updateConnectionSplash(
+        "Installing required Python packages",
+        "First-time setup may take a few minutes, and the screen may not update. Please keep this window open and wait."
+      );
+    }
+  } else if (text.includes("Loading toolkits") || text.includes("Loading")) {
     setStatus("connected", "Loading toolkits...");
     updateConnectionSplash("Loading toolkits...", "Preparing AI environment");
   } else if (text) {
@@ -1225,6 +1269,7 @@ let activeConversationId = "";  // GNAI conversation ID
 let bridgeSessionCid = "";      // CID the bridge process was actually started with
 let _pendingSendMessage = null; // message queued to send after lazy bridge restart
 let _pendingCidContextRestore = false; // true after cid_mismatch — next send should prepend HSD context
+let _restartWithoutCidOnReady = false; // expired requested CID must be replaced before pending send
 let _configAutoFixed = false;   // set when bridge auto-repaired config.yaml; triggers auto-restart on end
 let _suppressNextSessionStopped = false; // suppress session_stopped side effects on tab switch
 let _pendingSessionRestart = false;      // true while an atomic session switch is in progress
@@ -2356,7 +2401,18 @@ document.getElementById("btn-toolkit-update")?.addEventListener("click", async (
       btn.textContent = "🔄 Update Toolkit (git pull)";
       resultEl.style.display = "block";
       resultEl.style.color = "#dc2626";
-      resultEl.textContent = `❌ ${data.error || data.stderr || "Update failed"}`;
+      if (data.error === "toolkit_repo_not_found") {
+        const checkedPath = data.checked_paths?.[0] || "SightingAssistantTool";
+        resultEl.textContent = uiLang === "zh"
+          ? `❌ 找不到可更新的 Toolkit Git repository。請重新註冊 SightingAssistantTool。已檢查：${checkedPath}`
+          : `❌ No updatable Toolkit Git repository was found. Please register SightingAssistantTool again. Checked: ${checkedPath}`;
+      } else if (data.error === "git_not_found") {
+        resultEl.textContent = uiLang === "zh"
+          ? "❌ 找不到 Git。請安裝 Git for Windows，並重新啟動 App。"
+          : "❌ Git was not found. Install Git for Windows, then restart the app.";
+      } else {
+        resultEl.textContent = `❌ ${data.error || data.stderr || (uiLang === "zh" ? "更新失敗" : "Update failed")}`;
+      }
     }
   } catch (e) {
     btn.textContent = "🔄 Update Toolkit (git pull)";
@@ -2485,6 +2541,8 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
     saveCurrentSession();
     persistSessions();
+  } else {
+    _initializeVisibleView();
   }
 });
 
@@ -2853,12 +2911,29 @@ regressionInput.addEventListener("input", () => {
 
 // ── Init ───────────────────────────────────────────────────────────────────
 
-connectPort();
+let _viewStateReady = false;
+let _viewInitialized = false;
+
+function _initializeVisibleView() {
+  if (document.visibilityState !== "visible" || !_viewStateReady || _viewInitialized) return;
+  if (!port) connectPort();
+  if (!port) return;
+  _viewInitialized = true;
+  port.postMessage({ action: "view_ready", view: _isPopup ? "popup" : "sidepanel" });
+  port.postMessage({
+    action: "initialize_view",
+    assistant: isLogAnalysisMode ? "displaydebugger" : "sighting_assistant",
+    conversation_id: activeConversationId || undefined,
+  });
+}
 
 // Populate version badge in Settings menu
 (function () {
-  const el = document.getElementById('app-version-badge');
-  if (el) el.textContent = 'v' + chrome.runtime.getManifest().version;
+  const versionText = 'v' + chrome.runtime.getManifest().version;
+  const settingsBadge = document.getElementById('app-version-badge');
+  const headerBadge = document.getElementById('header-version');
+  if (settingsBadge) settingsBadge.textContent = versionText;
+  if (headerBadge) headerBadge.textContent = versionText;
 }());
 
 // Regression button wiring
@@ -2949,14 +3024,8 @@ _restoreTransferState().then((restored) => {
   if (restored) {
     // The destination view is restored; attach to the existing session if present.
     hideConnectionSplash();
-    if (port) {
-      port.postMessage({ action: "view_ready", view: _isPopup ? "popup" : "sidepanel" });
-      port.postMessage({
-        action: "initialize_view",
-        assistant: isLogAnalysisMode ? "displaydebugger" : "sighting_assistant",
-        conversation_id: activeConversationId || undefined,
-      });
-    }
+    _viewStateReady = true;
+    _initializeVisibleView();
     return;
   }
 
@@ -2976,14 +3045,8 @@ _restoreTransferState().then((restored) => {
       rebuildChatArea();
       hideOnboarding();
     }
-    if (port) {
-      port.postMessage({ action: "view_ready", view: _isPopup ? "popup" : "sidepanel" });
-      port.postMessage({
-        action: "initialize_view",
-        assistant: isLogAnalysisMode ? "displaydebugger" : "sighting_assistant",
-        conversation_id: activeConversationId || undefined,
-      });
-    }
+    _viewStateReady = true;
+    _initializeVisibleView();
   });
 });
 

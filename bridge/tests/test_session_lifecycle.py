@@ -107,6 +107,75 @@ class SessionLifecycleTests(unittest.TestCase):
         cancel_timer.assert_called_once()
         reset_timer.assert_not_called()
 
+    def test_credential_prompt_is_exposed_to_ui(self):
+        session = bridge_server.ChatSession()
+
+        event = session._classify_event({
+            "level": "info",
+            "msg": "",
+            "prompt": "Username",
+            "secret": False,
+        })
+
+        self.assertEqual(event["type"], "credential_required")
+        self.assertEqual(event["prompt"], "Username")
+        self.assertEqual(event["command"], "dt gnai config set-credentials")
+
+    def test_stall_diagnostic_reports_processing_state(self):
+        session = bridge_server.ChatSession(conversation_id="requested-cid")
+        session._turn_id = 4
+        session._turn_started_at = 100.0
+        session.last_output_at = 125.0
+        session._ignore_prompt = True
+        session._tool_active = True
+        session._pty = type("Pty", (), {"isalive": lambda self: True})()
+        session._reader_thread = type("Reader", (), {"is_alive": lambda self: True})()
+
+        with (
+            patch.object(bridge_server.time, "time", return_value=130.0),
+            patch.object(bridge_server, "_debug") as debug,
+        ):
+            session._log_stall_diagnostic(4, 30.0)
+
+        message = debug.call_args.args[0]
+        self.assertIn("[stall] turn=4 threshold=30s", message)
+        self.assertIn("output_age=5.0s", message)
+        self.assertIn("pty_alive=True reader_alive=True", message)
+        self.assertIn("tool_active=True", message)
+        self.assertIn("requested_cid=requested-cid actual_cid=None", message)
+
+    def test_stall_diagnostic_is_suppressed_after_ready(self):
+        session = bridge_server.ChatSession()
+        session._turn_id = 1
+        session._waiting_input.set()
+
+        with patch.object(bridge_server, "_debug") as debug:
+            session._log_stall_diagnostic(1, 30.0)
+
+        debug.assert_not_called()
+
+    def test_stall_diagnostic_handles_no_pty_output(self):
+        session = bridge_server.ChatSession()
+        session._turn_id = 1
+
+        with patch.object(bridge_server, "_debug") as debug:
+            session._log_stall_diagnostic(1, 30.0)
+
+        self.assertIn("turn_age=n/a output_age=n/a", debug.call_args.args[0])
+
+    def test_stream_stays_active_while_reader_drains_exited_cli(self):
+        session = bridge_server.ChatSession()
+        session._pty = type("Pty", (), {"isalive": lambda self: False})()
+        session._reader_thread = type("Reader", (), {"is_alive": lambda self: True})()
+
+        self.assertTrue(session.has_stream_activity)
+
+        session._reader_thread = type("Reader", (), {"is_alive": lambda self: False})()
+        self.assertFalse(session.has_stream_activity)
+
+        session.event_queue.put({"type": "config_repaired"})
+        self.assertTrue(session.has_stream_activity)
+
     def test_health_reports_actual_gnai_conversation_id(self):
         session = FakeSession("sighting_assistant", "requested-cid")
         session.session_id = "actual-cid"
@@ -134,7 +203,10 @@ class SessionLifecycleTests(unittest.TestCase):
 
         session._process_line("> ")
 
-        self.assertEqual(session.event_queue.get_nowait()["type"], "cid_expired")
+        expired_event = session.event_queue.get_nowait()
+        self.assertEqual(expired_event["type"], "cid_expired")
+        self.assertEqual(expired_event["requested_cid"], "requested-cid")
+        self.assertIsNone(session.conversation_id)
         self.assertEqual(session.event_queue.get_nowait()["type"], "ready")
 
     def test_config_repair_cancels_expiry_and_requests_same_session(self):

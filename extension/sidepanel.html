@@ -26,17 +26,31 @@
       box-shadow: 0 2px 4px rgba(0,0,0,0.12);
     }
     .header-status-wrap {
-      width: 100px;
-      min-width: 100px;
+      flex: none;
       display: flex;
       align-items: center;
+      gap: 6px;
+      margin-right: 8px;
     }
     .header-title {
       font-size: 15px; font-weight: 700;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .header-identity {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      min-width: 0;
       margin-right: auto;
+    }
+    .header-version {
+      flex: none;
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.72);
+      white-space: nowrap;
     }
     .header-status {
       font-size: 11px;
@@ -1096,8 +1110,11 @@
   <div class="header">
     <div class="header-status-wrap">
       <span id="status-badge" class="header-status disconnected">Offline</span>
+      <span id="header-version" class="header-version"></span>
     </div>
-    <span id="header-title" class="header-title"></span>
+    <div class="header-identity">
+      <span id="header-title" class="header-title"></span>
+    </div>
     <div id="header-controls" class="header-controls">
       <button id="btn-popout" class="header-btn chat-only" title="Pop out to window / Back to sidepanel">⧉</button>
       <button id="btn-save" class="header-btn" title="Save chat as HTML">&#128190;</button>
