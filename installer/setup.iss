@@ -115,7 +115,8 @@ Type: dirifempty;      Name: "{app}"
 [Code]
 
 var
-  EnvCheckPage: TInputOptionWizardPage;
+  EnvCheckPage: TWizardPage;
+  EnvCheckButton: TNewButton;
   IsUpgrade: Boolean;
 
 { Prevent Chrome from relaunching old binaries, then stop the entire Bridge tree. }
@@ -146,68 +147,47 @@ begin
   end;
 end;
 
-{ Create environment-check page immediately after the Welcome page. }
-procedure InitializeWizard;
-begin
-  EnvCheckPage := CreateInputOptionPage(wpWelcome,
-    'Environment Check',
-    'Verify system prerequisites before installation',
-    'Would you like to run the environment checker now?',
-    False, False);
-  EnvCheckPage.Add('Yes — run environment check (recommended)');
-  EnvCheckPage.Add('No  — skip and proceed directly to installation');
-  EnvCheckPage.Values[0] := True;
-end;
-
-{ Gate the Next button on the environment-check page. }
-function NextButtonClick(CurPageID: Integer): Boolean;
+{ Runs check_env.exe on demand; installation is never gated on its result. }
+procedure EnvCheckButtonClick(Sender: TObject);
 var
   ResultCode: Integer;
 begin
-  Result := True;
+  ExtractTemporaryFile('check_env.exe');
 
-  { Silent deployments cannot interact with check_env.exe or its message boxes. }
-  if WizardSilent then
-    exit;
-
-  if CurPageID = EnvCheckPage.ID then
+  if not Exec(ExpandConstant('{tmp}\check_env.exe'), '', '',
+              SW_SHOW, ewWaitUntilTerminated, ResultCode) then
   begin
-    if EnvCheckPage.SelectedValueIndex = 0 then
-    begin
-      { Extract check_env.exe to the temp directory, then run it. }
-      ExtractTemporaryFile('check_env.exe');
-
-      if not Exec(ExpandConstant('{tmp}\check_env.exe'), '', '',
-                  SW_SHOW, ewWaitUntilTerminated, ResultCode) then
-      begin
-        { Could not launch the checker — allow proceeding with a notice. }
-        MsgBox('Unable to launch the environment checker.' + #13#10 +
-               'Proceeding with installation.',
-               mbInformation, MB_OK);
-      end
-      else if ResultCode = 1 then
-      begin
-        { One or more checks failed — ask the user whether to continue. }
-        Result := MsgBox(
-          'Some environment checks failed.' + #13#10 +
-          'It is recommended to resolve the issues before installing.' + #13#10 + #13#10 +
-          'Continue installation anyway?',
-          mbConfirmation, MB_YESNO) = IDYES;
-      end
-      else if (ResultCode <> 0) and (ResultCode <> 2) then
-      begin
-        { Unknown exit code — checker may have crashed; warn and ask. }
-        Result := MsgBox(
-          'The environment checker exited unexpectedly (code: ' + IntToStr(ResultCode) + ').' + #13#10 +
-          'This may indicate a crash. Continue installation anyway?',
-          mbConfirmation, MB_YESNO) = IDYES;
-      end;
-      { ResultCode = 0 → all passed, proceed normally.              }
-      { ResultCode = 2 → checker closed before checks ran (treated  }
-      {                  as "skip"), proceed normally.               }
-    end;
-    { SelectedValueIndex = 1 → user chose Skip, proceed normally. }
+    MsgBox('Unable to launch the environment checker.', mbError, MB_OK);
   end;
+end;
+
+{ Create environment-check page immediately after the Welcome page. }
+procedure InitializeWizard;
+var
+  Lbl: TNewStaticText;
+begin
+  EnvCheckPage := CreateCustomPage(wpWelcome,
+    'Environment Check',
+    'Verify system prerequisites before installation (optional)');
+
+  Lbl := TNewStaticText.Create(EnvCheckPage);
+  Lbl.Parent := EnvCheckPage.Surface;
+  Lbl.AutoSize := True;
+  Lbl.WordWrap := True;
+  Lbl.Width := EnvCheckPage.SurfaceWidth;
+  Lbl.Caption :=
+    'Click the button below to check whether required tools (Intel dt CLI, GNAI, ' +
+    'toolkits) are installed. This is optional — you can also skip it and click ' +
+    'Next to proceed directly to installation.';
+
+  EnvCheckButton := TNewButton.Create(EnvCheckPage);
+  EnvCheckButton.Parent := EnvCheckPage.Surface;
+  EnvCheckButton.Caption := 'Run Environment Check...';
+  EnvCheckButton.Left := 0;
+  EnvCheckButton.Top := Lbl.Top + Lbl.Height + 16;
+  EnvCheckButton.Width := 180;
+  EnvCheckButton.Height := 28;
+  EnvCheckButton.OnClick := @EnvCheckButtonClick;
 end;
 
 { Write nm_manifest.json pointing to native_host.exe in the install directory. }

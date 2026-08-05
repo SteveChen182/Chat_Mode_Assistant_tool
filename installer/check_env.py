@@ -164,109 +164,6 @@ def check_chrome():
     return False, "Google Chrome not found — please install Chrome"
 
 
-# Result constants for assistant check
-_ASSISTANT_OK   = "ok"
-_ASSISTANT_DENY = "denied"
-_ASSISTANT_WARN = "warn"   # could not verify conclusively
-
-_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]|\x1b.", re.I)
-
-# Patterns detected in dt gnai chat --json output (case-insensitive)
-_ERROR_PATTERNS = re.compile(
-    r"permission.denied|unauthorized|forbidden|not.authorized|"
-    r"access.denied|no.access|not.allowed|"
-    r"assistant.not.found|unknown.assistant|invalid.assistant|"
-    r"does.not.exist|cannot.find|could.not.find",
-    re.I,
-)
-_SUCCESS_PATTERNS = re.compile(
-    r"^\s*>\s*$|"           # bare prompt ">"
-    r"^\s*>\s+|"            # prompt with text "> ..."
-    r"loading|starting|initializ|connecting|authenticat",
-    re.I | re.MULTILINE,
-)
-
-
-def _probe_gnai_assistant(assistant_name: str, timeout: float = 10.0):
-    """
-    Launch `dt gnai chat --json --assistant <name>`, read output for <timeout> seconds,
-    and detect whether the assistant is accessible.
-
-    Returns: (_ASSISTANT_OK | _ASSISTANT_DENY | _ASSISTANT_WARN, detail_str)
-    """
-    dt = shutil.which("dt")
-    if not dt:
-        return _ASSISTANT_WARN, "dt not found — skipped"
-
-    try:
-        proc = subprocess.Popen(
-            [dt, "gnai", "chat", "--json", "--assistant", assistant_name],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            stdin=subprocess.DEVNULL,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=(
-                subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
-            ) if sys.platform == "win32" else 0,
-        )
-    except Exception as e:
-        return _ASSISTANT_WARN, f"Could not launch dt: {e}"
-
-    with _active_procs_lock:
-        _active_procs.append(proc)
-
-    # Collect output in background thread; terminate process after timeout
-    output_lines = []
-    stop_event = threading.Event()
-
-    def _collect():
-        for stream in (proc.stdout, proc.stderr):
-            try:
-                for line in iter(stream.readline, ""):
-                    if stop_event.is_set():
-                        break
-                    clean = _ANSI_RE.sub("", line).strip()
-                    if clean:
-                        output_lines.append(clean)
-            except Exception:
-                pass
-
-    t = threading.Thread(target=_collect, daemon=True)
-    t.start()
-    t.join(timeout=timeout)
-    stop_event.set()
-
-    # Terminate the process (use taskkill on Windows to kill full process tree)
-    _kill_proc_tree(proc)
-
-    with _active_procs_lock:
-        try:
-            _active_procs.remove(proc)
-        except ValueError:
-            pass
-
-    combined = "\n".join(output_lines)
-
-    if _ERROR_PATTERNS.search(combined):
-        # Pick the first matching error line as the detail message
-        for line in output_lines:
-            if _ERROR_PATTERNS.search(line):
-                return _ASSISTANT_DENY, line[:120]
-        return _ASSISTANT_DENY, "Permission denied or assistant not accessible"
-
-    if _SUCCESS_PATTERNS.search(combined):
-        return _ASSISTANT_OK, "Accessible"
-
-    if combined.strip():
-        # Got some output but no clear signal — lean toward OK
-        return _ASSISTANT_OK, f"Accessible (output: {combined.splitlines()[0][:80]})"
-
-    # No output at all — dt may buffer without a PTY; can't determine access
-    return _ASSISTANT_WARN, "Could not verify — ensure GNAI is set up correctly and you have access"
-
-
 # ── GNAI Toolkit installation check ───────────────────────────────────────
 
 _toolkit_cache      = None   # dict of {name: {"status": "valid"|"missing", "path": str}}
@@ -374,44 +271,23 @@ def _kill_proc_tree(proc):
             pass
 
 
-def _make_toolkit_check(toolkit_name: str, assistant_name: str):
+def _make_toolkit_check(toolkit_name: str):
     """
-    Combined check: toolkit installed AND assistant accessible.
-    Returns a single result with a summary line.
+    Check: is the toolkit installed? Returns a single result with a summary line.
     """
     def _check():
-        # ── 1. Toolkit installed? ─────────────────────────────────────────
         toolkits, err = _get_installed_toolkits()
         if toolkits is None:
-            tk_ok, tk_msg = None, f"Could not check toolkits: {err}"
-        else:
-            key = toolkit_name.lower()
-            info = toolkits.get(key)
-            if info and info["status"] == "valid":
-                tk_ok, tk_msg = True, "installed"
-            elif info and info["status"] == "missing":
-                tk_ok, tk_msg = False, "missing dependency"
-            else:
-                tk_ok, tk_msg = False, "not installed"
+            return None, f"Could not check toolkits: {err}"
 
-        # ── 2. Assistant accessible? ──────────────────────────────────────
-        result, detail = _probe_gnai_assistant(assistant_name)
-        if result == _ASSISTANT_OK:
-            ast_ok, ast_msg = True, "accessible"
-        elif result == _ASSISTANT_DENY:
-            ast_ok, ast_msg = False, f"no access ({detail[:60]})"
+        key = toolkit_name.lower()
+        info = toolkits.get(key)
+        if info and info["status"] == "valid":
+            return True, "Toolkit: installed"
+        elif info and info["status"] == "missing":
+            return False, "Toolkit: missing dependency"
         else:
-            ast_ok, ast_msg = None, "access unverified"
-
-        # ── 3. Combine ────────────────────────────────────────────────────
-        summary = f"Toolkit: {tk_msg}  |  Assistant: {ast_msg}"
-        if tk_ok is False:
-            return False, summary
-        if ast_ok is False:
-            return False, summary
-        if tk_ok is None or ast_ok is None:
-            return None, summary
-        return True, summary
+            return False, "Toolkit: not installed"
 
     return _check
 
@@ -419,11 +295,11 @@ def _make_toolkit_check(toolkit_name: str, assistant_name: str):
 CHECKS = [
     ("Intel dt CLI (PATH)",      check_dt_in_path,  DT_INSTALL_HELP_CMD),
     ("GNAI Connection Test",     check_gnai_connection, None),
-    ("sighting",       _make_toolkit_check("sighting",        "sighting_assistant"),
+    ("sighting",       _make_toolkit_check("sighting"),
      "dt gnai toolkits register intel-sandbox/SightingAssistantTool"),
-    ("displaydebugger", _make_toolkit_check("displaydebugger", "displaydebugger"),
+    ("displaydebugger", _make_toolkit_check("displaydebugger"),
      "dt gnai toolkits register intel-sandbox/displaydebugger"),
-    ("sherlog",        _make_toolkit_check("sherlog",         "sherlog"),
+    ("sherlog",        _make_toolkit_check("sherlog"),
      "dt gnai toolkits register intel-innersource/drivers.gpu.core.sherlog-toolkit"),
 ]
 
@@ -467,6 +343,7 @@ class App(tk.Tk):
         self.configure(bg=self.BG)
         self.resizable(True, True)
         self._exit_code = 2  # 0=passed, 1=failed, 2=not completed
+        self._install_in_progress = False
         self._fonts()
         self._build()
         self._center()
@@ -591,10 +468,12 @@ class App(tk.Tk):
             padx=16, pady=5, cursor="hand2", state="disabled")
         self._btn_recheck.pack(side="left")
 
-        tk.Button(btn_row, text="Close", font=self.f_body,
-                  command=self.destroy,
-                  bg=self.BORDER, fg=self.TEXT_DARK, relief="flat",
-                  padx=16, pady=5, cursor="hand2").pack(side="left", padx=(8, 0))
+        self._btn_close = tk.Button(
+            btn_row, text="Close", font=self.f_body,
+            command=self.destroy,
+            bg=self.BORDER, fg=self.TEXT_DARK, relief="flat",
+            padx=16, pady=5, cursor="hand2")
+        self._btn_close.pack(side="left", padx=(8, 0))
 
         # ── Help note ──────────────────────────────────────────────────────
         self._help = tk.Label(self._body, text="",
@@ -714,18 +593,30 @@ class App(tk.Tk):
         cmd = CHECKS[i][2]
         if not cmd:
             return
+        self._set_install_in_progress(True)
         if install_btn:
-            install_btn.config(state="disabled", text="Installing…")
+            install_btn.config(text="Installing…")
 
         def _run():
             subprocess.Popen(
-                ["powershell", "-NoExit", "-Command", cmd],
+                ["powershell", "-Command", cmd],
                 creationflags=subprocess.CREATE_NEW_CONSOLE,
             ).wait()
-            # After the console window is closed, reset button and re-check
+            # The console closes itself once the command finishes; re-enable controls and re-check
+            self.after(0, self._set_install_in_progress, False)
             self.after(0, self._run_checks)
 
         threading.Thread(target=_run, daemon=True).start()
+
+    def _set_install_in_progress(self, in_progress: bool):
+        """Block other Install buttons, Re-check, and Close while an install console is running."""
+        self._install_in_progress = in_progress
+        state = "disabled" if in_progress else "normal"
+        for _, _, install_btn, _ in self._rows:
+            if install_btn:
+                install_btn.config(state=state)
+        self._btn_recheck.config(state=state)
+        self._btn_close.config(state=state)
 
     def _recheck(self):
         self._run_checks()
@@ -764,6 +655,8 @@ class App(tk.Tk):
 
     def _on_close(self):
         """Kill all active gnai subprocesses before closing the window."""
+        if self._install_in_progress:
+            return
         with _active_procs_lock:
             procs = list(_active_procs)
         for proc in procs:
