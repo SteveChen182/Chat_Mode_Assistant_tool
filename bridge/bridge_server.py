@@ -851,6 +851,20 @@ class ChatSession:
             elif line and line[0] in "◐◑◒◓⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏✔✓✗":
                 is_status = True
 
+            # Some assistants (e.g. displaydebugger) print raw text directly
+            # to stdout instead of emitting JSON — including questions that
+            # need a user reply (e.g. "Continue? (y/n)"). If we silently drop
+            # these while a tool is active, the line never reaches the UI and
+            # _ignore_prompt is never cleared, so the '> ' prompt that follows
+            # is ignored too — the session gets stuck showing "Running: ..."
+            # forever with no way to answer. Surface any non-empty line seen
+            # during an active tool call, and treat it like an answer chunk
+            # for echo-protection purposes.
+            if not is_status and self._tool_active and line.strip():
+                is_status = True
+                if self._ignore_prompt:
+                    self._ignore_prompt = False
+
             if is_status:
                 clean = line.strip()[:120]
                 _debug(f"[pty] (non-JSON status → info) {clean}")
