@@ -520,7 +520,9 @@ function connectPort() {
         onReady(msg.accumulated_answer || "");
         break;
       case "send_rejected":
-        // Bridge rejected send (session busy)
+        // Bridge rejected send (session busy) — must reset isStreaming or the
+        // client-side guard in sendUserMessage() silently blocks all future sends.
+        isStreaming = false;
         addSystemMsg(`⏳ ${msg.message || "AI is still processing. Please wait."}`);
         setInputEnabled(true);
         break;
@@ -1511,7 +1513,9 @@ btnFontDown.addEventListener("click", () => {
 });
 
 inputEl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
+  // isComposing/keyCode 229: Enter is confirming an IME composition (e.g. Chinese
+  // input), not submitting — ignore it or the first real Enter press gets eaten.
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
     e.preventDefault();
     sendUserMessage(inputEl.value);
     inputEl.value = "";
@@ -2899,7 +2903,7 @@ btnLogAnalyze.addEventListener("click", () => {
 
 regressionSendBtn.addEventListener("click", sendRegressionMessage);
 regressionInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
     e.preventDefault();
     sendRegressionMessage();
   }

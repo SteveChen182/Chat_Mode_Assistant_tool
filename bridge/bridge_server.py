@@ -64,6 +64,17 @@ PROTOCOL_VERSION = 2
 INSTANCE_ID = uuid.uuid4().hex
 STARTED_AT = time.time()
 
+# Some GNAI tools (e.g. sighting_phase1b_console, displaydebugger_analyze's
+# "Interactive Follow-up Mode") run their own interactive sub-console that
+# blocks on raw stdin for a reply, without ever emitting a "usage" event or
+# the outer '> ' prompt. Their prompt text arrives as a normal (JSON) answer
+# chunk, so it looks just like ordinary tool output — matched against the
+# tail of the accumulated answer to detect it.
+_INTERACTIVE_CONSOLE_PROMPT_RE = re.compile(
+    r"(enter\s+selection|enter\s+your\s+choice|enter\s+number\(s\)|select\s+number\(s\)|\bquestion)\s*:\s*$",
+    re.I,
+)
+
 
 def _read_sighting_toolkit_path(config_path):
     """Read the sighting toolkit path from GNAI's simple toolkit YAML list."""
@@ -926,9 +937,55 @@ class ChatSession:
             # silently ignored and the session is stuck waiting forever.
             if self._ignore_prompt:
                 self._ignore_prompt = False
+            # Some tools (e.g. sighting_phase1b_console) launch an interactive
+            # sub-console that blocks on raw stdin for a selection and never
+            # emits "usage" or the outer '> ' prompt. If we keep treating the
+            # session as "tool still running" here, is_waiting_input never
+            # gets set and the user's reply can never reach the process —
+            # the session is stuck forever. Detect the console's own prompt
+            # text and switch to ready immediately.
+            if self._tool_active and _INTERACTIVE_CONSOLE_PROMPT_RE.search(self.accumulated_answer.rstrip()):
+                _debug("[pty] interactive console prompt detected in answer stream → ready")
+                self._tool_active = False
+                self._cancel_stall_diagnostics()
+                self._waiting_input.set()
+                # Enqueue the "answer" chunk BEFORE the synthetic "ready" event.
+                # The frontend sets isStreaming=true on every "answer" chunk and
+                # isStreaming=false on "ready" — if "ready" were enqueued first
+                # (as it used to be, since this branch ran before returning the
+                # "answer" event below for the caller to enqueue), the caller's
+                # "answer" put would land AFTER "ready" and immediately re-block
+                # the input box forever. Enqueue both here, in the correct
+                # order, and return None so the caller does not double-enqueue.
+                answer_event = {"type": "answer", "text": text}
+                _debug(f"[event] type=answer")
+                _session_log("OUTPUT", f"[answer] {text[:500]}")
+                self.event_queue.put(answer_event)
+                ready_event = {"type": "ready", "accumulated_answer": self.accumulated_answer}
+                _debug(f"[event] type=ready")
+                _session_log("EVENT", "[ready] waiting for input")
+                self.event_queue.put(ready_event)
+                return None
+            elif self._waiting_input.is_set():
+                # Already waiting for a reply (e.g. the interactive console
+                # prompt handled above) but more trailing/echoed output
+                # arrived (redraw, blank line, etc). The frontend flips
+                # isStreaming=true on every "answer" chunk, so without
+                # re-sending "ready" right after, the input box would stay
+                # blocked forever — the idle timer's own synthetic "ready"
+                # bails out once _waiting_input is already set (see
+                # _on_idle_timeout), so nothing else would ever unblock it.
+                _debug("[pty] trailing answer chunk while already waiting_input → re-sync ready")
+                answer_event = {"type": "answer", "text": text}
+                _session_log("OUTPUT", f"[answer] {text[:500]}")
+                self.event_queue.put(answer_event)
+                ready_event = {"type": "ready", "accumulated_answer": self.accumulated_answer}
+                _session_log("EVENT", "[ready] waiting for input (re-sync)")
+                self.event_queue.put(ready_event)
+                return None
             # Tool output can contain answer chunks with long pauses. Do not
             # interpret those pauses as turn completion; wait for usage/prompt.
-            if not self._tool_active:
+            elif not self._tool_active:
                 self._reset_idle_timer()
             return {"type": "answer", "text": text}
 
