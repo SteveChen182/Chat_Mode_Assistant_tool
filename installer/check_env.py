@@ -336,6 +336,7 @@ class App(tk.Tk):
     STATUS_OK      = ("✓",  "#16a34a")
     STATUS_FAIL    = ("✗",  "#dc2626")
     STATUS_WARN    = ("⚠",  "#d97706")
+    STATUS_SKIP    = ("‒",  "#9ca3af")
 
     def __init__(self):
         super().__init__()
@@ -509,6 +510,7 @@ class App(tk.Tk):
 
         def worker():
             results = []
+            stopped_at = None
             for i, (label, fn, _) in enumerate(CHECKS):
                 try:
                     ok, msg = fn()
@@ -516,6 +518,15 @@ class App(tk.Tk):
                     ok, msg = False, f"Error: {e}"
                 self.after(0, self._update_row, i, ok, msg)
                 results.append((i, ok, msg))
+                if ok is False:
+                    # Stop advancing to the next check once one fails.
+                    stopped_at = i
+                    break
+
+            if stopped_at is not None:
+                for j in range(stopped_at + 1, len(CHECKS)):
+                    self.after(0, self._update_row_skipped, j)
+                    results.append((j, "skipped", "Skipped — fix the previous check first"))
 
             self.after(0, self._show_summary, results)
 
@@ -555,11 +566,23 @@ class App(tk.Tk):
             else:
                 config_btn.pack_forget()
 
+    def _update_row_skipped(self, i):
+        """Mark a row as not run because an earlier check already failed."""
+        badge, detail, install_btn, config_btn = self._rows[i]
+        icon, color = self.STATUS_SKIP
+        badge.config(text=icon, fg=color)
+        detail.config(text="Skipped — fix the previous check first", fg=self.GRAY)
+        if install_btn:
+            install_btn.pack_forget()
+        if config_btn:
+            config_btn.pack_forget()
+
     def _show_summary(self, results):
         failed  = [(i, msg) for i, ok, msg in results if ok is False]
         warned  = [(i, msg) for i, ok, msg in results if ok is None]
+        skipped = [(i, msg) for i, ok, msg in results if ok == "skipped"]
         total   = len(results)
-        passed  = total - len(failed) - len(warned)
+        passed  = total - len(failed) - len(warned) - len(skipped)
 
         if not failed and not warned:
             self._summary.config(
@@ -575,13 +598,15 @@ class App(tk.Tk):
                      "\n".join(f"  • {CHECKS[i][0]}: {msg}" for i, msg in warned))
         else:
             self._summary.config(
-                text=f"✗  {len(failed)} failed ({passed}/{total} passed) — please fix before installing",
+                text=f"✗  {len(failed)} failed, {len(skipped)} skipped ({passed}/{total} passed) — please fix before installing",
                 fg=self.RED)
             help_lines = []
             for i, msg in failed:
                 help_lines.append(f"✗ {CHECKS[i][0]}: {msg}")
             for i, msg in warned:
                 help_lines.append(f"⚠ {CHECKS[i][0]}: {msg}")
+            for i, msg in skipped:
+                help_lines.append(f"‒ {CHECKS[i][0]}: {msg}")
             self._help.config(text="\n".join(help_lines))
 
         self._btn_recheck.config(state="normal")
