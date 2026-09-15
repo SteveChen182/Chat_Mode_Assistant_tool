@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chat Mode Assistant</title>
+  <style>
+    :root { --primary: #5f80ab; --background: #f3f4f6; --border: #d1d5db; --ink: #202832; --muted: #596575; }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; height: 100vh; height: 100dvh; display: flex; flex-direction: column; background: var(--background); color: var(--ink); font: 14px/1.5 "Segoe UI", "Microsoft JhengHei", sans-serif; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; border: 1px solid var(--border); border-radius: 6px; background: white; color: var(--ink); padding: 6px 10px; min-height: 36px; }
+    button:hover:not(:disabled) { background: #e9eef5; }
+    button:disabled { cursor: default; opacity: .5; }
+    :focus-visible { outline: 2px solid #24755a; outline-offset: 2px; }
+    header { display: flex; align-items: center; gap: 9px; padding: 12px; background: var(--primary); color: white; }
+    header img { width: 22px; height: 22px; flex: none; }
+    header { padding: 10px 14px; gap: 6px; flex-wrap: wrap; }
+    header button { min-height: 30px; height: 30px; background: rgb(255 255 255 / .2); color: white; border: 0; padding: 4px 8px; }
+    header .icon-button { width: 30px; height: 30px; font-size: 16px; }
+    h1 { font-size: 16px; line-height: 1.3; margin: 0; overflow-wrap: anywhere; }
+    .identity { flex: 1 1 100px; min-width: 0; }
+    .version { font-size: 11px; opacity: .85; }
+    .icon-button { width: 36px; height: 36px; flex: none; padding: 0; font-size: 20px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); background: white; }
+    .session-controls { display: flex; gap: 8px; width: 100%; min-width: 0; }
+    .session-controls button { flex: none; }
+    #sessions { display: flex; align-items: stretch; flex: 1; min-width: 0; min-height: 36px; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; background: #e8ecf0; }
+    .session-tab-group { display: flex; flex: none; align-items: stretch; }
+    #sessions .session-close { width: 26px; min-height: 36px; padding: 0; border: 0; border-radius: 0; background: transparent; color: #6b7280; font-size: 16px; }
+    #sessions .session-close:hover:not(:disabled) { background: #fee2e2; color: #991b1b; }
+    #undo-close { align-self: center; white-space: nowrap; color: #24583b; border-color: #a4cbb6; background: #e3f1e9; }
+    #sessions .session-tab { min-height: 36px; max-width: 180px; border: 0; border-right: 1px solid #d1d5db; border-radius: 0; background: transparent; color: #6b7280; padding: 6px 12px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #sessions .session-tab:hover:not(:disabled) { background: #d4dbe4; color: #374151; }
+    #sessions .session-tab[aria-selected="true"] { background: white; color: #1f2937; font-weight: 600; box-shadow: inset 0 -2px 0 var(--primary); }
+    #sessions .session-tab:focus-visible { outline-offset: -2px; }
+    .toolbar-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; flex: 1 1 170px; min-width: 0; align-items: center; }
+    .toolbar-actions button { white-space: nowrap; }
+    #quick-panel { flex: none; border-top: 1px solid #cbd5e5; background: linear-gradient(110deg, #f5f7fc, #e8eef9); }
+    #quick-panel summary { cursor: pointer; padding: 9px 14px; font-size: 13px; font-weight: 600; color: #374151; }
+    #quick-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 0 14px 12px; }
+    #quick-actions button { border: 1px solid #cbd5e5; border-radius: 8px; background: white; color: #425d85; font-size: 12px; font-weight: 600; padding: 8px 6px; overflow-wrap: anywhere; box-shadow: 0 1px 3px rgb(0 0 0 / .06); }
+    #quick-actions button:hover:not(:disabled) { background: #edf3fc; }
+    #sat-actions { padding: 0 12px 10px; }
+    #quick-actions #sat-analysis { grid-column: span 2; width: 100%; background: #e3f1e9; border-color: #a4cbb6; color: #24583b; font-weight: 600; overflow-wrap: anywhere; }
+    #quick-actions #sat-analysis:hover:not(:disabled) { background: #d2e8dc; }
+    #sat-status { margin-top: 4px; }
+    #sat-status[data-kind="error"] { color: #a03024; }
+    #sat-reference { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    #sat-reference label { display: flex; align-items: center; gap: 6px; }
+    #sat-report-content { overflow-wrap: anywhere; font: inherit; max-height: 60vh; overflow-y: auto; }
+    select { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--border); border-radius: 4px; background: white; color: var(--ink); }
+    .model-controls { display: flex; align-items: center; gap: 8px; }
+    .primary { background: #42678f; border-color: #42678f; color: white; }
+    .primary:hover:not(:disabled) { background: #355777; }
+    .source { flex: none; width: 100%; min-width: 0; padding: 8px 0 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .source a { color: #285e93; overflow-wrap: anywhere; font-weight: 600; }
+    .meta { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .notice { color: #815512; font-size: 12px; }
+    #chat-viewport { position: relative; display: flex; flex: 1; min-height: 100px; }
+    #messages { flex: 1; min-width: 0; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; font-size: var(--chat-font-size, 14px); }
+    .message { flex: none; min-width: 0; max-width: 94%; padding: 10px 14px; border: 1px solid transparent; border-radius: 12px; border-bottom-left-radius: 4px; background: white; overflow-wrap: anywhere; box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+    .message.user { background: #dbeafe; align-self: flex-end; border-radius: 12px; border-bottom-right-radius: 4px; }
+    #scroll-bottom { position: absolute; bottom: 12px; left: calc(50% - 20px); width: 40px; height: 40px; border-radius: 50%; background: var(--primary); color: white; border: 2px solid #b3c7df; box-shadow: 0 2px 8px rgb(0 0 0 / .2); font-size: 24px; padding: 0; }
+    .message.failed { border-color: #b95d47; }
+    .message-label { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+    .message-content { white-space: pre-wrap; }
+    .markdown { white-space: normal; line-height: 1.6; }
+    .markdown > :first-child { margin-top: 0; }
+    .markdown > :last-child { margin-bottom: 0; }
+    .markdown p { margin: 8px 0; }
+    .markdown h1, .markdown h2, .markdown h3, .markdown h4 { font-size: 1.08em; line-height: 1.5; margin: 16px 0 8px; }
+    .markdown ul, .markdown ol { margin: 8px 0; padding-left: 24px; }
+    .markdown hr { border: 0; border-top: 1px solid #d1d5db; margin: 20px 0; }
+    .markdown blockquote { margin: 10px 0; padding-left: 12px; border-left: 3px solid #9eb5d0; color: #596575; }
+    .markdown pre { max-width: 100%; background: #f9fafb; padding: 10px 12px; border-radius: 6px; overflow-x: auto; font-size: .9em; margin: 6px 0; }
+    .markdown code { font-family: Consolas, monospace; font-size: .9em; }
+    .markdown pre code { font-size: inherit; white-space: pre; }
+    .markdown a { color: #285e93; overflow-wrap: anywhere; }
+    .table-scroll { max-width: 100%; overflow-x: auto; margin: 8px 0; }
+    .markdown table { border-collapse: collapse; font-size: .9em; width: 100%; }
+    .markdown th, .markdown td { border: 1px solid #d1d5db; padding: 5px 9px; text-align: left; min-width: 80px; }
+    .markdown th { background: #f3f4f6; }
+    .markdown tr:nth-child(even) td { background: #fafbfd; }
+    .waiting-triangles { display: flex; gap: 5px; width: 85px; height: 30px; align-items: center; color: var(--primary); font-size: 20px; }
+    .waiting-triangles span { display: inline-block; width: 23px; text-align: center; }
+    .waiting-triangles span:nth-child(2) { animation: second-triangle 1.2s step-end infinite; }
+    .waiting-triangles span:nth-child(3) { animation: third-triangle 1.2s step-end infinite; }
+    @keyframes second-triangle { 0% { visibility: hidden; } 33.333% { visibility: visible; } }
+    @keyframes third-triangle { 0% { visibility: hidden; } 66.667% { visibility: visible; } }
+    @media (prefers-reduced-motion: reduce) { .waiting-triangles span { animation: none !important; visibility: visible; } }
+    #status { min-height: 30px; padding: 5px 12px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+    #status[data-kind="error"] { color: #a03024; background: #fff0ed; }
+    #status[data-kind="success"] { color: #24755a; }
+    #composer { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px 14px; border-top: 1px solid var(--border); background: white; }
+    #question { resize: none; width: 100%; min-width: 0; height: 42px; min-height: 42px; max-height: 140px; padding: 8px; border: 1px solid var(--border); border-radius: 10px; }
+    .font-controls { display: grid; gap: 3px; flex: none; }
+    .font-controls button { width: 24px; min-height: 20px; height: 20px; padding: 0; background: #e5e7eb; border: 0; line-height: 1; }
+    body > header, body > .toolbar, #sat-actions, #status, #composer { flex-shrink: 0; }
+    @media (max-height: 650px) { .toolbar { padding-block: 6px; } #quick-panel summary { padding-block: 6px; } }
+    .send-actions { display: grid; gap: 6px; }
+    dialog { width: min(440px, calc(100% - 24px)); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 20px; border: 1px solid var(--border); border-radius: 8px; color: var(--ink); }
+    dialog::backdrop { background: rgb(0 0 0 / .3); }
+    dialog h2 { font-size: 17px; margin: 0 0 14px; }
+    dialog label { display: block; margin: 12px 0 4px; font-weight: 600; }
+    dialog input { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--border); border-radius: 4px; }
+    dialog .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    #settings-status { margin-top: 12px; overflow-wrap: anywhere; }
+    #settings-status[data-kind="error"], #models-status[data-kind="error"] { color: #a03024; }
+    @media (max-width: 600px) { .toolbar-actions { order: 1; flex-basis: 100%; } }
+    @media (max-width: 340px) { header { padding: 10px; } h1 { font-size: 14px; } .toolbar { gap: 6px; } button { padding-inline: 8px; } #quick-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="icons/icon48.png" alt="" />
+    <div class="identity"><h1 id="chat-title">Chat Mode Assistant</h1><div class="version">網頁聊天 <span id="version"></span></div></div>
+    <div class="toolbar-actions">
+      <button id="load-page" type="button" disabled>載入網頁</button>
+      <button id="clear-chat" type="button" disabled>清除對話</button>
+    </div>
+    <button id="open-regression" class="icon-button" type="button" title="Regression Tool" aria-label="Regression Tool" style="background:#d4a017;color:#fff;font-weight:700;" disabled>R</button>
+    <button id="open-log" type="button" title="Log Analysis Mode (displaydebugger)" disabled>📋 Log</button>
+    <button id="save-chat" class="icon-button" type="button" title="儲存對話為 HTML" aria-label="儲存對話為 HTML" disabled>💾</button>
+    <button id="cancel" type="button" title="停止等待目前回覆" disabled>Stop</button>
+    <button id="settings-open" class="icon-button" type="button" title="Settings" aria-label="Settings" disabled>⚙</button>
+  </header>
+  <div class="toolbar">
+    <div class="session-controls">
+      <div id="sessions" role="tablist" aria-label="網頁對話"></div>
+      <button id="undo-close" type="button" title="復原關閉的分頁（30 秒內）" hidden disabled>↶ 復原</button>
+    </div>
+  </div>
+  <div id="chat-viewport" role="tabpanel" aria-label="目前網頁對話">
+    <main id="messages" aria-label="對話紀錄" aria-busy="false">
+      <section id="source" class="source" hidden aria-label="網頁資料">
+        <div class="message-label">來源資訊</div>
+        <a id="source-link" target="_blank" rel="noopener noreferrer"></a>
+        <div id="source-meta" class="meta"></div>
+        <div id="source-warning" class="notice"></div>
+      </section>
+    </main>
+    <button id="scroll-bottom" type="button" title="回到最新訊息" aria-label="回到最新訊息" hidden>↓</button>
+  </div>
+  <details id="quick-panel" hidden open>
+    <summary>快速提問 · What's next?</summary>
+    <nav id="quick-actions" aria-label="快速提問" hidden>
+      <button type="button" data-prompt="summary" disabled>摘要問題</button>
+      <button type="button" data-prompt="test-env" disabled>測試環境</button>
+      <button type="button" data-prompt="reproduce" disabled>如何重現</button>
+      <button type="button" data-prompt="latest-status" disabled>最新狀態</button>
+      <button id="sat-analysis" type="button" hidden disabled>Analysis HSD by SAT</button>
+    </nav>
+    <section id="sat-actions" hidden aria-label="SAT 分析">
+      <div id="sat-status" class="meta" role="status" aria-live="polite"></div>
+      <div id="sat-reference" hidden>
+        <label><input id="sat-include" type="checkbox" checked />納入 SAT 報告</label>
+        <button id="sat-view-report" type="button">查看報告</button>
+        <span id="sat-report-meta" class="meta"></span>
+      </div>
+    </section>
+  </details>
+  <div id="status" role="status" aria-live="polite">載入中…</div>
+  <form id="composer">
+    <textarea id="question" aria-label="問題" placeholder="針對網頁內容提問…" maxlength="8000" disabled></textarea>
+    <div class="send-actions">
+      <button id="send" type="submit" class="primary" disabled>傳送</button>
+    </div>
+    <div class="font-controls">
+      <button id="font-up" type="button" title="放大字體" aria-label="放大字體">+</button>
+      <button id="font-down" type="button" title="縮小字體" aria-label="縮小字體">−</button>
+    </div>
+  </form>
+  <dialog id="settings-home" aria-labelledby="settings-home-title">
+    <h2 id="settings-home-title">Settings</h2>
+    <div class="actions"><button id="settings-oauth" type="button">OAuth2 Token 與模型</button></div>
+    <label for="settings-language">SAT／工具語言</label>
+    <select id="settings-language"><option value="en">English</option><option value="zh">繁體中文</option></select>
+    <h3>Features</h3>
+    <label><input id="settings-log" type="checkbox" style="width:auto;" />Log Analysis (beta)</label>
+    <label><input id="settings-regression" type="checkbox" style="width:auto;" />Regression Checker</label>
+    <h3>SAT 互動</h3>
+    <label><input id="settings-auto-interact" type="checkbox" style="width:auto;" />自動互動模式 (Menu → What's Next)</label>
+    <label><input id="settings-progress-filter" type="checkbox" style="width:auto;" />隱藏進度區塊</label>
+    <div class="actions"><button id="settings-legacy" type="button">SAT／Bridge 進階設定</button></div>
+    <div id="settings-home-status" class="meta" role="status" aria-live="polite"></div>
+    <form method="dialog"><div class="actions"><button type="submit">關閉</button></div></form>
+  </dialog>
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <form id="settings-form">
+      <h2 id="settings-title">OAuth2 與模型</h2>
+      <div class="meta">GNAI · OAuth2 Bearer</div>
+      <label for="token">Access Token</label>
+      <input id="token" type="password" autocomplete="off" spellcheck="false" maxlength="24000" placeholder="貼入 Token 或 OAuth2 JSON" />
+      <div id="token-state" class="meta"></div>
+      <label><input id="remember-token" type="checkbox" style="width:auto;" />在此裝置記住 Token（重新載入 extension 後保留）</label>
+      <div class="meta">預設僅保留於本次瀏覽器工作階段。勾選後存於 Chrome 本機儲存，並非加密憑證庫；僅建議在可信任的個人裝置使用。Token 過期仍需更新。</div>
+      <label for="model-menu">LLM 模型</label>
+      <div class="model-controls">
+        <select id="model-menu" aria-label="LLM 模型"></select>
+        <button id="refresh-models" class="icon-button" type="button" title="讀取 GNAI 模型清單" aria-label="讀取 GNAI 模型清單">↻</button>
+      </div>
+      <div id="models-status" class="meta" role="status" aria-live="polite">尚未讀取模型清單</div>
+      <div id="custom-model" hidden>
+        <label for="model">自訂模型名稱</label>
+        <input id="model" type="text" value="gpt-4o" required maxlength="120" spellcheck="false" />
+      </div>
+      <div class="actions">
+        <button id="settings-save" type="submit" class="primary">儲存</button>
+        <button id="test-connection" type="button">測試連線</button>
+        <button id="clear-token" type="button">清除 Token</button>
+        <button id="settings-close" type="button">關閉</button>
+      </div>
+      <div id="settings-status" class="meta" role="status" aria-live="polite"></div>
+    </form>
+  </dialog>
+  <dialog id="sat-report-dialog" aria-labelledby="sat-report-title">
+    <h2 id="sat-report-title">SAT 報告</h2>
+    <div id="sat-report-content" class="markdown"></div>
+    <form method="dialog"><button type="submit">關閉</button></form>
+  </dialog>
+  <script src="vendor/marked.umd.js"></script>
+  <script src="vendor/purify.min.js"></script>
+  <script src="webchat.js"></script>
+</body>
+</html>

@@ -863,8 +863,119 @@ chrome.action.onClicked.addListener(async (tab) => {
 // ── Pop-out / Pop-in Window Management ─────────────────────────────────────
 
 let popoutWindowId = null;
+let satWindowOpening = false;
+
+async function openSatAnalysis(message) {
+  const hsdId = String(message.hsdId || "");
+  if (!/^\d{8,14}$/.test(hsdId)) throw new Error("請先載入有效的 HSD 網頁。");
+  const satPage = chrome.runtime.getURL("sidepanel.html");
+  const existingTabs = await chrome.tabs.query({ url: `${satPage}*` });
+  for (const tab of existingTabs) {
+    if (new URL(tab.url).searchParams.get("satHsd") !== hsdId) {
+      throw new Error("已有其他 SAT 分析視窗，請先完成並關閉該視窗。");
+    }
+    await chrome.windows.update(tab.windowId, { focused: true });
+    await chrome.tabs.update(tab.id, { active: true });
+    return { ok: true, existing: true };
+  }
+  if (uiPorts.size > 0 || isStarting || isRecovering) {
+    throw new Error("目前仍有舊分析介面或連線作業，請關閉舊分析介面後再試。");
+  }
+  const runId = crypto.randomUUID();
+  const jobKey = `satJob_${hsdId}`;
+  const stored = await chrome.storage.local.get(jobKey);
+  const job = {
+    hsdId, runId, title: String(message.hsdTitle || "").slice(0, 500),
+    status: "starting", startedAt: Date.now(), updatedAt: Date.now(),
+    report: stored[jobKey]?.report || null,
+  };
+  appActivated = true;
+  await chrome.storage.session.set({ appActivated: true });
+  await chrome.storage.local.set({ [jobKey]: job });
+  try {
+    const url = new URL(satPage);
+    url.searchParams.set("satHsd", hsdId);
+    url.searchParams.set("satTitle", job.title);
+    url.searchParams.set("satRun", runId);
+    const window = await chrome.windows.create({ url: url.href, type: "popup", width: 760, height: 900 });
+    await chrome.storage.session.set({ satActiveWindow: { windowId: window.id, hsdId, runId } });
+    return { ok: true, existing: false };
+  } catch (error) {
+    const latest = await chrome.storage.local.get(jobKey);
+    if (latest[jobKey]?.runId === runId) {
+      await chrome.storage.local.set({ [jobKey]: { ...latest[jobKey], status: "failed", updatedAt: Date.now() } });
+    }
+    throw error;
+  }
+}
+
+async function openLegacyTool(message) {
+  const tool = message.tool;
+  if (!["regression", "log"].includes(tool)) throw new Error("不支援的工具。");
+  const hsdId = String(message.hsdId || "");
+  if (tool === "regression" && !/^\d{8,14}$/.test(hsdId)) throw new Error("請先載入有效的 HSD 網頁。");
+  const toolPage = chrome.runtime.getURL("sidepanel.html");
+  const existingTabs = await chrome.tabs.query({ url: `${toolPage}*` });
+  for (const tab of existingTabs) {
+    const params = new URL(tab.url).searchParams;
+    if (params.get("tool") !== tool || (tool === "regression" && params.get("toolHsd") !== hsdId)) {
+      throw new Error("SAT 與工具共用 Bridge，請先完成並關閉目前的分析／工具視窗。");
+    }
+    await chrome.windows.update(tab.windowId, { focused: true });
+    await chrome.tabs.update(tab.id, { active: true });
+    return { ok: true, existing: true };
+  }
+  if (uiPorts.size > 0 || isStarting || isRecovering) throw new Error("目前仍有分析介面或連線作業，請稍後再試。");
+  appActivated = true;
+  await chrome.storage.session.set({ appActivated: true });
+  const url = new URL(toolPage);
+  url.searchParams.set("tool", tool);
+  url.searchParams.set("toolHsd", hsdId);
+  url.searchParams.set("toolTitle", String(message.hsdTitle || "").slice(0, 500));
+  await chrome.windows.create({ url: url.href, type: "popup", width: 760, height: 900 });
+  return { ok: true, existing: false };
+}
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === "open_legacy_settings" || msg.action === "ensure_tool_bridge") {
+    if (msg.action === "ensure_tool_bridge") {
+      ensureBridgeRunning(() => {}).then(ok => sendResponse({ ok })).catch(() => sendResponse({ ok: false }));
+      return true;
+    }
+    if (satWindowOpening) {
+      sendResponse({ ok: false, error: "工具視窗正在開啟，請稍後再試。" });
+      return false;
+    }
+    satWindowOpening = true;
+    (async () => {
+      const toolPage = chrome.runtime.getURL("sidepanel.html");
+      const tabs = await chrome.tabs.query({ url: `${toolPage}*` });
+      if (tabs.length) {
+        await chrome.windows.update(tabs[0].windowId, { focused: true });
+        await chrome.tabs.update(tabs[0].id, { active: true });
+        await chrome.runtime.sendMessage({ action: "show_legacy_settings" });
+      } else {
+        appActivated = true;
+        await chrome.storage.session.set({ appActivated: true });
+        await chrome.windows.create({ url: `${toolPage}?tool=settings`, type: "popup", width: 760, height: 900 });
+      }
+      return { ok: true };
+    })().then(sendResponse).catch(() => sendResponse({ ok: false, error: "無法開啟進階設定。" }))
+      .finally(() => { satWindowOpening = false; });
+    return true;
+  }
+  if (msg.action === "open_sat_analysis" || msg.action === "open_legacy_tool") {
+    if (satWindowOpening) {
+      sendResponse({ ok: false, error: "SAT 視窗正在開啟，請稍候再試。" });
+      return false;
+    }
+    satWindowOpening = true;
+    const openWindow = msg.action === "open_legacy_tool" ? openLegacyTool : openSatAnalysis;
+    openWindow(msg).then(sendResponse).catch(error => {
+      sendResponse({ ok: false, error: error.message || "無法開啟 SAT 視窗。" });
+    }).finally(() => { satWindowOpening = false; });
+    return true;
+  }
   if (msg.action === "popout_open") {
     // Keep the sidepanel alive until the popup confirms its runtime port is ready.
     pendingPopupReady = false;
@@ -907,6 +1018,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
 // Clean up popoutWindowId when the window is closed by user
 chrome.windows.onRemoved.addListener((windowId) => {
+  finishClosedSatWindow(windowId).catch(() => {});
   if (windowId === popoutWindowId) {
     popoutWindowId = null;
   }
@@ -918,3 +1030,11 @@ chrome.windows.onRemoved.addListener((windowId) => {
     pendingPopupReady = false;
   }
 });
+
+async function finishClosedSatWindow(windowId) {
+  const { satActiveWindow: active } = await chrome.storage.session.get("satActiveWindow");
+  if (active?.windowId !== windowId) return;
+  await chrome.storage.local.set({
+    [`satClosed_${active.hsdId}`]: { runId: active.runId, closedAt: Date.now() },
+  });
+}

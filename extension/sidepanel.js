@@ -335,6 +335,13 @@ function getRenderDebounce() {
 
 // ── Session State ─────────────────────────────────────────────────────────
 const MAX_SESSIONS = 6;        // 1 active + 5 saved
+const _satParams = new URLSearchParams(window.location.search);
+const _satHsdId = /^\d{8,14}$/.test(_satParams.get("satHsd") || "") ? _satParams.get("satHsd") : "";
+const _satRunId = _satParams.get("satRun") || "";
+const _entryTool = ["regression", "log", "settings"].includes(_satParams.get("tool")) ? _satParams.get("tool") : "";
+let _toolNeedsNewSession = false;
+let _satNeedsNewSession = false;
+let _satJobWrite = Promise.resolve();
 let activeHsdId = null;        // detected from user's first message
 let hsdImported = false;       // true after Import HSD, before first analysis sent
 let sessionMessages = [];      // [{role, content}] for current session
@@ -347,6 +354,7 @@ function connectPort() {
   port = chrome.runtime.connect({ name: "sidepanel" });
 
   port.onMessage.addListener((msg) => {
+    if ((_satNeedsNewSession || _toolNeedsNewSession) && ["health_result", "ready", "answer", "usage", "tool_start", "tool_request"].includes(msg.type || msg.action)) return;
     switch (msg.type || msg.action) {
       // File dialog result from browse buttons
       case "file_dialog_result":
@@ -355,6 +363,8 @@ function connectPort() {
 
       // Session lifecycle
       case "session_started":
+        _satNeedsNewSession = false;
+        _toolNeedsNewSession = false;
         _pendingSessionRestart = false;
         _cancelConnectionTimeout();
         bridgeSessionCid = msg.conversation_id || "";
@@ -420,6 +430,7 @@ function connectPort() {
         updateConnectionSplash(msg.message || "Starting...", "");
         break;
       case "bridge_unavailable":
+        _setSatStatus("failed");
         _cancelConnectionTimeout();
         setStatus("disconnected", "No Bridge");
         updateConnectionSplash("Bridge unavailable", "Run: cd bridge && python bridge_server.py");
@@ -433,6 +444,7 @@ function connectPort() {
         _initializeVisibleView();
         break;
       case "session_start_error":
+        _setSatStatus("failed");
         _cancelConnectionTimeout();
         setStatus("disconnected", "Session Error");
         updateConnectionSplash("Session failed to start", msg.error || "Unknown error");
@@ -498,6 +510,7 @@ function connectPort() {
         onUsage(msg.usage);
         break;
       case "error":
+        _setSatStatus("failed");
         // gnai-level error (e.g. tool execution failure, connection abort)
         removeToolIndicator();
         isStreaming = false;
@@ -530,6 +543,7 @@ function connectPort() {
         onInfo(msg.text || "");
         break;
       case "credential_required": {
+        _setSatStatus("awaiting_input");
         removeToolIndicator();
         removeTypingIndicator();
         isStreaming = false;
@@ -643,6 +657,7 @@ function connectPort() {
 
       // Errors (from Service Worker — SW-level exceptions)
       case "sw_error":
+        _setSatStatus("failed");
         addSystemMsg(`❌ Bridge Error: ${msg.error || "Unknown"}`);
         break;
     }
@@ -669,6 +684,7 @@ function connectPort() {
 // ── Event Handlers ─────────────────────────────────────────────────────────
 
 function onAnswerChunk(text) {
+  if (_satHsdId) document.getElementById("sat-return-report").disabled = true;
   removeTypingIndicator();
 
   if (!currentAiMsg) {
@@ -810,11 +826,19 @@ function onReady(accumulatedAnswer) {
     }
     console.log(`[onReady] auto-sending pending message: "${msg.slice(0, 50)}..."`);
     isStreaming = true;
+    _setSatStatus("running");
     setTimeout(() => {
       port.postMessage({ action: "send", message: msg });
       showTypingIndicator();
     }, 100);
     return;  // Input stays disabled; will enable when AI responds
+  }
+
+  if (_satHsdId) {
+    const lastReply = [...sessionMessages].reverse().find(message => message.role === "assistant")?.content || "";
+    const reportText = accumulatedAnswer || lastReply;
+    document.getElementById("sat-return-report").disabled = !reportText;
+    if (reportText) _publishSatReply(reportText).catch(() => addSystemMsg("SAT 報告回傳失敗，請使用回傳按鈕重試。"));
   }
 
   // If this is the first ready after session start, show welcome
@@ -1133,6 +1157,7 @@ function sendUserMessage(text, displayText) {
   }
 
   isStreaming = true;
+  _setSatStatus("running");
   port.postMessage({ action: "send", message: messageToSend });
   showTypingIndicator();
   hideOnboarding();
@@ -1632,7 +1657,8 @@ function saveCurrentSession() {
 
 async function persistSessions() {
   try {
-    await chrome.storage.local.set({ chatSessions: sessions.slice(0, MAX_SESSIONS) });
+    const storageKey = _satHsdId ? `satChatSessions_${_satHsdId}` : "chatSessions";
+    await chrome.storage.local.set({ [storageKey]: sessions.slice(0, MAX_SESSIONS) });
     renderTabBar();
   } catch (e) {
     console.error("[sessions] persist error:", e);
@@ -1641,8 +1667,9 @@ async function persistSessions() {
 
 async function loadSessions() {
   try {
-    const stored = await chrome.storage.local.get({ chatSessions: [] });
-    sessions = Array.isArray(stored.chatSessions) ? stored.chatSessions : [];
+    const storageKey = _satHsdId ? `satChatSessions_${_satHsdId}` : "chatSessions";
+    const stored = await chrome.storage.local.get({ [storageKey]: [] });
+    sessions = Array.isArray(stored[storageKey]) ? stored[storageKey] : [];
   } catch (e) {
     sessions = [];
   }
@@ -2042,6 +2069,27 @@ function applyLang(lang) {
 // Init language on load
 applyLang(uiLang);
 
+window.addEventListener("storage", event => {
+  if (event.key === "uiLang") applyLang(event.newValue === "zh" ? "zh" : "en");
+  if (["feature_log", "feature_regression"].includes(event.key)) {
+    featureLogEnabled = localStorage.getItem("feature_log") === "true";
+    featureRegressionEnabled = localStorage.getItem("feature_regression") !== "false";
+    applyFeatureFlags();
+  }
+});
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  if (changes.autoInteract) {
+    autoInteractEnabled = !!changes.autoInteract.newValue;
+    autoInteractCheck.checked = autoInteractEnabled;
+  }
+  if (changes.progressFilter) {
+    progressFilterEnabled = !!changes.progressFilter.newValue;
+    progressFilterCheck.checked = progressFilterEnabled;
+  }
+});
+
 // ── Debug Mode Setting ──────────────────────────────────────────────────────
 const debugModeCheck = document.getElementById("debug-mode-check");
 const debugModeApplyBtn = document.getElementById("debug-mode-apply");
@@ -2335,6 +2383,7 @@ debugModeApplyBtn.addEventListener("click", async () => {
   debugModeApplyBtn.style.display = "none";
   showToast(uiLang === "zh" ? "✅ Debug Mode 設定已儲存" : "✅ Debug Mode setting saved");
 
+  if (confirmed && !port && _entryTool === "settings") connectPort();
   if (confirmed && port) {
     // Restart bridge: stop session → re-launch with new debug flag
     port.postMessage({ action: "stop_session" });
@@ -2353,6 +2402,7 @@ btnResetConnection?.addEventListener("click", async () => {
     uiLang === "zh" ? "重置並重連" : "Reset & Reconnect",
     uiLang === "zh" ? "取消" : "Cancel"
   );
+  if (confirmed && !port && _entryTool === "settings") connectPort();
   if (!confirmed || !port) return;
 
   btnResetConnection.disabled = true;
@@ -2385,6 +2435,10 @@ document.getElementById("btn-toolkit-update")?.addEventListener("click", async (
   resultEl.style.display = "none";
 
   try {
+    if (_entryTool === "settings") {
+      const result = await chrome.runtime.sendMessage({ action: "ensure_tool_bridge" });
+      if (!result?.ok) throw new Error("Bridge not connected");
+    }
     const bridgeUrl = `http://127.0.0.1:${await (async () => {
       const stored = await chrome.storage.local.get({ bridgePort: 8776 });
       return stored.bridgePort;
@@ -2437,6 +2491,12 @@ btnSettings.addEventListener("click", (e) => {
   menu.classList.toggle("show", !isOpen);
 });
 
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action !== "show_legacy_settings") return;
+  document.getElementById("settingsMenu").classList.add("show");
+  sendResponse({ ok: true });
+});
+
 document.querySelectorAll(".lang-opt").forEach(btn => {
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -2453,11 +2513,18 @@ document.addEventListener("click", (e) => {
 });
 
 // ── Pop-out / Pop-in Toggle ──────────────────────────────────────────────────
-const _isPopup = new URLSearchParams(window.location.search).has("popup");
+const _isPopup = _satParams.has("popup") || !!_satHsdId || !!_entryTool;
 const _hostWindowId = Number.parseInt(new URLSearchParams(window.location.search).get("hostWindowId"), 10);
 
 // Update button icon based on mode
 if (_isPopup) {
+  if (_entryTool) btnPopout.hidden = true;
+  if (_satHsdId) {
+    btnPopout.hidden = true;
+    btnNew.hidden = true;
+    document.getElementById("tab-bar").style.display = "none";
+    document.getElementById("sat-return-report").hidden = false;
+  }
   btnPopout.textContent = "⧉"; // indicate "back to sidepanel"
   btnPopout.title = "Back to sidepanel";
   // In popup mode, hide Import button — only show HSD ID input
@@ -2656,8 +2723,8 @@ btnBackToChat.addEventListener("click", switchToChatMode);
 
 // ── Log Analysis Mode ────────────────────────────────────────────────────────────────────────
 
-async function switchToLogAnalysisMode() {
-  const confirmed = await showModal(
+async function switchToLogAnalysisMode({ confirm = true, restart = true } = {}) {
+  const confirmed = !confirm || await showModal(
     "Switch to Log Analysis Mode",
     "This will restart the bridge session with the 'displaydebugger' assistant. Current session will be saved. Continue?",
     "Switch",
@@ -2694,7 +2761,7 @@ async function switchToLogAnalysisMode() {
   showConnectionSplash("Switching to Log Analysis Mode...", "Restarting with displaydebugger assistant");
   setInputEnabled(false);
 
-  if (port) {
+  if (restart && port) {
     port.postMessage({ action: "restart_session", assistant: "displaydebugger" });
   }
 }
@@ -2920,12 +2987,13 @@ let _viewInitialized = false;
 
 function _initializeVisibleView() {
   if (document.visibilityState !== "visible" || !_viewStateReady || _viewInitialized) return;
+  if (_entryTool === "settings") return;
   if (!port) connectPort();
   if (!port) return;
   _viewInitialized = true;
-  port.postMessage({ action: "view_ready", view: _isPopup ? "popup" : "sidepanel" });
+  port.postMessage({ action: "view_ready", view: _entryTool ? "tool" : (_satHsdId ? "sat" : (_isPopup ? "popup" : "sidepanel")) });
   port.postMessage({
-    action: "initialize_view",
+    action: _satNeedsNewSession || _toolNeedsNewSession ? "restart_session" : "initialize_view",
     assistant: isLogAnalysisMode ? "displaydebugger" : "sighting_assistant",
     conversation_id: activeConversationId || undefined,
   });
@@ -2978,6 +3046,66 @@ setInputEnabled(false);
 // Check for pop-out/pop-in transfer data first
 async function _restoreTransferState() {
   try {
+    if (_entryTool === "settings") {
+      document.getElementById("settingsMenu").classList.add("show");
+      return true;
+    }
+    if (_entryTool) {
+      await loadSessions();
+      activeHsdId = /^\d{8,14}$/.test(_satParams.get("toolHsd") || "") ? _satParams.get("toolHsd") : null;
+      activeHsdTitle = activeHsdId ? (_satParams.get("toolTitle") || `HSD ${activeHsdId}`) : "";
+      activeConversationId = "";
+      sessionMessages = [];
+      sessions.unshift({});
+      sessions = sessions.slice(0, MAX_SESSIONS);
+      activeSessionIndex = 0;
+      saveCurrentSession();
+      renderTabBar();
+      updateHeaderTitle();
+      updateHeaderSubtitle(activeHsdTitle);
+      updateRegressionBtnState();
+      hideOnboarding();
+      _toolNeedsNewSession = true;
+      if (_entryTool === "regression") switchToRegressionMode();
+      else await switchToLogAnalysisMode({ confirm: false, restart: false });
+      return true;
+    }
+    if (_satHsdId) {
+      const jobKey = `satJob_${_satHsdId}`;
+      const storedJob = await chrome.storage.local.get(jobKey);
+      if (!_satRunId || storedJob[jobKey]?.runId !== _satRunId) throw new Error("Invalid SAT run");
+      await loadSessions();
+      const marker = `satPrepared_${_satRunId}`;
+      const isNewRun = !sessionStorage.getItem(marker);
+      activeHsdId = _satHsdId;
+      activeHsdTitle = _satParams.get("satTitle") || `HSD ${_satHsdId}`;
+      activeConversationId = "";
+      activeSessionIndex = 0;
+      sessionMessages = [];
+      if (isNewRun) {
+        sessionStorage.setItem(marker, "1");
+        _satNeedsNewSession = true;
+        const prompt = `Analyze HSD ${_satHsdId} using sighting_assistant. Follow the SAT workflow and produce the final report in Traditional Chinese with rich emoji style. Ask for attachment selections or required input in this session. ONLY when the final report is complete, wrap its full text between [[SAT_REPORT_BEGIN:${_satRunId}]] and [[SAT_REPORT_END:${_satRunId}]]. Place each marker on its own line without markdown formatting. Do not use these markers for progress updates, questions, menus, or partial results. Include findings, evidence, limitations, and next actions. Generate an HTML report if supported and include its actual path, but do not claim a file exists unless it was generated.`;
+        _pendingSendMessage = prompt;
+        sessionMessages.push({ role: "user", content: prompt });
+        sessions.unshift({});
+        sessions = sessions.slice(0, MAX_SESSIONS);
+        saveCurrentSession();
+        await persistSessions();
+      } else if (sessions[0]) {
+        activeConversationId = sessions[0].conversationId || "";
+        sessionMessages = [...(sessions[0].messages || [])];
+        _postAnalysisShown = !!sessions[0].postAnalysisShown;
+      }
+      updateHeaderTitle();
+      updateHeaderSubtitle(activeHsdTitle);
+      updateConversationId(activeConversationId);
+      renderTabBar();
+      rebuildChatArea();
+      hideOnboarding();
+      if (!isNewRun) addSystemMsg("已恢復 SAT 視窗，未自動重送分析；若先前尚未送出，請手動重新提問。");
+      return true;
+    }
     const stored = await chrome.storage.local.get({ _popoutTransfer: null });
     const data = stored._popoutTransfer;
     if (!data || (Date.now() - data.timestamp > 30000)) {
@@ -3019,6 +3147,15 @@ async function _restoreTransferState() {
     await chrome.storage.local.remove("_popoutTransfer");
     return true;
   } catch (e) {
+    if (_entryTool) {
+      _toolNeedsNewSession = false;
+      throw e;
+    }
+    if (_satHsdId) {
+      _satNeedsNewSession = false;
+      _pendingSendMessage = null;
+      throw e;
+    }
     console.error("[popout] restore error:", e);
     return false;
   }
@@ -3052,6 +3189,59 @@ _restoreTransferState().then((restored) => {
     _viewStateReady = true;
     _initializeVisibleView();
   });
+}).catch(() => {
+  hideConnectionSplash();
+  setStatus("disconnected", _entryTool ? "Tool initialization failed" : "SAT initialization failed");
+  _setSatStatus("failed");
+  addSystemMsg(_entryTool ? "工具視窗初始化失敗，請關閉此視窗後重新開啟。" : "SAT 視窗初始化失敗，未自動送出分析。請關閉此視窗後重新開啟。");
+});
+
+function _updateSatJob(patch) {
+  if (!_satHsdId || !_satRunId) return Promise.resolve(false);
+  const operation = _satJobWrite.catch(() => {}).then(async () => {
+    const key = `satJob_${_satHsdId}`;
+    const stored = await chrome.storage.local.get(key);
+    if (stored[key]?.runId !== _satRunId) return false;
+    if (stored[key].status === "completed" && !patch.report) return false;
+    await chrome.storage.local.set({ [key]: { ...stored[key], ...patch, updatedAt: Date.now() } });
+    return true;
+  });
+  _satJobWrite = operation;
+  return operation;
+}
+
+function _setSatStatus(status) {
+  _updateSatJob({ status }).catch(() => {});
+}
+
+async function _publishSatReply(text, manual = false) {
+  const begin = `[[SAT_REPORT_BEGIN:${_satRunId}]]`;
+  const end = `[[SAT_REPORT_END:${_satRunId}]]`;
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex(line => line.trim() === begin);
+  const finish = start >= 0 ? lines.findIndex((line, index) => index > start && line.trim() === end) : -1;
+  const content = start >= 0 && finish > start ? lines.slice(start + 1, finish).join("\n").trim() : (manual ? text.trim() : "");
+  if (!content) {
+    await _updateSatJob({ status: "awaiting_input" });
+    return;
+  }
+  if (content.length > 120000) throw new Error("Report exceeds storage limit");
+  const stored = await chrome.storage.local.get(`satJob_${_satHsdId}`);
+  if (stored[`satJob_${_satHsdId}`]?.report?.runId === _satRunId && stored[`satJob_${_satHsdId}`].report.text === content) return;
+  const returned = await _updateSatJob({
+    status: "completed",
+    report: { runId: _satRunId, hsdId: _satHsdId, text: content, receivedAt: Date.now(), source: manual ? "user_confirmed" : "sat_final_marker" },
+  });
+  if (returned) addSystemMsg("SAT 報告已回傳至原本的 HSD 網頁聊天，可作為後續提問的參考資料。");
+}
+
+document.getElementById("sat-return-report").addEventListener("click", async () => {
+  if (!_satHsdId || isStreaming) return;
+  const reply = [...sessionMessages].reverse().find(message => message.role === "assistant")?.content;
+  if (!reply || !window.confirm("將目前最後一則 SAT 回覆作為報告傳回網頁聊天？請確認它不是附件選單或進度訊息。")) return;
+  try { await _publishSatReply(reply, true); } catch {
+    addSystemMsg("報告回傳失敗。報告可能過長或本機儲存空間不足，請先保留原始報告。");
+  }
 });
 
 // ── Connection Timeout with Retry ──────────────────────────────────────────
