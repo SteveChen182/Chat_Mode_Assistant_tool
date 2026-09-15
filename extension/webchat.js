@@ -151,6 +151,7 @@ function updateControls() {
   elements["open-regression"].disabled = !ready || !hasHsd || satOpening || busy === "loading";
   elements["open-log"].disabled = !ready || satOpening || busy === "loading";
   elements["load-page"].disabled = !ready || !!busy;
+  elements["reload-page"].disabled = !ready || !!busy || !hasSession;
   for (const tab of elements.sessions.querySelectorAll("button")) {
     tab.disabled = !ready || !!busy;
   }
@@ -161,7 +162,7 @@ function updateControls() {
   elements["settings-open"].disabled = !ready || !!busy;
   elements["quick-actions"].hidden = !hasSession;
   for (const button of elements["quick-actions"].querySelectorAll("button[data-prompt]")) {
-    button.disabled = !ready || !!busy || !hasSession || !tokenAvailable();
+    button.disabled = !ready || !!busy || !hasSession;
   }
   elements.cancel.disabled = !requestController;
   elements.messages.setAttribute("aria-busy", String(busy === "chat"));
@@ -231,6 +232,7 @@ function render() {
   const session = currentSession();
   elements["chat-title"].textContent = session?.page.hsdId ? `HSD ${session.page.hsdId}` : "Chat Mode Assistant";
   elements.source.hidden = !session;
+  elements["source-meta"].hidden = !session;
   elements.messages.replaceChildren(elements.source);
   if (session) {
     const page = session.page;
@@ -242,6 +244,7 @@ function render() {
       `${page.originalLength.toLocaleString()} 字元`,
     ].join(" · ");
     const notices = ["來源僅限擷取時已顯示的網頁文字，不含附件內容。"];
+    if (page.cleaned) notices.push("已排除主內容區外的導覽列及頁首頁尾。");
     if (page.truncated) notices.push("內文過長，僅保留開頭與結尾，中間已省略。");
     if (session.historyTrimmed) notices.push("較舊對話已移除，僅保留近期紀錄。");
     if (session.contextTrimmed) notices.push("上次請求因長度限制，未包含部分較早對話。");
@@ -254,6 +257,7 @@ function render() {
       label.textContent = message.role === "user" ? "你" : `GNAI · ${message.model || selectedModel}`;
       if (message.status === "pending") label.textContent += " · 等待回覆";
       if (message.status === "failed") label.textContent += " · 未完成";
+      if (message.cached) label.textContent += ` · 使用先前結果 · ${new Date(message.generatedAt).toLocaleString()}`;
       const content = document.createElement("div");
       content.className = "message-content";
       if (message.role === "assistant") renderMarkdownContent(content, message.content);
@@ -263,8 +267,20 @@ function render() {
         const retry = document.createElement("button");
         retry.type = "button";
         retry.textContent = "重試";
-        retry.addEventListener("click", () => sendQuestion(message.content, message.displayText));
+        retry.addEventListener("click", () => sendQuestion(message.content, message.displayText, { quickId: message.quickId, force: true }));
         article.append(retry);
+      }
+      if (message.cached && message.role === "assistant" && QUICK_PROMPTS[message.quickId]) {
+        const regenerate = document.createElement("button");
+        regenerate.type = "button";
+        regenerate.textContent = "↻";
+        regenerate.title = "重新產生（使用目前來源資料與模型）";
+        regenerate.setAttribute("aria-label", regenerate.title);
+        regenerate.addEventListener("click", () => {
+          const action = QUICK_PROMPTS[message.quickId];
+          sendQuestion(action.prompt, action.displayText, { quickId: message.quickId, force: true });
+        });
+        article.append(regenerate);
       }
       elements.messages.append(article);
     }
@@ -550,13 +566,13 @@ async function requestCompletion(messages, connectionTest = false) {
   }
 }
 
-function buildMessages(session, question) {
+function buildMessages(session, question, independent = false) {
   const page = session.page;
   const source = JSON.stringify({
     hsdId: page.hsdId, title: page.title, url: page.url,
-    capturedAt: page.capturedAt, truncated: page.truncated, text: page.text,
+    capturedAt: independent ? undefined : page.capturedAt, truncated: page.truncated, text: page.text,
   });
-  const completed = session.messages.filter(message => message.status === "done");
+  const completed = independent ? [] : session.messages.filter(message => message.status === "done" && !message.historyExcluded);
   const report = satJobs.get(page.hsdId)?.report;
   const useReport = session.satReportEnabled !== false && report?.hsdId === page.hsdId && typeof report?.text === "string";
   const reportText = useReport ? report.text : "";
@@ -586,62 +602,113 @@ function buildMessages(session, question) {
   ];
 }
 
-async function sendQuestion(text, displayText) {
+async function sendQuestion(text, displayText, { quickId, force = false } = {}) {
   const question = text.trim();
   const session = currentSession();
   if (!ready || busy || !question || !session) return;
   if (question.length > 8000) return showStatus("問題長度不能超過 8,000 字元。", "error");
-  if (!tokenAvailable()) return openSettings("請先貼上有效的 OAuth2 Token。");
-  setBusy("chat");
+  const quickAction = QUICK_PROMPTS[quickId];
+  const independent = !!quickAction && quickAction.prompt === question;
+  if (!independent && !tokenAvailable()) return openSettings("請先貼上有效的 OAuth2 Token。");
+  setBusy(independent ? "cache" : "chat");
   followLatest = true;
-  elements["quick-panel"].open = false;
-  const message = { role: "user", content: question, displayText: displayText || question, status: "pending" };
-  const apiMessages = buildMessages(session, question);
-  session.messages.push(message);
-  trimHistory(session);
-  elements.question.value = "";
-  render();
-  showStatus(session.contextTrimmed ? "GNAI 回覆中…本次省略部分較早對話。" : "GNAI 回覆中…");
-  await persistState();
+  let message;
+  let usedCache = false;
   try {
+    const apiMessages = buildMessages(session, question, independent);
+    let cacheKey;
+    if (independent) {
+      const payload = JSON.stringify({ version: 1, model: selectedModel, reportEnabled: session.satReportEnabled !== false, messages: apiMessages });
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
+      cacheKey = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+      const cached = session.quickCache?.[quickId];
+      if (!force && cached?.key === cacheKey && typeof cached.answer === "string" && cached.answer.trim()) {
+        usedCache = true;
+        session.messages.push(
+          { role: "user", content: question, displayText: displayText || question, status: "done", quickId, historyExcluded: true },
+          { role: "assistant", content: cached.answer, status: "done", model: cached.model, quickId, cached: true, generatedAt: cached.generatedAt, historyExcluded: true }
+        );
+        elements["quick-panel"].open = true;
+        showStatus("已顯示先前結果，未呼叫 API。", "success");
+        return;
+      }
+    }
+    if (!tokenAvailable()) throw new Error("沒有可用的快取，請先更新 OAuth2 Token。");
+    setBusy("chat");
+    elements["quick-panel"].open = false;
+    message = { role: "user", content: question, displayText: displayText || question, status: "pending", ...(independent ? { quickId } : {}) };
+    session.messages.push(message);
+    trimHistory(session);
+    elements.question.value = "";
+    render();
+    showStatus(session.contextTrimmed ? "GNAI 回覆中…本次省略部分較早對話。" : "GNAI 回覆中…");
+    await persistState();
     const answer = await requestCompletion(apiMessages);
     message.status = "done";
     session.messages.push({ role: "assistant", content: answer, status: "done", model: selectedModel });
+    if (independent) {
+      session.quickCache ||= {};
+      session.quickCache[quickId] = { key: cacheKey, answer, model: selectedModel, generatedAt: Date.now() };
+    }
     elements["quick-panel"].open = true;
     showStatus("回覆完成。", "success");
   } catch (error) {
-    message.status = "failed";
+    if (message) message.status = "failed";
     elements.question.value = question;
+    elements["quick-panel"].open = true;
     showStatus(error.message, "error");
   } finally {
     trimHistory(session);
     await persistState();
     setBusy("");
     render();
-    if (!tokenAvailable()) openSettings("請更新 OAuth2 Token 後重試；對話已保留。");
+    if (!tokenAvailable() && !usedCache) openSettings("請更新 OAuth2 Token 後重試；對話已保留。");
     else elements.question.focus();
   }
 }
 
-async function loadPage() {
+async function loadPage(refreshCurrent = false) {
   if (!ready || busy) return;
+  const sourceUrl = refreshCurrent === true ? currentSession()?.page.url : null;
+  if (refreshCurrent === true && !sourceUrl) return;
   setBusy("loading");
   showStatus("正在擷取網頁…");
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const tabs = await chrome.tabs.query(sourceUrl ? {} : { active: true, currentWindow: true });
+    const tab = sourceUrl
+      ? tabs.find(item => item.url === sourceUrl && item.active) || tabs.find(item => item.url === sourceUrl)
+      : tabs[0];
+    if (sourceUrl && !tab) throw new Error("找不到來源網頁，請先在瀏覽器開啟此聊天的來源網址，再重新載入頁面資料。");
     if (!tab?.id || !/^https?:\/\//i.test(tab.url || "")) throw new Error("請先開啟可讀取的 HTTP／HTTPS 網頁。");
     let results;
     try {
       results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => {
-          const fullText = (document.body?.innerText || "").trim();
+          const rawText = (document.body?.innerText || "").trim();
+          const contentSelector = "main, article, [role='main']";
+          const excluded = new Set([...document.querySelectorAll("nav, [role='navigation'], [role='banner'], [role='contentinfo'], body > header, body > footer")]
+            .filter(element => !element.closest(contentSelector) && !element.querySelector(contentSelector)));
+          const readContent = node => {
+            if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+            if (!(node instanceof HTMLElement) || excluded.has(node)) return "";
+            const style = getComputedStyle(node);
+            if (style.display === "none" || style.visibility === "hidden" || style.visibility === "collapse") return "";
+            if (["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT"].includes(node.tagName)) return "";
+            if (node.tagName === "BR") return "\n";
+            const hasExcluded = [...excluded].some(element => node.contains(element));
+            const text = hasExcluded ? [...node.childNodes].map(readContent).join("") : node.innerText;
+            return style.display === "inline" || style.display === "contents" ? text : `\n${text}\n`;
+          };
+          const filteredText = excluded.size ? (readContent(document.body) || "").trim() : rawText;
+          const fullText = filteredText || rawText;
           const truncated = fullText.length > 32000;
           return {
             title: document.title.slice(0, 500),
             url: location.href,
             text: truncated ? fullText.slice(0, 20000) + "\n\n[中間內容已省略]\n\n" + fullText.slice(-12000) : fullText,
-            originalLength: fullText.length,
+            originalLength: rawText.length,
+            cleaned: fullText !== rawText,
             truncated,
             capturedAt: new Date().toISOString(),
           };
@@ -651,6 +718,7 @@ async function loadPage() {
       throw new Error("無法讀取此分頁。請確認網站存取權限，並在目標網頁點擊 extension 圖示後重試。");
     }
     const page = results[0]?.result;
+    if (sourceUrl && page?.url !== sourceUrl) throw new Error("來源分頁已切換網址，未更新資料。請重新開啟原本的來源網頁。");
     if (!page?.text) throw new Error("網頁尚無可讀取文字，請等待內容載入後重試。");
     const url = new URL(page.url);
     if (!["https:", "http:"].includes(url.protocol)) throw new Error("網頁已切換，請重新載入。");
@@ -666,6 +734,7 @@ async function loadPage() {
         return;
       }
       session.messages = [];
+      session.quickCache = {};
       session.historyTrimmed = false;
       session.contextTrimmed = false;
     }
@@ -788,10 +857,11 @@ async function openLegacyTool(tool) {
 elements["open-regression"].addEventListener("click", () => openLegacyTool("regression"));
 elements["open-log"].addEventListener("click", () => openLegacyTool("log"));
 elements["load-page"].addEventListener("click", loadPage);
+elements["reload-page"].addEventListener("click", () => loadPage(true));
 for (const button of elements["quick-actions"].querySelectorAll("button[data-prompt]")) {
   button.addEventListener("click", () => {
     const action = QUICK_PROMPTS[button.dataset.prompt];
-    if (action) sendQuestion(action.prompt, action.displayText);
+    if (action) sendQuestion(action.prompt, action.displayText, { quickId: button.dataset.prompt });
   });
 }
 elements.composer.addEventListener("submit", event => {
@@ -1024,8 +1094,9 @@ elements.sessions.addEventListener("keydown", event => {
 });
 elements["clear-chat"].addEventListener("click", async () => {
   const session = currentSession();
-  if (busy || !session || !window.confirm("清除此網頁的聊天紀錄？網頁快照會保留。")) return;
+  if (busy || !session || !window.confirm("清除此網頁的聊天紀錄與快速提問快取？網頁快照會保留。")) return;
   session.messages = [];
+  session.quickCache = {};
   session.historyTrimmed = false;
   session.contextTrimmed = false;
   elements.question.value = "";
