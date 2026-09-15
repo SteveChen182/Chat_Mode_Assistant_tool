@@ -99,9 +99,12 @@ function updateScrollButton() {
   return atBottom;
 }
 
-function scrollToLatest() {
+function scrollToLatest(smooth = false) {
   followLatest = true;
-  elements.messages.scrollTop = elements.messages.scrollHeight;
+  elements.messages.scrollTo({
+    top: elements.messages.scrollHeight,
+    behavior: smooth && !window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "instant",
+  });
   updateScrollButton();
 }
 
@@ -250,6 +253,13 @@ function render() {
     if (session.contextTrimmed) notices.push("上次請求因長度限制，未包含部分較早對話。");
     elements["source-warning"].textContent = notices.join(" ");
     for (const message of session.messages) {
+      if (message.role === "snapshot") {
+        const divider = document.createElement("div");
+        divider.className = "snapshot-divider";
+        divider.textContent = message.content;
+        elements.messages.append(divider);
+        continue;
+      }
       const article = document.createElement("article");
       article.className = `message ${message.role}${message.status === "failed" ? " failed" : ""}`;
       const label = document.createElement("div");
@@ -572,7 +582,7 @@ function buildMessages(session, question, independent = false) {
     hsdId: page.hsdId, title: page.title, url: page.url,
     capturedAt: independent ? undefined : page.capturedAt, truncated: page.truncated, text: page.text,
   });
-  const completed = independent ? [] : session.messages.filter(message => message.status === "done" && !message.historyExcluded);
+  const completed = independent ? [] : session.messages.filter(message => message.status === "done" && !message.historyExcluded && ["user", "assistant"].includes(message.role));
   const report = satJobs.get(page.hsdId)?.report;
   const useReport = session.satReportEnabled !== false && report?.hsdId === page.hsdId && typeof report?.text === "string";
   const reportText = useReport ? report.text : "";
@@ -667,6 +677,39 @@ async function sendQuestion(text, displayText, { quickId, force = false } = {}) 
   }
 }
 
+function reloadSourceTab(tabId, sourceUrl, navigate = false) {
+  return new Promise((resolve, reject) => {
+    let loading = false;
+    const finish = error => {
+      clearTimeout(timeout);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      chrome.tabs.onRemoved.removeListener(onRemoved);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onUpdated = (updatedId, change, tab) => {
+      if (updatedId !== tabId) return;
+      if (navigate && tab.url === "about:blank" && (!change.url || change.url === "about:blank")) return;
+      if (change.url && change.url !== sourceUrl) {
+        finish(new Error("來源分頁已切換網址，未更新聊天資料。"));
+        return;
+      }
+      if (change.status === "loading") loading = true;
+      if (loading && change.status === "complete") {
+        finish(tab.url === sourceUrl ? null : new Error("來源分頁已切換網址，未更新聊天資料。"));
+      }
+    };
+    const onRemoved = removedId => {
+      if (removedId === tabId) finish(new Error("來源分頁已關閉，未更新聊天資料。"));
+    };
+    const timeout = setTimeout(() => finish(new Error("重新整理網頁逾時，已保留原本聊天資料。")), 45000);
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.onRemoved.addListener(onRemoved);
+    const request = navigate ? chrome.tabs.update(tabId, { url: sourceUrl }) : chrome.tabs.reload(tabId);
+    request.catch(() => finish(new Error("無法載入來源分頁，已保留原本聊天資料。")));
+  });
+}
+
 async function loadPage(refreshCurrent = false) {
   if (!ready || busy) return;
   const sourceUrl = refreshCurrent === true ? currentSession()?.page.url : null;
@@ -675,16 +718,62 @@ async function loadPage(refreshCurrent = false) {
   showStatus("正在擷取網頁…");
   try {
     const tabs = await chrome.tabs.query(sourceUrl ? {} : { active: true, currentWindow: true });
-    const tab = sourceUrl
+    let tab = sourceUrl
       ? tabs.find(item => item.url === sourceUrl && item.active) || tabs.find(item => item.url === sourceUrl)
       : tabs[0];
-    if (sourceUrl && !tab) throw new Error("找不到來源網頁，請先在瀏覽器開啟此聊天的來源網址，再重新載入頁面資料。");
-    if (!tab?.id || !/^https?:\/\//i.test(tab.url || "")) throw new Error("請先開啟可讀取的 HTTP／HTTPS 網頁。");
+    let openedSource = false;
+    if (sourceUrl && !tab) {
+      if (!/^https?:\/\//i.test(sourceUrl)) throw new Error("來源網址不是可讀取的 HTTP／HTTPS 網頁。");
+      if (!window.confirm(`找不到來源分頁。是否重新開啟此網址，並載入最新資料？\n\n${sourceUrl}`)) {
+        showStatus("已取消重新開啟，保留原本的網頁快照與對話。");
+        return;
+      }
+      tab = await chrome.tabs.create({ url: "about:blank", active: true });
+      openedSource = true;
+    }
+    if (!tab?.id || (!openedSource && !/^https?:\/\//i.test(tab.url || ""))) throw new Error("請先開啟可讀取的 HTTP／HTTPS 網頁。");
+    if (sourceUrl) {
+      showStatus(openedSource ? "正在重新開啟來源網頁…" : "正在重新整理來源網頁…");
+      await reloadSourceTab(tab.id, sourceUrl, openedSource);
+      showStatus("正在等待網頁內容載入…");
+    }
     let results;
     try {
       results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: () => {
+        args: [sourceUrl],
+        func: async expectedUrl => {
+          if (expectedUrl) {
+            const settled = await new Promise(resolve => {
+              const startedAt = Date.now();
+              let lastText = "";
+              let stableSince = startedAt;
+              const timer = setInterval(() => {
+                if (location.href !== expectedUrl) {
+                  clearInterval(timer);
+                  resolve(false);
+                  return;
+                }
+                const now = Date.now();
+                const text = (document.body?.innerText || "").trim();
+                const loading = [...document.querySelectorAll('[aria-busy="true"], [role="progressbar"]')]
+                  .some(element => element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
+                if (text !== lastText || loading) {
+                  lastText = text;
+                  stableSince = now;
+                }
+                const ready = document.readyState === "complete" && text && !loading && now - startedAt >= 3000 && now - stableSince >= 1500;
+                if (ready || now - startedAt >= 30000) {
+                  clearInterval(timer);
+                  resolve(!!ready);
+                }
+              }, 500);
+            });
+            if (!settled) return { captureError: "網頁內容尚未穩定或網址已變更，已保留原本聊天資料。請待頁面載入完成後重試。" };
+            const loginRequired = [...document.querySelectorAll('input[type="password"]')]
+              .some(element => element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
+            if (loginRequired) return { captureError: "來源網頁需要登入，已保留原本聊天資料。請先在網頁完成登入，再重新載入頁面資料。" };
+          }
           const rawText = (document.body?.innerText || "").trim();
           const contentSelector = "main, article, [role='main']";
           const excluded = new Set([...document.querySelectorAll("nav, [role='navigation'], [role='banner'], [role='contentinfo'], body > header, body > footer")]
@@ -718,6 +807,7 @@ async function loadPage(refreshCurrent = false) {
       throw new Error("無法讀取此分頁。請確認網站存取權限，並在目標網頁點擊 extension 圖示後重試。");
     }
     const page = results[0]?.result;
+    if (page?.captureError) throw new Error(page.captureError);
     if (sourceUrl && page?.url !== sourceUrl) throw new Error("來源分頁已切換網址，未更新資料。請重新開啟原本的來源網頁。");
     if (!page?.text) throw new Error("網頁尚無可讀取文字，請等待內容載入後重試。");
     const url = new URL(page.url);
@@ -728,15 +818,18 @@ async function loadPage(refreshCurrent = false) {
     page.hsdId = match?.[1] || null;
     const id = page.hsdId ? `hsd:${page.hsdId}` : page.url;
     let session = state.sessions.find(item => item.id === id);
-    if (session && session.messages.length && session.page.text !== page.text) {
-      if (!window.confirm("網頁內容已有變更。更新快照將清除這個網頁的聊天紀錄，是否繼續？")) {
-        showStatus("已保留原本的網頁快照與對話。");
-        return;
+    if (session && (refreshCurrent === true || session.page.text !== page.text)) {
+      for (const message of session.messages) message.historyExcluded = true;
+      if (session.messages.length) {
+        session.messages.push({
+          role: "snapshot", status: "done", historyExcluded: true,
+          content: `資料已更新 · ${new Date(page.capturedAt).toLocaleString()}\n以上對話參考更新前的資料；以下新回答使用最新擷取資料。`,
+        });
       }
-      session.messages = [];
       session.quickCache = {};
-      session.historyTrimmed = false;
       session.contextTrimmed = false;
+      trimHistory(session);
+      followLatest = true;
     }
     if (!session) {
       if (state.sessions.length >= MAX_SESSIONS) throw new Error("已達 10 個網頁紀錄上限，請先刪除不需要的紀錄。");
@@ -875,7 +968,7 @@ elements.question.addEventListener("keydown", event => {
   }
 });
 elements.cancel.addEventListener("click", () => requestController?.abort());
-elements["scroll-bottom"].addEventListener("click", scrollToLatest);
+elements["scroll-bottom"].addEventListener("click", () => scrollToLatest(true));
 elements.messages.addEventListener("scroll", () => {
   followLatest = updateScrollButton();
 }, { passive: true });
@@ -917,6 +1010,13 @@ elements["save-chat"].addEventListener("click", () => {
     const transcript = output.createElement("main");
     transcript.id = "messages";
     for (const message of session.messages) {
+      if (message.role === "snapshot") {
+        const divider = output.createElement("div");
+        divider.className = "snapshot-divider";
+        divider.textContent = message.content;
+        transcript.append(divider);
+        continue;
+      }
       const article = output.createElement("article");
       article.className = `message ${message.role === "user" ? "user" : "assistant"}`;
       const label = output.createElement("div");
