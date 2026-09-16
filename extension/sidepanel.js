@@ -795,10 +795,14 @@ function onUsage(usage) {
   }
 }
 
+let _satLatestReply = "";
+let _satReturningReport = false;
+
 function onReady(accumulatedAnswer) {
   // AI finished responding, waiting for user input
   isStreaming = false;
   removeToolIndicator();
+  const completedReply = currentAiText;
   finalizeAiMsg();
 
   // Update status to Connected (handles initial toolkit-loaded ready too)
@@ -836,7 +840,8 @@ function onReady(accumulatedAnswer) {
 
   if (_satHsdId) {
     const lastReply = [...sessionMessages].reverse().find(message => message.role === "assistant")?.content || "";
-    const reportText = accumulatedAnswer || lastReply;
+    const reportText = accumulatedAnswer || completedReply || lastReply;
+    _satLatestReply = reportText;
     document.getElementById("sat-return-report").disabled = !reportText;
     if (reportText) _publishSatReply(reportText).catch(() => addSystemMsg("SAT 報告回傳失敗，請使用回傳按鈕重試。"));
   }
@@ -3215,6 +3220,7 @@ function _setSatStatus(status) {
 }
 
 async function _publishSatReply(text, manual = false) {
+  if (!_satHsdId || !_satRunId) throw new Error("缺少 SAT 工作資訊，請從主程式重新開啟 SAT 分析。");
   const begin = `[[SAT_REPORT_BEGIN:${_satRunId}]]`;
   const end = `[[SAT_REPORT_END:${_satRunId}]]`;
   const lines = text.split(/\r?\n/);
@@ -3225,22 +3231,43 @@ async function _publishSatReply(text, manual = false) {
     await _updateSatJob({ status: "awaiting_input" });
     return;
   }
-  if (content.length > 120000) throw new Error("Report exceeds storage limit");
+  if (content.length > 120000) throw new Error("報告超過 120,000 字元，無法回傳。請先保留原始報告。");
   const stored = await chrome.storage.local.get(`satJob_${_satHsdId}`);
-  if (stored[`satJob_${_satHsdId}`]?.report?.runId === _satRunId && stored[`satJob_${_satHsdId}`].report.text === content) return;
+  if (stored[`satJob_${_satHsdId}`]?.runId !== _satRunId) throw new Error("此 SAT 工作已失效或被新工作取代，請回到主程式確認目前的分析工作。");
+  if (stored[`satJob_${_satHsdId}`]?.report?.runId === _satRunId && stored[`satJob_${_satHsdId}`].report.text === content) {
+    if (manual) addSystemMsg("這份 SAT 報告已回傳。請在主程式同一個 HSD 的 What's Next 區域按「查看報告」。");
+    return;
+  }
   const returned = await _updateSatJob({
     status: "completed",
     report: { runId: _satRunId, hsdId: _satHsdId, text: content, receivedAt: Date.now(), source: manual ? "user_confirmed" : "sat_final_marker" },
   });
-  if (returned) addSystemMsg("SAT 報告已回傳至原本的 HSD 網頁聊天，可作為後續提問的參考資料。");
+  if (!returned) throw new Error("SAT 工作狀態已變更，報告未回傳，請回到主程式確認。");
+  addSystemMsg("SAT 報告已回傳至原本的 HSD 網頁聊天，可在 What's Next 區域按「查看報告」，並作為後續提問的參考資料。");
 }
 
 document.getElementById("sat-return-report").addEventListener("click", async () => {
-  if (!_satHsdId || isStreaming) return;
-  const reply = [...sessionMessages].reverse().find(message => message.role === "assistant")?.content;
-  if (!reply || !window.confirm("將目前最後一則 SAT 回覆作為報告傳回網頁聊天？請確認它不是附件選單或進度訊息。")) return;
-  try { await _publishSatReply(reply, true); } catch {
-    addSystemMsg("報告回傳失敗。報告可能過長或本機儲存空間不足，請先保留原始報告。");
+  if (_satReturningReport) return;
+  if (isStreaming) {
+    addSystemMsg("SAT 還在回覆中，請等回覆完成後再回傳報告。");
+    return;
+  }
+  const reply = _satLatestReply || [...sessionMessages].reverse().find(message => message.role === "assistant")?.content;
+  if (!reply) {
+    addSystemMsg("目前沒有可回傳的 SAT 回覆，請先完成分析。");
+    return;
+  }
+  if (!window.confirm("將目前最後一則 SAT 回覆作為報告傳回網頁聊天？請確認它不是附件選單或進度訊息。")) return;
+  const button = document.getElementById("sat-return-report");
+  _satReturningReport = true;
+  button.disabled = true;
+  try {
+    await _publishSatReply(reply, true);
+  } catch (error) {
+    addSystemMsg(`報告回傳失敗：${error.message || "本機儲存失敗，請先保留原始報告。"}`);
+  } finally {
+    _satReturningReport = false;
+    button.disabled = isStreaming;
   }
 });
 

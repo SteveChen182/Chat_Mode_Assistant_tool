@@ -1260,6 +1260,12 @@ chrome.storage.onChanged.addListener((changes, area) => {
       if (!match) continue;
       if (change.newValue?.hsdId === match[1]) satJobs.set(match[1], change.newValue);
       else satJobs.delete(match[1]);
+      const report = change.newValue?.report;
+      if (ready && report?.text && report.hsdId === currentSession()?.page.hsdId &&
+          (report.receivedAt !== change.oldValue?.report?.receivedAt || report.text !== change.oldValue?.report?.text)) {
+        elements["quick-panel"].open = true;
+        showStatus("已收到 SAT 報告，可在 What's Next 查看報告或繼續提問。", "success");
+      }
       updated = true;
     }
     if (updated && ready) renderSatState();
