@@ -7,8 +7,25 @@ const REMEMBERED_AUTH_KEY = "webChatRememberedOAuth2";
 const STATE_KEY = "webChatState";
 const MODEL_KEY = "webChatModel";
 const FONT_KEY = "webChatFontSize";
+const CHAT_VIEW_KEY = "webChatViewTransfer";
+const chatPopup = new URLSearchParams(location.search).get("chatPopup") === "1";
+const chatViewId = crypto.randomUUID();
+const chatViewChannel = new BroadcastChannel("webChatView");
+let chatHostWindowId = null;
+let chatWindowId = null;
+let releaseChatView = null;
+let acquiringChatView = false;
+let switchingChatView = false;
+let chatHandoffTimer = null;
+let chatAcquirePending = false;
 const MAX_SESSIONS = 10;
 const REQUEST_TIMEOUT = 90000;
+const SAT_SECTIONS = {
+  checklist: { title: "DFD Checklist", match: /DFD\s+Checklist|DFD\s*檢查|Checklist\s*合規/i },
+  triage: { title: "Triage & Troubleshooting", match: /Triage\s*(?:&|and)\s*Troubleshooting|分流與故障排除/i },
+  similar: { title: "Similar HSDs", match: /Similar\s+HSDs|相似\s*HSD|相似案例/i },
+  executive: { title: "Executive Summary & Recommendations", match: /Executive\s+Summary|執行摘要與建議/i },
+};
 const QUICK_PROMPTS = {
   summary: {
     displayText: "摘要問題",
@@ -24,7 +41,7 @@ const QUICK_PROMPTS = {
   },
   "latest-status": {
     displayText: "最新狀態",
-    prompt: "請告訴我目前的狀態，還有整理comment的大綱(table style 列出每位說了那些建議)。",
+    prompt: "請告訴我issue在網頁上最新的狀態，還有整理comment的大綱(分成兩個tabletable style 1.列出每位說了那些建議 2.如果有納入SAT報告 另外產生一個SAT分析的table)。",
   },
 };
 const elements = Object.fromEntries(
@@ -49,16 +66,86 @@ let followLatest = true;
 let renderedSessionId = null;
 let closedSessions = [];
 let closeUndoTimer = null;
+let pendingStateSave = Promise.resolve(true);
+let clearingClosedSessions = false;
+let quickPanelAnimation = null;
+let quickPanelExpanded = false;
+
+function setQuickPanelExpanded(expanded) {
+  const panel = elements["quick-panel"];
+  if (quickPanelExpanded === expanded && (quickPanelAnimation || panel.open === expanded)) return;
+  quickPanelExpanded = expanded;
+  const startHeight = panel.getBoundingClientRect().height;
+  quickPanelAnimation?.cancel();
+  quickPanelAnimation = null;
+  if (panel.hidden || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    panel.open = expanded;
+    panel.style.overflow = "";
+    return;
+  }
+  panel.open = expanded;
+  const endHeight = panel.getBoundingClientRect().height;
+  panel.open = true;
+  panel.style.overflow = "hidden";
+  const animation = panel.animate([
+    { height: `${startHeight}px` }, { height: `${endHeight}px` },
+  ], { duration: 220, easing: "ease-in-out" });
+  quickPanelAnimation = animation;
+  animation.onfinish = () => {
+    if (quickPanelAnimation !== animation) return;
+    panel.open = expanded;
+    panel.style.overflow = "";
+    quickPanelAnimation = null;
+  };
+}
+
+elements["quick-panel"].querySelector("summary").addEventListener("click", event => {
+  event.preventDefault();
+  setQuickPanelExpanded(!quickPanelExpanded);
+});
 
 function updateCloseUndo() {
   clearTimeout(closeUndoTimer);
-  closedSessions = closedSessions.filter(entry => entry.expiresAt > Date.now());
-  elements["undo-close"].hidden = !closedSessions.length;
-  elements["undo-close"].disabled = !ready || !!busy || !closedSessions.length;
-  const latest = closedSessions[closedSessions.length - 1];
+  const restorable = closedSessions.filter(entry => entry.expiresAt > Date.now());
+  elements["undo-close"].hidden = !restorable.length;
+  elements["undo-close"].disabled = !ready || !!busy || !restorable.length;
+  const latest = restorable[restorable.length - 1];
   if (latest) {
     elements["undo-close"].title = `復原 ${latest.session.page.hsdId || latest.session.page.title}（關閉後 30 秒內）`;
-    closeUndoTimer = setTimeout(updateCloseUndo, Math.max(1, Math.min(...closedSessions.map(entry => entry.expiresAt)) - Date.now()));
+  }
+  if (closedSessions.length && ready && !clearingClosedSessions) {
+    closeUndoTimer = setTimeout(clearExpiredSessions, Math.max(1000, Math.min(...closedSessions.map(entry => entry.expiresAt)) - Date.now()));
+  }
+}
+
+async function clearExpiredSessions() {
+  if (!ready || busy || satOpening || switchingChatView || clearingClosedSessions) {
+    updateCloseUndo();
+    return;
+  }
+  clearingClosedSessions = true;
+  setBusy("deleting");
+  try {
+    for (const entry of [...closedSessions]) {
+      if (entry.expiresAt > Date.now()) continue;
+      const hsdId = entry.session.page.hsdId;
+      if (!state.sessions.some(session => session.id === entry.session.id) && hsdId) {
+        const result = await chrome.runtime.sendMessage({ action: "delete_webchat_sat", hsdId });
+        if (!result?.ok) throw new Error(result?.error || "SAT 資料清除失敗，稍後重試。");
+        satJobs.delete(hsdId);
+        satClosedWindows.delete(hsdId);
+      }
+      closedSessions = closedSessions.filter(item => item !== entry);
+      if (!await persistState()) {
+        closedSessions.push(entry);
+        throw new Error("刪除紀錄儲存失敗，稍後重試。");
+      }
+    }
+  } catch (error) {
+    showStatus(error.message, "error");
+  } finally {
+    clearingClosedSessions = false;
+    setBusy("");
   }
 }
 
@@ -142,6 +229,7 @@ function showStatus(text, kind = "", target = "status") {
 }
 
 function updateControls() {
+  elements["chat-window-toggle"].disabled = !ready || !!busy || satOpening || switchingChatView;
   const hasSession = !!currentSession();
   elements["save-chat"].disabled = !ready || !hasSession || !!busy || !currentSession()?.messages.length;
   elements["quick-panel"].hidden = !hasSession;
@@ -150,9 +238,10 @@ function updateControls() {
   elements["open-regression"].hidden = localStorage.getItem("feature_regression") === "false";
   elements["sat-actions"].hidden = !hasHsd;
   elements["sat-analysis"].hidden = !hasHsd;
-  elements["sat-analysis"].disabled = !ready || !hasHsd || satOpening || busy === "loading";
-  elements["open-regression"].disabled = !ready || !hasHsd || satOpening || busy === "loading";
-  elements["open-log"].disabled = !ready || satOpening || busy === "loading";
+  elements["sat-analysis"].disabled = !ready || !hasHsd || satOpening || busy === "loading" || busy === "deleting" || switchingChatView;
+  elements["open-regression"].disabled = !ready || !hasHsd || satOpening || busy === "loading" || switchingChatView;
+  elements["open-log"].disabled = !ready || satOpening || busy === "loading" || switchingChatView;
+  elements["sat-include"].disabled = !ready || switchingChatView;
   elements["load-page"].disabled = !ready || !!busy;
   elements["reload-page"].disabled = !ready || !!busy || !hasSession;
   for (const tab of elements.sessions.querySelectorAll("button")) {
@@ -167,6 +256,13 @@ function updateControls() {
   for (const button of elements["quick-actions"].querySelectorAll("button[data-prompt]")) {
     button.disabled = !ready || !!busy || !hasSession;
   }
+  const hasSatReport = !!satJobs.get(currentSession()?.page.hsdId)?.report?.text;
+  const showSatSections = hasSatReport && currentSession()?.satReportEnabled !== false;
+  elements["sat-report-actions"].hidden = !showSatSections;
+  for (const button of elements["quick-actions"].querySelectorAll("button[data-sat-section]")) {
+    button.hidden = !showSatSections;
+    button.disabled = !ready || !!busy || switchingChatView || !showSatSections;
+  }
   elements.cancel.disabled = !requestController;
   elements.messages.setAttribute("aria-busy", String(busy === "chat"));
   for (const control of ["settings-save", "test-connection", "clear-token", "token", "remember-token", "model", "model-menu", "refresh-models"]) {
@@ -174,7 +270,7 @@ function updateControls() {
   }
   elements["settings-close"].disabled = busy === "settings";
   for (const retry of elements.messages.querySelectorAll("button")) {
-    retry.disabled = !!busy || !tokenAvailable();
+    retry.disabled = !ready || !!busy || !tokenAvailable();
   }
 }
 
@@ -198,7 +294,7 @@ function render() {
   const changedSession = renderedSessionId !== state.activeId;
   if (changedSession) {
     followLatest = true;
-    elements["quick-panel"].open = true;
+    setQuickPanelExpanded(false);
     renderedSessionId = state.activeId;
   }
   renderSatState();
@@ -261,16 +357,16 @@ function render() {
         continue;
       }
       const article = document.createElement("article");
-      article.className = `message ${message.role}${message.status === "failed" ? " failed" : ""}`;
+      article.className = `message ${message.role === "sat" ? "assistant" : message.role}${message.status === "failed" ? " failed" : ""}`;
       const label = document.createElement("div");
       label.className = "message-label";
-      label.textContent = message.role === "user" ? "你" : `GNAI · ${message.model || selectedModel}`;
+      label.textContent = message.role === "sat" ? message.displayText : message.role === "user" ? "你" : `GNAI · ${message.model || selectedModel}`;
       if (message.status === "pending") label.textContent += " · 等待回覆";
       if (message.status === "failed") label.textContent += " · 未完成";
       if (message.cached) label.textContent += ` · 使用先前結果 · ${new Date(message.generatedAt).toLocaleString()}`;
       const content = document.createElement("div");
       content.className = "message-content";
-      if (message.role === "assistant") renderMarkdownContent(content, message.content);
+      if (["assistant", "sat"].includes(message.role)) renderMarkdownContent(content, message.content);
       else content.textContent = message.displayText || message.content;
       article.append(label, content);
       if (message.status === "failed" && message.role === "user") {
@@ -322,23 +418,31 @@ function render() {
   }
 }
 
-async function persistState() {
-  try {
-    await chrome.storage.local.set({ [STATE_KEY]: state });
+function persistState() {
+  if (!ready || !releaseChatView) return Promise.resolve(false);
+  const snapshot = structuredClone({ ...state, closedSessions });
+  pendingStateSave = pendingStateSave.then(async () => {
+    await chrome.storage.local.set({ [STATE_KEY]: snapshot });
     return true;
-  } catch {
+  }).catch(() => {
     showStatus("本機紀錄儲存失敗；目前對話仍在畫面中，關閉後可能遺失。", "error");
     return false;
-  }
+  });
+  return pendingStateSave;
 }
 
 function trimHistory(session) {
-  let total = session.messages.reduce((sum, message) => sum + message.content.length, 0);
-  while (session.messages.length > 40 || total > 120000) {
-    total -= session.messages.shift().content.length;
+  const history = session.messages.filter(message => message.role !== "sat");
+  let total = history.reduce((sum, message) => sum + message.content.length, 0);
+  while (history.length > 40 || total > 120000) {
+    const removed = history.shift();
+    total -= removed.content.length;
+    session.messages.splice(session.messages.indexOf(removed), 1);
     session.historyTrimmed = true;
   }
-  while (session.messages[0]?.role === "assistant") session.messages.shift();
+  while (history[0]?.role === "assistant") {
+    session.messages.splice(session.messages.indexOf(history.shift()), 1);
+  }
 }
 
 function updateTokenState() {
@@ -526,7 +630,7 @@ async function requestCompletion(messages, connectionTest = false) {
     controller.abort();
   }, REQUEST_TIMEOUT);
   const reasoningModel = /^(o\d|gpt-5)/i.test(selectedModel);
-  const tokenLimit = connectionTest && !reasoningModel ? 32 : 2000;
+  const tokenLimit = connectionTest ? (reasoningModel ? 2000 : 32) : (reasoningModel ? 8000 : 2000);
   try {
     const response = await fetch(CHAT_ENDPOINT, {
       method: "POST",
@@ -559,10 +663,26 @@ async function requestCompletion(messages, connectionTest = false) {
       if (controller.signal.aborted) throw new Error("請求中斷。");
       throw new Error("GNAI 回傳的資料不是有效 JSON。");
     }
-    const choice = data.choices?.[0];
+    const choice = data?.choices?.[0];
     if (choice?.finish_reason === "content_filter") throw new Error("GNAI 內容政策限制了這次回覆。");
     const content = choice?.message?.content || choice?.message?.refusal;
-    if (typeof content !== "string" || !content.trim()) throw new Error("GNAI 未回傳文字內容，請檢查模型或稍後重試。");
+    if (typeof content !== "string" || !content.trim()) {
+      const formatUsage = value => Number.isSafeInteger(value) && value >= 0 ? String(value) : "未提供";
+      const finishReason = ["stop", "length", "tool_calls", "function_call", "content_filter"].includes(choice?.finish_reason)
+        ? choice.finish_reason : choice?.finish_reason == null ? "未提供" : "未知";
+      const diagnostics = [
+        `模型：${selectedModel}`,
+        `finish_reason：${finishReason}`,
+        `輸入 tokens：${formatUsage(data?.usage?.prompt_tokens)}`,
+        `輸出 tokens（含推理）：${formatUsage(data?.usage?.completion_tokens)}`,
+        `推理 tokens：${formatUsage(data?.usage?.completion_tokens_details?.reasoning_tokens)}`,
+        `${reasoningModel ? "max_completion_tokens" : "max_tokens"}：${tokenLimit}`,
+      ].join("；");
+      const hint = finishReason === "length"
+        ? "回覆因長度限制而結束；請依 token 用量確認是否需提高額度。"
+        : "尚無法確認原因，請回報以下診斷資訊。";
+      throw new Error(`GNAI 未回傳文字內容。${hint} 診斷：${diagnostics}`);
+    }
     const clipped = content.length > 16000;
     return content.slice(0, 16000).trim() + (choice.finish_reason === "length" || clipped ? "\n\n[回覆已達長度上限，可能尚未完整。]" : "");
   } catch (error) {
@@ -638,14 +758,14 @@ async function sendQuestion(text, displayText, { quickId, force = false } = {}) 
           { role: "user", content: question, displayText: displayText || question, status: "done", quickId, historyExcluded: true },
           { role: "assistant", content: cached.answer, status: "done", model: cached.model, quickId, cached: true, generatedAt: cached.generatedAt, historyExcluded: true }
         );
-        elements["quick-panel"].open = true;
+        setQuickPanelExpanded(false);
         showStatus("已顯示先前結果，未呼叫 API。", "success");
         return;
       }
     }
     if (!tokenAvailable()) throw new Error("沒有可用的快取，請先更新 OAuth2 Token。");
     setBusy("chat");
-    elements["quick-panel"].open = false;
+    setQuickPanelExpanded(false);
     message = { role: "user", content: question, displayText: displayText || question, status: "pending", ...(independent ? { quickId } : {}) };
     session.messages.push(message);
     trimHistory(session);
@@ -660,12 +780,12 @@ async function sendQuestion(text, displayText, { quickId, force = false } = {}) 
       session.quickCache ||= {};
       session.quickCache[quickId] = { key: cacheKey, answer, model: selectedModel, generatedAt: Date.now() };
     }
-    elements["quick-panel"].open = true;
+    setQuickPanelExpanded(false);
     showStatus("回覆完成。", "success");
   } catch (error) {
     if (message) message.status = "failed";
     elements.question.value = question;
-    elements["quick-panel"].open = true;
+    setQuickPanelExpanded(false);
     showStatus(error.message, "error");
   } finally {
     trimHistory(session);
@@ -717,9 +837,16 @@ async function loadPage(refreshCurrent = false) {
   setBusy("loading");
   showStatus("正在擷取網頁…");
   try {
-    const tabs = await chrome.tabs.query(sourceUrl ? {} : { active: true, currentWindow: true });
+    if (chatPopup) {
+      const host = await chrome.runtime.sendMessage({ action: "webchat_host", hostWindowId: chatHostWindowId });
+      if (!host?.ok) throw new Error(host?.error || "找不到一般 Chrome 視窗。");
+      chatHostWindowId = host.windowId;
+    }
+    const tabs = await chrome.tabs.query(sourceUrl ? {} : { active: true, windowId: chatHostWindowId });
     let tab = sourceUrl
-      ? tabs.find(item => item.url === sourceUrl && item.active) || tabs.find(item => item.url === sourceUrl)
+      ? tabs.find(item => item.url === sourceUrl && item.windowId === chatHostWindowId && item.active)
+        || tabs.find(item => item.url === sourceUrl && item.windowId === chatHostWindowId)
+        || tabs.find(item => item.url === sourceUrl && item.active) || tabs.find(item => item.url === sourceUrl)
       : tabs[0];
     let openedSource = false;
     if (sourceUrl && !tab) {
@@ -728,7 +855,7 @@ async function loadPage(refreshCurrent = false) {
         showStatus("已取消重新開啟，保留原本的網頁快照與對話。");
         return;
       }
-      tab = await chrome.tabs.create({ url: "about:blank", active: true });
+      tab = await chrome.tabs.create({ url: "about:blank", active: true, windowId: chatHostWindowId });
       openedSource = true;
     }
     if (!tab?.id || (!openedSource && !/^https?:\/\//i.test(tab.url || ""))) throw new Error("請先開啟可讀取的 HTTP／HTTPS 網頁。");
@@ -817,6 +944,9 @@ async function loadPage(refreshCurrent = false) {
       : null;
     page.hsdId = match?.[1] || null;
     const id = page.hsdId ? `hsd:${page.hsdId}` : page.url;
+    if (closedSessions.some(entry => entry.session.id === id)) {
+      throw new Error("此網頁仍在復原或待清除期間，請按「復原」，或等清除完成後再載入。");
+    }
     let session = state.sessions.find(item => item.id === id);
     if (session && (refreshCurrent === true || session.page.text !== page.text)) {
       for (const message of session.messages) message.historyExcluded = true;
@@ -839,6 +969,7 @@ async function loadPage(refreshCurrent = false) {
     session.page = page;
     state.activeId = id;
     await loadSatJob(page.hsdId);
+    appendSatReport(session);
     elements.question.value = "";
     render();
     showStatus(page.truncated ? "網頁已載入；內容過長，已標示省略區段。" : "網頁已載入。", "success");
@@ -848,6 +979,56 @@ async function loadPage(refreshCurrent = false) {
   } finally {
     setBusy("");
   }
+}
+
+function extractSatSection(text, sectionId) {
+  const section = SAT_SECTIONS[sectionId];
+  if (!section) return "";
+  text = text.replace(/\r\n?/g, "\n");
+  const boundaries = [];
+  let offset = 0;
+  for (const token of marked.lexer(text)) {
+    if (token.type !== "code" && token.type !== "html") {
+      let lineOffset = offset;
+      for (const line of token.raw.split(/(?<=\n)/)) {
+        const trimmed = line.trim();
+        const heading = trimmed.match(/^#{1,6}\s+(.+?)\s*#*$/);
+        const bold = trimmed.match(/^(?:[-*+]\s+|\d+[.)]\s+)?\*\*(.+?)\*\*\s*[:：]?$/);
+        const title = heading?.[1] || bold?.[1];
+        if (title) {
+          const numbered = /^\s*(?:\*\*)?\d[\d\uFE0F\u20E3]*[.、)\s]?/.test(title);
+          const major = numbered || Object.entries(SAT_SECTIONS).some(([key, item]) => key !== "similar" && item.match.test(title));
+          boundaries.push({ title, offset: lineOffset, major, depth: heading ? trimmed.match(/^#+/)[0].length : null });
+        } else if (/^(?:---+|___+|\*\*\*+)\s*$/.test(trimmed)) {
+          boundaries.push({ title: "", offset: lineOffset, separator: true });
+        }
+        lineOffset += line.length;
+      }
+    }
+    offset += token.raw.length;
+  }
+  const startIndex = boundaries.findIndex(boundary => section.match.test(boundary.title));
+  if (startIndex < 0) return "";
+  const start = boundaries[startIndex];
+  const end = boundaries.slice(startIndex + 1).find(boundary =>
+    boundary.separator || boundary.major || sectionId === "similar" ||
+    (start.depth !== null && boundary.depth !== null && boundary.depth <= start.depth)
+  );
+  return text.slice(start.offset, end?.offset ?? text.length).trim();
+}
+
+function appendSatReport(session) {
+  const report = satJobs.get(session?.page.hsdId)?.report;
+  if (!session || !report?.text || report.hsdId !== session.page.hsdId) return false;
+  const receipt = JSON.stringify([report.runId, report.receivedAt]);
+  if (session.satReportReceipt === receipt) return false;
+  session.messages.push({
+    role: "sat", status: "done", historyExcluded: true,
+    displayText: `HSD ${report.hsdId} · SAT 完整報告`, content: report.text,
+  });
+  session.satReportReceipt = receipt;
+  if (session.id === state.activeId) setQuickPanelExpanded(false);
+  return true;
 }
 
 async function loadSatJob(hsdId) {
@@ -880,8 +1061,19 @@ function renderSatState() {
     failed: "SAT 發生錯誤，請查看分析視窗；原聊天不受影響。",
     interrupted: "SAT 視窗已關閉，未收到本次完整報告。",
   };
-  showStatus(job ? (labels[status] || "SAT 狀態待確認。") : "尚未啟動 SAT 分析。",
+  showStatus(job ? (labels[status] || "SAT 狀態待確認。") : "",
     ["failed", "interrupted"].includes(status) ? "error" : "", "sat-status");
+  if (status === "running") {
+    const dots = document.createElement("span");
+    dots.className = "sat-dots";
+    dots.setAttribute("aria-hidden", "true");
+    for (let index = 0; index < 3; index++) {
+      const dot = document.createElement("span");
+      dot.textContent = ".";
+      dots.append(dot);
+    }
+    elements["sat-status"].replaceChildren("SAT 分析中", dots, " 原聊天可繼續使用。");
+  }
   const report = job?.report;
   const hasReport = !!report?.text && report.hsdId === session?.page.hsdId;
   elements["sat-reference"].hidden = !hasReport;
@@ -898,7 +1090,7 @@ function renderSatState() {
 
 elements["sat-analysis"].addEventListener("click", async () => {
   const session = currentSession();
-  if (!ready || satOpening || !session?.page.hsdId || busy === "loading") return;
+  if (!ready || satOpening || !session?.page.hsdId || busy === "loading" || busy === "deleting" || switchingChatView) return;
   const hsdId = session.page.hsdId;
   satOpening = true;
   updateControls();
@@ -917,8 +1109,9 @@ elements["sat-analysis"].addEventListener("click", async () => {
 });
 elements["sat-include"].addEventListener("change", async () => {
   const session = currentSession();
-  if (!session) return;
+  if (!ready || switchingChatView || !session) return;
   session.satReportEnabled = elements["sat-include"].checked;
+  updateControls();
   await persistState();
 });
 elements["sat-view-report"].addEventListener("click", () => {
@@ -930,8 +1123,30 @@ elements["sat-view-report"].addEventListener("click", () => {
   elements["sat-report-dialog"].showModal();
 });
 
+for (const button of elements["quick-actions"].querySelectorAll("button[data-sat-section]")) {
+  button.addEventListener("click", async () => {
+    if (!ready || busy || switchingChatView) return;
+    const session = currentSession();
+    if (session?.satReportEnabled === false) return;
+    const report = satJobs.get(session?.page.hsdId)?.report;
+    if (!report?.text || report.hsdId !== session?.page.hsdId) return;
+    const sectionId = button.dataset.satSection;
+    const content = extractSatSection(report.text, sectionId);
+    if (!content) return showStatus(`SAT 報告中找不到 ${SAT_SECTIONS[sectionId].title} 段落，請查看完整報告。`, "error");
+    session.messages.push({
+      role: "sat", status: "done", historyExcluded: true,
+      displayText: `SAT · ${SAT_SECTIONS[sectionId].title}`, content,
+    });
+    setQuickPanelExpanded(false);
+    followLatest = true;
+    render();
+    showStatus("已顯示 SAT 報告原文，未呼叫 API。", "success");
+    await persistState();
+  });
+}
+
 async function openLegacyTool(tool) {
-  if (!ready || satOpening || busy === "loading") return;
+  if (!ready || satOpening || busy === "loading" || switchingChatView) return;
   const page = currentSession()?.page;
   satOpening = true;
   updateControls();
@@ -1021,10 +1236,10 @@ elements["save-chat"].addEventListener("click", () => {
       article.className = `message ${message.role === "user" ? "user" : "assistant"}`;
       const label = output.createElement("div");
       label.className = "message-label";
-      label.textContent = `${message.role === "user" ? "你" : `GNAI · ${message.model || ""}`}${message.status === "failed" ? " · 未完成" : ""}`;
+      label.textContent = `${message.role === "sat" ? message.displayText : message.role === "user" ? "你" : `GNAI · ${message.model || ""}`}${message.status === "failed" ? " · 未完成" : ""}`;
       const content = output.createElement("div");
       content.className = "message-content";
-      if (message.role === "assistant") renderMarkdownContent(content, message.content);
+      if (["assistant", "sat"].includes(message.role)) renderMarkdownContent(content, message.content);
       else content.textContent = message.displayText || message.content;
       article.append(label, content);
       transcript.append(article);
@@ -1205,39 +1420,62 @@ elements["clear-chat"].addEventListener("click", async () => {
   await persistState();
 });
 async function closeSession(id) {
-  if (!ready || busy) return;
+  if (!ready || busy || satOpening) return;
   const index = state.sessions.findIndex(session => session.id === id);
   if (index < 0) return;
-  const active = state.activeId === id;
-  const [session] = state.sessions.splice(index, 1);
-  closedSessions.push({ session, index, draft: active ? elements.question.value : "", expiresAt: Date.now() + 30000 });
-  if (active) {
-    state.activeId = state.sessions[Math.min(index, state.sessions.length - 1)]?.id || null;
-    elements.question.value = "";
+  const session = state.sessions[index];
+  const previousActiveId = state.activeId;
+  const draft = elements.question.value;
+  const entry = { session, index, draft: state.activeId === id ? draft : "", expiresAt: Date.now() + 30000 };
+  setBusy("closing");
+  try {
+    state.sessions.splice(index, 1);
+    closedSessions.push(entry);
+    if (state.activeId === id) {
+      state.activeId = state.sessions[Math.min(index, state.sessions.length - 1)]?.id || null;
+      elements.question.value = "";
+    }
+    if (!await persistState()) {
+      state.sessions.splice(index, 0, session);
+      closedSessions = closedSessions.filter(item => item !== entry);
+      state.activeId = previousActiveId;
+      elements.question.value = draft;
+      throw new Error("無法儲存待刪除紀錄，分頁已保留。");
+    }
+    showStatus("分頁已關閉，30 秒內可復原；逾時後才清除聊天與 SAT 紀錄。", "success");
+  } catch (error) {
+    showStatus(error.message || "清除失敗，請重試。", "error");
+  } finally {
+    setBusy("");
+    render();
+    elements.sessions.querySelector('[aria-selected="true"]')?.focus({ preventScroll: true });
   }
-  render();
-  elements.sessions.querySelector('[aria-selected="true"]')?.focus({ preventScroll: true });
-  showReadyStatus();
-  await persistState();
 }
 elements["undo-close"].addEventListener("click", async () => {
   if (!ready || busy) return;
   updateCloseUndo();
-  const entry = closedSessions[closedSessions.length - 1];
+  const entry = closedSessions.filter(item => item.expiresAt > Date.now()).at(-1);
   if (!entry) return;
   const existing = state.sessions.find(session => session.id === entry.session.id);
   if (!existing && state.sessions.length >= MAX_SESSIONS) {
     showStatus("已達 10 個網頁紀錄上限，請先關閉其他分頁再復原。", "error");
     return;
   }
-  closedSessions.pop();
-  if (!existing) state.sessions.splice(Math.min(entry.index, state.sessions.length), 0, entry.session);
-  state.activeId = entry.session.id;
-  elements.question.value = existing ? "" : entry.draft;
-  render();
-  elements.sessions.querySelector('[aria-selected="true"]')?.focus({ preventScroll: true });
-  showStatus(existing ? "此網頁已重新開啟，已切回現有分頁並保留新紀錄。" : "分頁與對話已復原。", "success");
-  await persistState();
+  setBusy("restoring");
+  try {
+    closedSessions = closedSessions.filter(item => item !== entry);
+    if (!existing) state.sessions.splice(Math.min(entry.index, state.sessions.length), 0, entry.session);
+    state.activeId = entry.session.id;
+    await loadSatJob(entry.session.page.hsdId);
+    appendSatReport(existing || entry.session);
+    elements.question.value = existing ? "" : entry.draft;
+    render();
+    showStatus(existing ? "此網頁已重新開啟，已切回現有分頁並保留新紀錄。" : "分頁、對話與 SAT 資料已復原。", "success");
+    await persistState();
+  } finally {
+    setBusy("");
+    elements.sessions.querySelector('[aria-selected="true"]')?.focus({ preventScroll: true });
+  }
 });
 window.addEventListener("pagehide", () => requestController?.abort());
 
@@ -1248,6 +1486,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
       elements["remember-token"].checked = rememberToken;
     }
     let updated = false;
+    let reportAppended = false;
+    let visibleReportAppended = false;
     for (const [key, change] of Object.entries(changes)) {
       const closedMatch = key.match(/^satClosed_(\d{8,14})$/);
       if (closedMatch) {
@@ -1261,14 +1501,27 @@ chrome.storage.onChanged.addListener((changes, area) => {
       if (change.newValue?.hsdId === match[1]) satJobs.set(match[1], change.newValue);
       else satJobs.delete(match[1]);
       const report = change.newValue?.report;
+      if (ready && releaseChatView && !switchingChatView) {
+        for (const session of state.sessions.filter(item => item.page.hsdId === match[1])) {
+          if (appendSatReport(session)) {
+            reportAppended = true;
+            if (session.id === state.activeId) visibleReportAppended = true;
+          }
+        }
+      }
       if (ready && report?.text && report.hsdId === currentSession()?.page.hsdId &&
           (report.receivedAt !== change.oldValue?.report?.receivedAt || report.text !== change.oldValue?.report?.text)) {
-        elements["quick-panel"].open = true;
+        setQuickPanelExpanded(false);
         showStatus("已收到 SAT 報告，可在 What's Next 查看報告或繼續提問。", "success");
       }
       updated = true;
     }
-    if (updated && ready) renderSatState();
+    if (reportAppended) persistState();
+    if (visibleReportAppended) {
+      followLatest = true;
+      render();
+    } else if (updated && ready) renderSatState();
+    if (updated && ready) updateControls();
     return;
   }
   if (area !== "session" || !Object.hasOwn(changes, AUTH_KEY)) return;
@@ -1307,6 +1560,8 @@ async function initialize() {
     }
     if (Array.isArray(local[STATE_KEY]?.sessions)) {
       state = local[STATE_KEY];
+      closedSessions = Array.isArray(state.closedSessions) ? state.closedSessions : [];
+      delete state.closedSessions;
       for (const session of state.sessions) {
         for (const message of session.messages) {
           if (message.status === "pending") message.status = "failed";
@@ -1317,13 +1572,192 @@ async function initialize() {
     await Promise.all(state.sessions.map(session => loadSatJob(session.page.hsdId)));
     elements.version.textContent = `v${chrome.runtime.getManifest().version}`;
     ready = true;
+    let reportAppended = false;
+    for (const chatSession of state.sessions) {
+      if (appendSatReport(chatSession)) reportAppended = true;
+    }
+    if (reportAppended) await persistState();
     render();
     showReadyStatus();
     scheduleExpiration();
     if (!tokenAvailable()) openSettings(credential?.accessToken ? "OAuth2 Token 已過期，請更新。" : "請貼上 OAuth2 Token，以啟用網頁聊天。");
   } catch {
     showStatus("無法載入本機設定，請重新載入 extension 後再試。", "error");
+    throw new Error("無法載入聊天資料，請重試。");
   }
 }
 
-initialize();
+function pauseChatView(message) {
+  ready = false;
+  clearTimeout(expirationTimer);
+  for (const dialog of document.querySelectorAll("dialog[open]")) dialog.close();
+  updateControls();
+  elements["chat-standby-status"].textContent = message;
+  if (!elements["chat-standby"].open) elements["chat-standby"].showModal();
+}
+
+async function acquireChatView(resumeHere = false) {
+  if (releaseChatView) return;
+  if (acquiringChatView) {
+    chatAcquirePending = true;
+    return;
+  }
+  acquiringChatView = true;
+  let completeRelease;
+  const released = new Promise(resolve => { completeRelease = resolve; });
+  try {
+    const stored = await chrome.storage.session.get(CHAT_VIEW_KEY);
+    const transfer = stored[CHAT_VIEW_KEY];
+    if (!resumeHere && transfer && (transfer.popup !== chatPopup || transfer.windowId !== chatWindowId)) {
+      pauseChatView("聊天已移至另一個介面。可切到聊天視窗，或在該介面關閉後按「在此繼續」。");
+      return;
+    }
+    await navigator.locks.request("webChatSingleWriter", { ifAvailable: true }, async lock => {
+      if (!lock) {
+        pauseChatView("另一個聊天介面正在使用中，請先在該介面切換或關閉它。");
+        return;
+      }
+      const latest = (await chrome.storage.session.get(CHAT_VIEW_KEY))[CHAT_VIEW_KEY];
+      if (!resumeHere && latest && (latest.popup !== chatPopup || latest.windowId !== chatWindowId)) {
+        pauseChatView("聊天已移至另一個介面。請切到聊天視窗。");
+        return;
+      }
+      let unlock;
+      const held = new Promise(resolve => { unlock = resolve; });
+      releaseChatView = () => { unlock(); return released; };
+      try {
+        if (chatPopup && Number.isInteger(latest?.hostWindowId)) chatHostWindowId = latest.hostWindowId;
+        state = { sessions: [], activeId: null };
+        elements.question.value = "";
+        closedSessions = [];
+        renderedSessionId = null;
+        satJobs.clear();
+        satClosedWindows.clear();
+        await initialize();
+        if (latest?.view) {
+          elements.question.value = latest.view.draft || "";
+          followLatest = latest.view.followLatest !== false;
+          setQuickPanelExpanded(false);
+          resizeQuestion();
+          if (followLatest) scrollToLatest();
+          else elements.messages.scrollTop = latest.view.scrollTop || 0;
+          updateCloseUndo();
+          updateScrollButton();
+        }
+        elements["chat-standby"].close();
+        await chrome.storage.session.set({ [CHAT_VIEW_KEY]: {
+          popup: chatPopup, hostWindowId: chatHostWindowId, windowId: chatWindowId, owner: chatViewId,
+        } });
+        chatViewChannel.postMessage({ action: "ready", owner: chatViewId, popup: chatPopup });
+      } catch (error) {
+        pauseChatView(error.message);
+        unlock();
+      }
+      acquiringChatView = false;
+      await held;
+      releaseChatView = null;
+    });
+  } catch {
+    pauseChatView("無法取得聊天介面，請重新載入 extension。");
+  } finally {
+    acquiringChatView = false;
+    completeRelease();
+    if (chatAcquirePending) {
+      chatAcquirePending = false;
+      acquireChatView();
+    }
+  }
+}
+
+async function moveChatView(openPanelRequest) {
+  if (!ready || busy || satOpening || switchingChatView) return;
+  switchingChatView = true;
+  setBusy("handoff");
+  try {
+    if (openPanelRequest) await openPanelRequest;
+    if (!await persistState()) throw new Error("聊天尚未儲存，已取消切換。");
+    const view = {
+      draft: elements.question.value, scrollTop: elements.messages.scrollTop,
+      followLatest,
+    };
+    let destinationWindowId = chatHostWindowId;
+    if (!chatPopup) {
+      const result = await chrome.runtime.sendMessage({ action: "webchat_popout", hostWindowId: chatHostWindowId });
+      if (!result?.ok) throw new Error(result?.error || "無法開啟獨立視窗。");
+      destinationWindowId = result.windowId;
+    }
+    await chrome.storage.session.set({ [CHAT_VIEW_KEY]: {
+      popup: !chatPopup, hostWindowId: chatHostWindowId, windowId: destinationWindowId, view,
+    } });
+    await pendingStateSave;
+    pauseChatView("正在將聊天移至另一個介面…");
+    chatHandoffTimer = setTimeout(() => {
+      switchingChatView = false;
+      elements["chat-standby-status"].textContent = "目的介面尚未確認接手。可按「在此繼續」恢復，或切到聊天視窗查看。";
+    }, 15000);
+    await releaseChatView?.();
+    chatViewChannel.postMessage({ action: "available" });
+  } catch (error) {
+    switchingChatView = false;
+    showStatus(error.message || "視窗切換失敗，原聊天已保留。", "error");
+    if (chatPopup) {
+      try {
+        const host = await chrome.runtime.sendMessage({ action: "webchat_host", hostWindowId: chatHostWindowId });
+        if (host?.ok && host.windowId !== chatHostWindowId) {
+          chatHostWindowId = host.windowId;
+          showStatus("原瀏覽器視窗已關閉，已找到另一個一般視窗。請再按一次「回到側欄」。", "error");
+        }
+      } catch {}
+    }
+  } finally {
+    setBusy("");
+  }
+}
+
+elements["chat-window-toggle"].addEventListener("click", () => {
+  if (!ready || busy || satOpening || switchingChatView) return;
+  const request = chatPopup ? chrome.sidePanel.open({ windowId: chatHostWindowId }) : null;
+  moveChatView(request);
+});
+elements["chat-standby"].addEventListener("cancel", event => event.preventDefault());
+elements["chat-resume"].addEventListener("click", () => {
+  if (!switchingChatView) acquireChatView(true);
+});
+elements["chat-focus"].addEventListener("click", async () => {
+  try {
+    const stored = (await chrome.storage.session.get(CHAT_VIEW_KEY))[CHAT_VIEW_KEY];
+    if (!Number.isInteger(stored?.windowId)) throw new Error();
+    await chrome.windows.update(stored.windowId, { focused: true });
+  } catch {
+    elements["chat-standby-status"].textContent = "聊天視窗已關閉，請按「在此繼續」。";
+  }
+});
+chatViewChannel.addEventListener("message", event => {
+  if (event.data?.action === "available") acquireChatView();
+  if (event.data?.action === "ready" && switchingChatView && event.data.owner !== chatViewId && event.data.popup !== chatPopup) {
+    clearTimeout(chatHandoffTimer);
+    switchingChatView = false;
+    if (chatPopup) window.close();
+    else elements["chat-standby-status"].textContent = "聊天已移至獨立視窗。關閉獨立視窗後可在此繼續。";
+  }
+});
+window.addEventListener("pagehide", () => { releaseChatView?.(); chatViewChannel.close(); });
+
+(async () => {
+  pauseChatView("正在確認聊天視窗…");
+  try {
+    const ownWindow = await chrome.windows.getCurrent();
+    chatWindowId = ownWindow.id;
+    if (chatPopup) {
+      const host = await chrome.runtime.sendMessage({ action: "webchat_host", hostWindowId: Number(new URLSearchParams(location.search).get("hostWindowId")) });
+      if (!host?.ok) throw new Error(host?.error || "找不到一般 Chrome 視窗。");
+      chatHostWindowId = host.windowId;
+    } else chatHostWindowId = ownWindow.id;
+    elements["chat-window-toggle"].textContent = chatPopup ? "↙" : "↗";
+    elements["chat-window-toggle"].title = chatPopup ? "回到側欄" : "獨立視窗";
+    elements["chat-window-toggle"].setAttribute("aria-label", elements["chat-window-toggle"].title);
+    await acquireChatView();
+  } catch (error) {
+    pauseChatView(error.message || "聊天視窗初始化失敗。");
+  }
+})();

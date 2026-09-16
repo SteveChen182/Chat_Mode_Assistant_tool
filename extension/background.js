@@ -864,6 +864,36 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 let popoutWindowId = null;
 let satWindowOpening = false;
+let webchatWindowOpening = false;
+
+async function findWebchatHost(windowId) {
+  if (Number.isInteger(windowId)) {
+    try {
+      const host = await chrome.windows.get(windowId);
+      if (host.type === "normal") return host;
+    } catch {}
+  }
+  const host = await chrome.windows.getLastFocused({ windowTypes: ["normal"] });
+  if (host?.type !== "normal") throw new Error("請先開啟一般 Chrome 視窗。");
+  return host;
+}
+
+async function openWebchatWindow(hostWindowId) {
+  const host = await findWebchatHost(hostWindowId);
+  const chatPage = chrome.runtime.getURL("webchat.html");
+  const tabs = await chrome.tabs.query({ url: `${chatPage}*` });
+  const existing = tabs.find(tab => new URL(tab.url).searchParams.get("chatPopup") === "1");
+  if (existing) {
+    await chrome.windows.update(existing.windowId, { focused: true });
+    await chrome.tabs.update(existing.id, { active: true });
+    return { ok: true, windowId: existing.windowId };
+  }
+  const url = new URL(chatPage);
+  url.searchParams.set("chatPopup", "1");
+  url.searchParams.set("hostWindowId", host.id);
+  const popup = await chrome.windows.create({ url: url.href, type: "popup", width: 960, height: 900 });
+  return { ok: true, windowId: popup.id };
+}
 
 async function openSatAnalysis(message) {
   const hsdId = String(message.hsdId || "");
@@ -937,6 +967,43 @@ async function openLegacyTool(message) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.action === "delete_webchat_sat") {
+    const hsdId = String(msg.hsdId || "");
+    if (!/^\d{8,14}$/.test(hsdId) || satWindowOpening) {
+      sendResponse({ ok: false, error: "SAT 視窗正在切換或 ID 無效，請稍後再刪除。" });
+      return false;
+    }
+    satWindowOpening = true;
+    (async () => {
+      const tabs = await chrome.tabs.query({ url: `${chrome.runtime.getURL("sidepanel.html")}*` });
+      const matching = tabs.filter(tab => new URL(tab.url).searchParams.get("satHsd") === hsdId);
+      const { satActiveWindow: active } = await chrome.storage.session.get("satActiveWindow");
+      if (active?.hsdId === hsdId) await chrome.storage.session.remove("satActiveWindow");
+      for (const tab of matching) await chrome.tabs.remove(tab.id);
+      await chrome.storage.local.remove([`satJob_${hsdId}`, `satClosed_${hsdId}`]);
+      return { ok: true };
+    })().then(sendResponse).catch(error => sendResponse({ ok: false, error: error.message || "SAT 資料清除失敗。" }))
+      .finally(() => { satWindowOpening = false; });
+    return true;
+  }
+  if (msg.action === "webchat_host") {
+    findWebchatHost(msg.hostWindowId)
+      .then(host => sendResponse({ ok: true, windowId: host.id }))
+      .catch(error => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+  if (msg.action === "webchat_popout") {
+    if (webchatWindowOpening) {
+      sendResponse({ ok: false, error: "聊天視窗正在開啟，請稍後再試。" });
+      return false;
+    }
+    webchatWindowOpening = true;
+    openWebchatWindow(msg.hostWindowId)
+      .then(sendResponse)
+      .catch(error => sendResponse({ ok: false, error: error.message || "無法開啟聊天視窗。" }))
+      .finally(() => { webchatWindowOpening = false; });
+    return true;
+  }
   if (msg.action === "open_legacy_settings" || msg.action === "ensure_tool_bridge") {
     if (msg.action === "ensure_tool_bridge") {
       ensureBridgeRunning(() => {}).then(ok => sendResponse({ ok })).catch(() => sendResponse({ ok: false }));

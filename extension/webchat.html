@@ -44,14 +44,26 @@
     #quick-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding: 0 14px 12px; }
     #quick-actions button { border: 1px solid #cbd5e5; border-radius: 8px; background: white; color: #425d85; font-size: 12px; font-weight: 600; padding: 8px 6px; overflow-wrap: anywhere; box-shadow: 0 1px 3px rgb(0 0 0 / .06); }
     #quick-actions button:hover:not(:disabled) { background: #edf3fc; }
+    #sat-report-actions { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; min-width: 0; padding: 10px; border: 1px solid #a4cbb6; border-radius: 6px; background: #e3f1e9; }
+    #sat-report-actions button { min-width: 0; border-color: #a4cbb6; color: #24583b; box-shadow: none; }
+    #sat-report-actions button:hover:not(:disabled) { background: #d2e8dc; }
+    @media (max-width: 600px) { #sat-report-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     #sat-actions { padding: 0 12px 10px; }
     #quick-actions #sat-analysis { grid-column: span 2; width: 100%; background: #e3f1e9; border-color: #a4cbb6; color: #24583b; font-weight: 600; overflow-wrap: anywhere; }
     #quick-actions #sat-analysis:hover:not(:disabled) { background: #d2e8dc; }
-    #sat-status { margin-top: 4px; }
+    #sat-status { flex: 1 1 200px; min-width: 0; }
+    #sat-status:empty { display: none; }
+    .sat-dots { display: inline-flex; width: 15px; }
+    .sat-dots span { width: 5px; animation: sat-dot 1.2s step-end infinite; }
+    .sat-dots span:nth-child(2) { animation-delay: .4s; }
+    .sat-dots span:nth-child(3) { animation-delay: .8s; }
+    @keyframes sat-dot { 0%, 100% { visibility: hidden; } 33%, 66% { visibility: visible; } }
+    @media (prefers-reduced-motion: reduce) { .sat-dots span { animation: none; visibility: visible; } }
     #sat-status[data-kind="error"] { color: #a03024; }
     #sat-reference { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
     #sat-reference label { display: flex; align-items: center; gap: 6px; }
     #sat-report-content { overflow-wrap: anywhere; font: inherit; max-height: 60vh; overflow-y: auto; }
+    #sat-report-dialog { width: calc(100% - 10px); max-width: calc(100% - 10px); }
     select { width: 100%; min-width: 0; padding: 7px; border: 1px solid var(--border); border-radius: 4px; background: white; color: var(--ink); }
     .model-controls { display: flex; align-items: center; gap: 8px; }
     .primary { background: #42678f; border-color: #42678f; color: white; }
@@ -132,6 +144,7 @@
     <button id="save-chat" class="icon-button" type="button" title="儲存對話為 HTML" aria-label="儲存對話為 HTML" disabled>💾</button>
     <button id="cancel" type="button" title="停止等待目前回覆" disabled>Stop</button>
     <button id="settings-open" class="icon-button" type="button" title="Settings" aria-label="Settings" disabled>⚙</button>
+    <button id="chat-window-toggle" class="icon-button" type="button" title="獨立視窗" aria-label="獨立視窗" disabled>↗</button>
   </header>
   <div class="toolbar">
     <div class="session-controls">
@@ -149,7 +162,7 @@
     </main>
     <button id="scroll-bottom" type="button" title="回到最新訊息" aria-label="回到最新訊息" hidden>↓</button>
   </div>
-  <details id="quick-panel" hidden open>
+  <details id="quick-panel" hidden>
     <summary><span aria-hidden="true">💡</span> What's Next</summary>
     <nav id="quick-actions" aria-label="快速提問" hidden>
       <button type="button" data-prompt="summary" disabled><span aria-hidden="true">📝</span> 摘要問題</button>
@@ -157,9 +170,14 @@
       <button type="button" data-prompt="reproduce" disabled><span aria-hidden="true">🔁</span> 如何重現</button>
       <button type="button" data-prompt="latest-status" disabled><span aria-hidden="true">📊</span> 最新狀態</button>
       <button id="sat-analysis" type="button" hidden disabled><span aria-hidden="true">🔍</span> Analysis HSD by SAT</button>
+      <div id="sat-report-actions" role="group" aria-label="SAT 報告段落" hidden>
+        <button type="button" data-sat-section="checklist" hidden disabled>DFD Checklist</button>
+        <button type="button" data-sat-section="triage" hidden disabled>Triage &amp; Troubleshooting</button>
+        <button type="button" data-sat-section="similar" hidden disabled>Similar HSDs</button>
+        <button type="button" data-sat-section="executive" hidden disabled>Executive Summary &amp; Recommendations</button>
+      </div>
     </nav>
     <section id="sat-actions" hidden aria-label="SAT 分析">
-      <div id="sat-status" class="meta" role="status" aria-live="polite"></div>
       <div id="sat-reference" hidden>
         <label><input id="sat-include" type="checkbox" checked />納入 SAT 報告</label>
         <button id="sat-view-report" type="button">查看報告</button>
@@ -169,6 +187,7 @@
   </details>
   <div class="status-row">
     <div id="status" role="status" aria-live="polite">載入中…</div>
+    <div id="sat-status" class="meta" role="status" aria-live="polite"></div>
     <div id="source-meta" class="meta" aria-live="polite"></div>
   </div>
   <form id="composer">
@@ -231,6 +250,14 @@
     <form method="dialog"><button type="submit">關閉</button></form>
   </dialog>
   <script src="vendor/marked.umd.js"></script>
+  <dialog id="chat-standby" aria-labelledby="chat-standby-title">
+    <h2 id="chat-standby-title">聊天介面已暫停</h2>
+    <p id="chat-standby-status" role="status">正在確認聊天視窗…</p>
+    <div class="actions">
+      <button id="chat-focus" type="button">切到聊天視窗</button>
+      <button id="chat-resume" type="button">在此繼續</button>
+    </div>
+  </dialog>
   <script src="vendor/purify.min.js"></script>
   <script src="webchat.js"></script>
 </body>
